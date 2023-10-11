@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 type Message struct {
@@ -20,103 +20,95 @@ type Connection struct {
 	Socket *websocket.Conn
 }
 
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
 func main() {
-	var wg sync.WaitGroup
-	wg.Add(2)
-
 	events := make(chan Message)
+	connections := make(chan Connection)
+	disconnections := make(chan string)
 
-	go func(receiver chan<- Message) {
-		e := echo.New()
+	e := echo.New()
+	e.Use(middleware.CORS())
+	e.Use(middleware.Logger())
 
-		e.GET("/", func(c echo.Context) error {
-			events <- Message{Message: "Hello, World"}
-			return c.String(http.StatusOK, "Hello, World!")
-		})
+	e.GET("/", func(c echo.Context) error {
+		events <- Message{Message: "Hello, World"}
+		return c.String(http.StatusOK, "Hello, World!")
+	})
 
-		e.GET("/private", func(c echo.Context) error {
-			token := c.QueryParam("token")
 
-			events <- Message{
-				Token:   token,
-				Message: fmt.Sprintf("private message for %s", token),
-			}
+	e.GET("/private", func(c echo.Context) error {
+		token := c.QueryParam("token")
 
-			return c.String(http.StatusOK, fmt.Sprintf("Private page for %s", token))
-		})
-
-		e.Logger.Fatal(e.Start(":1323"))
-		wg.Done()
-	}(events)
-
-	go func(dispatcher <-chan Message) {
-		var upgrader = websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
+		events <- Message{
+			Token:   token,
+			Message: fmt.Sprintf("private message for %s", token),
 		}
 
-		connected := make(chan Connection)
-		disconnected := make(chan string)
-		sockets := make(map[string]*websocket.Conn)
+		return c.String(http.StatusOK, fmt.Sprintf("Private page for %s", token))
+	})
 
-		go func() {
-			for {
-				select {
-				case message := <-dispatcher:
-					log.Printf("received event: %v\n", message)
+	e.GET("/ws", func(c echo.Context) error {
+		ws, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+		if err != nil {
+			log.Print("upgrade: ", err)
+			return err
+		}
 
-					if message.Token != "" {
-						socket, ok := sockets[message.Token]
-						if ok {
-							if err := socket.WriteMessage(websocket.TextMessage, []byte(message.Message)); err != nil {
-								log.Println("write:", err)
-							}
-						} else {
-							log.Printf("socket not found: %s\n", message.Token)
-						}
-					} else {
-						for _, socket := range sockets {
-							if err := socket.WriteMessage(websocket.TextMessage, []byte(message.Message)); err != nil {
-								log.Println("write:", err)
-							}
-						}
-					}
-				case connection := <-connected:
-					log.Printf("registering socket for user: %s\n", connection.Token)
-					sockets[connection.Token] = connection.Socket
-				case token := <-disconnected:
-					log.Printf("socket disconnected for user: %s\n", token)
-					delete(sockets, token)
-				}
-			}
-		}()
+		defer ws.Close()
+		var userToken string
 
-		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			c, err := upgrader.Upgrade(w, r, nil)
+		for {
+			_, token, err := ws.ReadMessage()
 			if err != nil {
-				log.Print("upgrade:", err)
-				return
+				log.Print("read: ", err)
+				disconnections <- string(userToken)
+				break
 			}
+			userToken = string(token)
+			connections <- Connection{Token: userToken, Socket: ws}
+		}
 
-			defer c.Close()
-			var userToken string
+		return nil
+	})
 
-			for {
-				_, token, err := c.ReadMessage()
-				if err != nil {
-					log.Print("read:", err)
-					if websocket.IsCloseError(err) || websocket.IsUnexpectedCloseError(err) {
-						disconnected <- string(userToken)
-						break
+	go processEvents(events, connections, disconnections)
+
+	e.Logger.Fatal(e.Start(":1323"))
+}
+
+func processEvents(events <-chan Message, connections <-chan Connection, disconnections <-chan string) {
+	sockets := make(map[string]*websocket.Conn)
+
+	for {
+		select {
+		case message := <-events:
+			log.Printf("received event: %v\n", message)
+
+			if message.Token != "" {
+				socket, ok := sockets[message.Token]
+				if ok {
+					if err := socket.WriteMessage(websocket.TextMessage, []byte(message.Message)); err != nil {
+						log.Println("write:", err)
+					}
+				} else {
+					log.Printf("socket not found: %s\n", message.Token)
+				}
+			} else {
+				for _, socket := range sockets {
+					if err := socket.WriteMessage(websocket.TextMessage, []byte(message.Message)); err != nil {
+						log.Println("write:", err)
 					}
 				}
-				userToken = string(token)
-				connected <- Connection{Token: userToken, Socket: c}
 			}
-		})
-
-		log.Fatal(http.ListenAndServe(":8080", nil))
-		wg.Done()
-	}(events)
-
-	wg.Wait()
+		case connection := <-connections:
+			log.Printf("registering socket for user: %s\n", connection.Token)
+			sockets[connection.Token] = connection.Socket
+		case token := <-disconnections:
+			log.Printf("socket disconnected for user: %s\n", token)
+			delete(sockets, token)
+		}
+	}
 }
