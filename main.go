@@ -1,6 +1,7 @@
 package main
 
 import (
+	"api/repository"
 	"fmt"
 	"log"
 	"net/http"
@@ -38,6 +39,13 @@ func main() {
 		return c.String(http.StatusOK, "Hello, World!")
 	})
 
+	e.GET("/warehouse", func(c echo.Context) error {
+		items, err := repository.GetInventory(1)
+		if err != nil {
+			return err
+		}
+		return c.JSON(http.StatusOK, items)
+	})
 
 	e.GET("/private", func(c echo.Context) error {
 		token := c.QueryParam("token")
