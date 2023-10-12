@@ -11,31 +11,42 @@ import (
 func setup(t testing.TB, db *goqu.Database) {
 	t.Helper()
 
-	warehouse.CreateResourcesTable(db)
-	warehouse.CreateInventoriesTable(db)
+	err := db.WithTx(func(td *goqu.TxDatabase) error {
+		_, err := td.Insert("resources").Rows(
+			goqu.Record{"name": "Wood"},
+			goqu.Record{"name": "Window"},
+		).Executor().Exec()
 
-	_, err := db.Insert("resources").Rows(
-		goqu.Record{"name": "Wood"},
-		goqu.Record{"name": "Window"},
-	).Executor().Exec()
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		t.Fatal(err)
-	}
+		_, err = td.Insert("inventories").Rows(
+			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 1300, "quality": 0, "sourcing_cost": 8.57},
+			goqu.Record{"company_id": 1, "resource_id": 2, "quantity": 130, "quality": 0, "sourcing_cost": 108.3},
+			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 150, "quality": 1, "sourcing_cost": 9.05},
+		).Executor().Exec()
 
-	_, err = db.Insert("inventories").Rows(
-		goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 1300, "quality": 0, "sourcing_cost": 8.57},
-		goqu.Record{"company_id": 1, "resource_id": 2, "quantity": 130, "quality": 0, "sourcing_cost": 108.3},
-		goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 150, "quality": 1, "sourcing_cost": 9.05},
-	).Executor().Exec()
+		return err
+	})
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Cleanup(func() {
-		warehouse.RollbackResourcesTable(db)
-		warehouse.RollbackInventoriesTable(db)
+		err := db.WithTx(func(td *goqu.TxDatabase) error {
+			if _, err := td.Delete("inventories").Executor().Exec(); err != nil {
+				return err
+			}
+
+			_, err := td.Delete("resources").Executor().Exec()
+			return err
+		})
+
+		if err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 
