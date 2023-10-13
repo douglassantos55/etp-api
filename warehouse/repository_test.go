@@ -66,6 +66,9 @@ func TestGoquRepository(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if resources == nil {
+			t.Fatal("expected empty list, got nil")
+		}
 		if len(resources) != 0 {
 			t.Errorf("expected no result, got %d", len(resources))
 		}

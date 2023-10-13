@@ -23,7 +23,7 @@ func NewRepository(conn *database.Connection) Repository {
 }
 
 func (r *goquRepository) FetchInventory(companyId uint64) ([]*Resource, error) {
-	var resources []*Resource
+	resources := make([]*Resource, 0)
 
 	err := r.builder.
 		Select("r.id", "r.name", "r.image", goqu.SUM("i.quantity").As("quantity")).
