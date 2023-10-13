@@ -2,7 +2,6 @@ package warehouse
 
 import (
 	"api/database"
-	"database/sql"
 	"net/http"
 	"strconv"
 
@@ -10,12 +9,12 @@ import (
 )
 
 type Resource struct {
-	Id      uint64         `db:"id"`
-	Name    string         `db:"name"`
-	Qty     uint64         `db:"quantity"`
-	Quality uint8          `db:"quality"`
-	Cost    float64        `db:"sourcing_cost"`
-	Image   sql.NullString `db:"image"`
+	Id      uint64  `db:"id" json:"id"`
+	Name    string  `db:"name" json:"name"`
+	Qty     uint64  `db:"quantity" json:"quantity"`
+	Quality uint8   `db:"quality" json:"quality"`
+	Cost    float64 `db:"sourcing_cost" json:"cost"`
+	Image   *string `db:"image" json:"image"`
 }
 
 func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
