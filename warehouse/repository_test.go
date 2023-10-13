@@ -8,10 +8,12 @@ import (
 	"github.com/doug-martin/goqu/v9"
 )
 
-func setup(t testing.TB, db *goqu.Database) {
+func setup(t testing.TB, conn *database.Connection) {
 	t.Helper()
 
-	err := db.WithTx(func(td *goqu.TxDatabase) error {
+	builder := goqu.New(conn.Driver, conn.DB)
+
+	err := builder.WithTx(func(td *goqu.TxDatabase) error {
 		_, err := td.Insert("resources").Rows(
 			goqu.Record{"name": "Wood"},
 			goqu.Record{"name": "Window"},
@@ -35,7 +37,7 @@ func setup(t testing.TB, db *goqu.Database) {
 	}
 
 	t.Cleanup(func() {
-		err := db.WithTx(func(td *goqu.TxDatabase) error {
+		err := builder.WithTx(func(td *goqu.TxDatabase) error {
 			if _, err := td.Delete("inventories").Executor().Exec(); err != nil {
 				return err
 			}
@@ -51,17 +53,13 @@ func setup(t testing.TB, db *goqu.Database) {
 }
 
 func TestGoquRepository(t *testing.T) {
-	db, err := database.GetBuilder(database.SQLITE, "../test.db")
+	db, err := database.GetConnection(database.SQLITE, "../test.db")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	setup(t, db)
-
-	repository, err := warehouse.NewGoquRepository(db)
-	if err != nil {
-		t.Fatal(err)
-	}
+	repository := warehouse.NewRepository(db)
 
 	t.Run("should return empty list", func(t *testing.T) {
 		resources, err := repository.FetchInventory(2)

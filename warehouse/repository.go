@@ -1,8 +1,14 @@
 package warehouse
 
-import "github.com/doug-martin/goqu/v9"
+import (
+	"api/database"
+
+	"github.com/doug-martin/goqu/v9"
+	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
+)
 
 type Repository interface {
+	// Fetches the inventory of a company
 	FetchInventory(companyId uint64) ([]*Resource, error)
 }
 
@@ -10,11 +16,12 @@ type goquRepository struct {
 	builder *goqu.Database
 }
 
-func NewGoquRepository(builder *goqu.Database) (*goquRepository, error) {
-	return &goquRepository{builder}, nil
+// Creates warehouse repository
+func NewRepository(conn *database.Connection) Repository {
+	builder := goqu.New(conn.Driver, conn.DB)
+	return &goquRepository{builder}
 }
 
-// Fetches the inventory of a company
 func (r *goquRepository) FetchInventory(companyId uint64) ([]*Resource, error) {
 	var resources []*Resource
 
@@ -32,4 +39,9 @@ func (r *goquRepository) FetchInventory(companyId uint64) ([]*Resource, error) {
 	}
 
 	return resources, nil
+}
+
+// Get the stock of a company's resource, grouping by quality
+func (r *goquRepository) FetchStock(companyId, resourceId uint64) ([]any, error) {
+	return nil, nil
 }

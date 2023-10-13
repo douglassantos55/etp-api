@@ -1,7 +1,8 @@
 package main
 
 import (
-	"api/repository"
+	"api/database"
+	"api/warehouse"
 	"fmt"
 	"log"
 	"net/http"
@@ -26,6 +27,11 @@ var upgrader = websocket.Upgrader{
 }
 
 func main() {
+	conn, err := database.GetConnection(database.SQLITE, "development.db")
+	if err != nil {
+		log.Fatalf("could not connect to database: %s", err)
+	}
+
 	events := make(chan Message)
 	connections := make(chan Connection)
 	disconnections := make(chan string)
@@ -34,17 +40,11 @@ func main() {
 	e.Use(middleware.CORS())
 	e.Use(middleware.Logger())
 
+	warehouse.CreateEndpoints(e, conn)
+
 	e.GET("/", func(c echo.Context) error {
 		events <- Message{Message: "Hello, World"}
 		return c.String(http.StatusOK, "Hello, World!")
-	})
-
-	e.GET("/warehouse", func(c echo.Context) error {
-		items, err := repository.GetInventory(1)
-		if err != nil {
-			return err
-		}
-		return c.JSON(http.StatusOK, items)
 	})
 
 	e.GET("/private", func(c echo.Context) error {
