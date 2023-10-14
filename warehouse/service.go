@@ -2,19 +2,18 @@ package warehouse
 
 import (
 	"api/database"
+	"api/resource"
 	"net/http"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
 
-type Resource struct {
-	Id      uint64  `db:"id" json:"id"`
-	Name    string  `db:"name" json:"name"`
-	Qty     uint64  `db:"quantity" json:"quantity"`
-	Quality uint8   `db:"quality" json:"quality"`
 	Cost    float64 `db:"sourcing_cost" json:"cost"`
-	Image   *string `db:"image" json:"image"`
+type StockItem struct {
+	Qty      uint64             `db:"quantity" json:"quantity"`
+	Quality  uint8              `db:"quality" json:"quality"`
+	Resource *resource.Resource `db:"resource" json:"resource"`
 }
 
 func CreateEndpoints(e *echo.Echo, conn *database.Connection) {

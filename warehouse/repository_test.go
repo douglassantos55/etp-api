@@ -75,15 +75,11 @@ func TestGoquRepository(t *testing.T) {
 	})
 
 	t.Run("should list inventory grouped by resource", func(t *testing.T) {
-		resources, err := repository.FetchInventory(1)
+		items, err := repository.FetchInventory(1)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		for _, resource := range resources {
-			if resource.Id == 1 {
-				if resource.Qty != 1450 {
-					t.Errorf("expected qty %d, got %d", 1450, resource.Qty)
 		if items == nil {
 			t.Fatal("expected result, got nil")
 		}
@@ -92,15 +88,19 @@ func TestGoquRepository(t *testing.T) {
 			t.Fatal("expected items, got 0")
 		}
 
+		for _, item := range items {
+			if item.Resource.Id == 1 {
+				if item.Qty != 1450 {
+					t.Errorf("expected qty %d, got %d", 1450, item.Qty)
 				}
 				if resource.Cost != 8.78 {
 					t.Errorf("expected cost %.2f, got %.2f", 8.78, resource.Cost)
 				}
 			}
 
-			if resource.Id == 2 {
-				if resource.Qty != 130 {
-					t.Errorf("expected qty %d, got %d", 130, resource.Qty)
+			if item.Resource.Id == 2 {
+				if item.Qty != 130 {
+					t.Errorf("expected qty %d, got %d", 130, item.Qty)
 				}
 				if resource.Cost != 108.3 {
 					t.Errorf("expected cost %.2f, got %.2f", 108.3, resource.Cost)

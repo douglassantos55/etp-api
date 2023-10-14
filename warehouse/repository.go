@@ -9,7 +9,7 @@ import (
 
 type Repository interface {
 	// Fetches the inventory of a company
-	FetchInventory(companyId uint64) ([]*Resource, error)
+	FetchInventory(companyId uint64) ([]*StockItem, error)
 }
 
 type goquRepository struct {
@@ -22,8 +22,8 @@ func NewRepository(conn *database.Connection) Repository {
 	return &goquRepository{builder}
 }
 
-func (r *goquRepository) FetchInventory(companyId uint64) ([]*Resource, error) {
-	resources := make([]*Resource, 0)
+func (r *goquRepository) FetchInventory(companyId uint64) ([]*StockItem, error) {
+	items := make([]*StockItem, 0)
 
 	err := r.builder.
 		Select(
@@ -36,14 +36,14 @@ func (r *goquRepository) FetchInventory(companyId uint64) ([]*Resource, error) {
 		From(goqu.T("inventories").As("i")).
 		InnerJoin(goqu.T("resources").As("resource"), goqu.On(goqu.I("i.resource_id").Eq(goqu.I("resource.id")))).
 		Where(goqu.I("i.company_id").Eq(companyId)).
-		ScanStructs(&resources)
 		GroupBy(goqu.I("resource.id")).
+		ScanStructs(&items)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return resources, nil
+	return items, nil
 }
 
 // Get the stock of a company's resource, grouping by quality
