@@ -15,8 +15,8 @@ func setup(t testing.TB, conn *database.Connection) {
 
 	err := builder.WithTx(func(td *goqu.TxDatabase) error {
 		_, err := td.Insert("resources").Rows(
-			goqu.Record{"name": "Wood"},
-			goqu.Record{"name": "Window"},
+			goqu.Record{"id": 1, "name": "Wood"},
+			goqu.Record{"id": 2, "name": "Window"},
 		).Executor().Exec()
 
 		if err != nil {
@@ -84,6 +84,14 @@ func TestGoquRepository(t *testing.T) {
 			if resource.Id == 1 {
 				if resource.Qty != 1450 {
 					t.Errorf("expected qty %d, got %d", 1450, resource.Qty)
+		if items == nil {
+			t.Fatal("expected result, got nil")
+		}
+
+		if len(items) == 0 {
+			t.Fatal("expected items, got 0")
+		}
+
 				}
 				if resource.Cost != 8.78 {
 					t.Errorf("expected cost %.2f, got %.2f", 8.78, resource.Cost)

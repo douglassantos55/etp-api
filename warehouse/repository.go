@@ -26,13 +26,18 @@ func (r *goquRepository) FetchInventory(companyId uint64) ([]*Resource, error) {
 	resources := make([]*Resource, 0)
 
 	err := r.builder.
-		Select("r.id", "r.name", "r.image", goqu.SUM("i.quantity").As("quantity")).
-		Select(goqu.L("? / ?", goqu.SUM(goqu.I("i.sourcing_cost")), goqu.SUM(goqu.I("i.quantity")).As("sourcing_cost"))).
+		Select(
+			goqu.I("resource.id").As(goqu.C("resource.id")),
+			goqu.I("resource.name").As(goqu.C("resource.name")),
+			goqu.I("resource.image").As(goqu.C("resource.image")),
+			goqu.SUM("i.quantity").As("quantity"),
+			goqu.L("? / ?", goqu.SUM(goqu.L("? * ?", goqu.I("i.sourcing_cost"), goqu.I("i.quantity"))), goqu.SUM(goqu.I("i.quantity"))).As("sourcing_cost"),
+		).
 		From(goqu.T("inventories").As("i")).
-		InnerJoin(goqu.T("resources").As("r"), goqu.On(goqu.I("i.resource_id").Eq(goqu.I("r.id")))).
+		InnerJoin(goqu.T("resources").As("resource"), goqu.On(goqu.I("i.resource_id").Eq(goqu.I("resource.id")))).
 		Where(goqu.I("i.company_id").Eq(companyId)).
-		GroupBy(goqu.I("r.id")).
 		ScanStructs(&resources)
+		GroupBy(goqu.I("resource.id")).
 
 	if err != nil {
 		return nil, err
