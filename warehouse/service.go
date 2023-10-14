@@ -9,10 +9,10 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-	Cost    float64 `db:"sourcing_cost" json:"cost"`
 type StockItem struct {
 	Qty      uint64             `db:"quantity" json:"quantity"`
 	Quality  uint8              `db:"quality" json:"quality"`
+	Cost     uint64             `db:"sourcing_cost" json:"cost"`
 	Resource *resource.Resource `db:"resource" json:"resource"`
 }
 

@@ -24,9 +24,9 @@ func setup(t testing.TB, conn *database.Connection) {
 		}
 
 		_, err = td.Insert("inventories").Rows(
-			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 1300, "quality": 0, "sourcing_cost": 8.57},
-			goqu.Record{"company_id": 1, "resource_id": 2, "quantity": 130, "quality": 0, "sourcing_cost": 108.3},
-			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 150, "quality": 1, "sourcing_cost": 9.05},
+			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 1300, "quality": 0, "sourcing_cost": 857},
+			goqu.Record{"company_id": 1, "resource_id": 2, "quantity": 130, "quality": 0, "sourcing_cost": 10830},
+			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 150, "quality": 1, "sourcing_cost": 905},
 		).Executor().Exec()
 
 		return err
@@ -93,8 +93,8 @@ func TestGoquRepository(t *testing.T) {
 				if item.Qty != 1450 {
 					t.Errorf("expected qty %d, got %d", 1450, item.Qty)
 				}
-				if resource.Cost != 8.78 {
-					t.Errorf("expected cost %.2f, got %.2f", 8.78, resource.Cost)
+				if item.Cost != 861 {
+					t.Errorf("expected cost %d, got %d", 861, item.Cost)
 				}
 			}
 
@@ -102,8 +102,8 @@ func TestGoquRepository(t *testing.T) {
 				if item.Qty != 130 {
 					t.Errorf("expected qty %d, got %d", 130, item.Qty)
 				}
-				if resource.Cost != 108.3 {
-					t.Errorf("expected cost %.2f, got %.2f", 108.3, resource.Cost)
+				if item.Cost != 10830 {
+					t.Errorf("expected cost %d, got %d", 10830, item.Cost)
 				}
 			}
 		}
