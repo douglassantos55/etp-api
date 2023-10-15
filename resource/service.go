@@ -17,6 +17,14 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 	group := e.Group("/resources")
 	repository := NewRepository(conn)
 
+	group.GET("/", func(c echo.Context) error {
+		resources, err := repository.FetchResources()
+		if err != nil {
+			return err
+		}
+		return c.JSON(http.StatusOK, resources)
+	})
+
 	group.POST("/", func(c echo.Context) error {
 		var resource *Resource
 		if err := c.Bind(&resource); err != nil {

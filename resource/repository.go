@@ -7,6 +7,9 @@ import (
 )
 
 type Repository interface {
+	// Returns the list of registered resources
+	FetchResources() ([]*Resource, error)
+
 	// Creates a resource
 	SaveResource(resource *Resource) (*Resource, error)
 }
@@ -18,6 +21,15 @@ type goquRepository struct {
 func NewRepository(conn *database.Connection) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
 	return &goquRepository{builder}
+}
+
+func (r *goquRepository) FetchResources() ([]*Resource, error) {
+	resources := make([]*Resource, 0)
+	err := r.builder.From(goqu.T("resources")).ScanStructs(&resources)
+	if err != nil {
+		return nil, err
+	}
+	return resources, nil
 }
 
 func (r *goquRepository) SaveResource(resource *Resource) (*Resource, error) {
