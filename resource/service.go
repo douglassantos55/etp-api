@@ -3,6 +3,7 @@ package resource
 import (
 	"api/database"
 	"net/http"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
@@ -27,7 +28,7 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 
 	group.POST("/", func(c echo.Context) error {
 		var resource *Resource
-		if err := c.Bind(&resource); err != nil {
+		if err := c.Bind(resource); err != nil {
 			return err
 		}
 		resource, err := repository.SaveResource(resource)
@@ -35,5 +36,27 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 			return err
 		}
 		return c.JSON(http.StatusCreated, resource)
+	})
+
+	group.PUT("/:id", func(c echo.Context) error {
+		id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil {
+			return err
+		}
+
+		resource, err := repository.GetById(id)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusNotFound)
+		}
+
+		if err := c.Bind(resource); err != nil {
+			return err
+		}
+		resource, err = repository.UpdateResource(resource)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, resource)
 	})
 }
