@@ -2,15 +2,14 @@ package main
 
 import (
 	"api/database"
+	"api/resource"
+	"api/server"
 	"api/warehouse"
 	"fmt"
 	"log"
 	"net/http"
 
-	"github.com/gookit/validate"
 	"github.com/gorilla/websocket"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 )
 
 type Message struct {
@@ -27,16 +26,6 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-type Validator struct{}
-
-func (v *Validator) Validate(i any) error {
-	validation := validate.Struct(i)
-	if !validation.Validate() {
-		return echo.NewHTTPError(http.StatusBadRequest, string(validation.Errors.JSON()))
-	}
-	return nil
-}
-
 func main() {
 	conn, err := database.GetConnection(database.SQLITE, "development.db")
 	if err != nil {
@@ -46,13 +35,9 @@ func main() {
 	events := make(chan Message)
 	connections := make(chan Connection)
 	disconnections := make(chan string)
-
-	e := echo.New()
-	e.Use(middleware.CORS())
-	e.Use(middleware.Logger())
-	e.Validator = &Validator{}
-
-	warehouse.CreateEndpoints(e, conn)
+	svr := server.NewServer()
+	resource.CreateEndpoints(svr, conn)
+	warehouse.CreateEndpoints(svr, conn)
 
 	e.GET("/", func(c echo.Context) error {
 		events <- Message{Message: "Hello, World"}
@@ -96,7 +81,7 @@ func main() {
 
 	go processEvents(events, connections, disconnections)
 
-	e.Logger.Fatal(e.Start(":1323"))
+	svr.Start(":1323")
 }
 
 func processEvents(events <-chan Message, connections <-chan Connection, disconnections <-chan string) {
