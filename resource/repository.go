@@ -42,7 +42,7 @@ func (r *goquRepository) GetById(id uint64) (*Resource, error) {
 	var resource Resource
 
 	_, err := r.builder.From(goqu.T("resources")).
-		Where(goqu.I("id").Eq(id)).
+		Where(goqu.C("id").Eq(id)).
 		ScanStruct(&resource)
 
 	return &resource, err
