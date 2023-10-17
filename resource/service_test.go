@@ -4,6 +4,7 @@ import (
 	"api/database"
 	"api/resource"
 	"api/server"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -79,6 +80,67 @@ func TestService(t *testing.T) {
 
 		if rec.Code != http.StatusNotFound {
 			t.Errorf("expected status %d, got %d", http.StatusNotFound, rec.Code)
+		}
+	})
+
+	t.Run("should return 400 when updating invalid id", func(t *testing.T) {
+		req := httptest.NewRequest("PUT", "/resources/someid", strings.NewReader(`{"name":"Iron"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+		}
+	})
+
+	t.Run("should return 404 if resource is not found", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/resources/2355", nil)
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("expected status %d, got %d", http.StatusNotFound, rec.Code)
+		}
+	})
+
+	t.Run("should return 400 if id is invalid", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/resources/someid", nil)
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+		}
+	})
+
+	t.Run("should return resource", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/resources/2", nil)
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
+		}
+
+		var resource resource.Resource
+		if err := json.Unmarshal(rec.Body.Bytes(), &resource); err != nil {
+			t.Fatalf("could not parse json: %s", err)
+		}
+
+		if resource.Id != 2 {
+			t.Errorf("expected id %d, got %d", 2, resource.Id)
+		}
+		if resource.Name != "Seeds" {
+			t.Errorf("expected name %s, got %s", "Seeds", resource.Name)
 		}
 	})
 }

@@ -10,7 +10,7 @@ type Repository interface {
 	// Returns the list of registered resources
 	FetchResources() ([]*Resource, error)
 
-	// Get a resource by id
+	// Get a resource by id, returns nil if it can't be found
 	GetById(id uint64) (*Resource, error)
 
 	// Creates a resource
