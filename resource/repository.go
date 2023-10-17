@@ -39,13 +39,17 @@ func (r *goquRepository) FetchResources() ([]*Resource, error) {
 }
 
 func (r *goquRepository) GetById(id uint64) (*Resource, error) {
-	var resource Resource
+	resource := new(Resource)
 
-	_, err := r.builder.From(goqu.T("resources")).
-		Where(goqu.C("id").Eq(id)).
-		ScanStruct(&resource)
+	found, err := r.builder.From(goqu.T("resources")).
+		Where(goqu.I("id").Eq(id)).
+		ScanStruct(resource)
 
-	return &resource, err
+	if !found {
+		return nil, err
+	}
+
+	return resource, err
 }
 
 func (r *goquRepository) SaveResource(resource *Resource) (*Resource, error) {

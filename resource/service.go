@@ -27,14 +27,14 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 	})
 
 	group.POST("/", func(c echo.Context) error {
-		var resource *Resource
+		resource := new(Resource)
 		if err := c.Bind(resource); err != nil {
 			return err
 		}
 		if err := c.Validate(resource); err != nil {
 			return err
 		}
-		resource, err := repository.SaveResource(resource)
+		_, err := repository.SaveResource(resource)
 		if err != nil {
 			return err
 		}
@@ -49,6 +49,9 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 
 		resource, err := repository.GetById(id)
 		if err != nil {
+			return err
+		}
+		if resource == nil {
 			return echo.NewHTTPError(http.StatusNotFound)
 		}
 
