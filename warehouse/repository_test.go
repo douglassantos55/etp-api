@@ -14,9 +14,18 @@ func setup(t testing.TB, conn *database.Connection) {
 	builder := goqu.New(conn.Driver, conn.DB)
 
 	err := builder.WithTx(func(td *goqu.TxDatabase) error {
-		_, err := td.Insert("resources").Rows(
-			goqu.Record{"id": 1, "name": "Wood"},
-			goqu.Record{"id": 2, "name": "Window"},
+		_, err := td.Insert("categories").Rows(
+			goqu.Record{"id": 1, "name": "Food"},
+			goqu.Record{"id": 2, "name": "Infrastructure"},
+		).Executor().Exec()
+
+		if err != nil {
+			return err
+		}
+
+		_, err = td.Insert("resources").Rows(
+			goqu.Record{"id": 1, "name": "Wood", "category_id": 2},
+			goqu.Record{"id": 2, "name": "Window", "category_id": 2},
 		).Executor().Exec()
 
 		if err != nil {
@@ -42,7 +51,11 @@ func setup(t testing.TB, conn *database.Connection) {
 				return err
 			}
 
-			_, err := td.Delete("resources").Executor().Exec()
+			if _, err := td.Delete("resources").Executor().Exec(); err != nil {
+				return err
+			}
+
+			_, err := td.Delete("categories").Executor().Exec()
 			return err
 		})
 

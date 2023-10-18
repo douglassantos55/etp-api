@@ -8,10 +8,17 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+type Category struct {
+	Id   uint64 `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
+	Name string `db:"name" json:"name" validate:"required"`
+}
+
 type Resource struct {
-	Id    uint64  `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
-	Name  string  `db:"name" json:"name" validate:"required"`
-	Image *string `db:"image" json:"image"`
+	Id         uint64    `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
+	Name       string    `db:"name" json:"name" validate:"required"`
+	Image      *string   `db:"image" json:"image"`
+	CategoryId uint64    `db:"category_id" json:"category_id" validate:"required"`
+	Category   *Category `db:"category" json:"category" validate:"-"`
 }
 
 func CreateEndpoints(e *echo.Echo, conn *database.Connection) {

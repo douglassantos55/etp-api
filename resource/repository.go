@@ -31,18 +31,44 @@ func NewRepository(conn *database.Connection) Repository {
 
 func (r *goquRepository) FetchResources() ([]*Resource, error) {
 	resources := make([]*Resource, 0)
-	err := r.builder.From(goqu.T("resources")).ScanStructs(&resources)
+
+	err := r.builder.
+		Select(
+			goqu.I("r.*"),
+			goqu.I("c.id").As(goqu.C("category.id")),
+			goqu.I("c.name").As(goqu.C("category.name")),
+		).
+		From(goqu.T("resources").As("r")).
+		InnerJoin(goqu.T("categories").As("c"), goqu.On(goqu.I("r.category_id").Eq(goqu.I("c.id")))).
+		ScanStructs(&resources)
+
 	if err != nil {
 		return nil, err
 	}
+
 	return resources, nil
 }
 
 func (r *goquRepository) GetById(id uint64) (*Resource, error) {
 	resource := new(Resource)
 
-	found, err := r.builder.From(goqu.T("resources")).
-		Where(goqu.I("id").Eq(id)).
+	found, err := r.builder.
+		Select(
+			goqu.I("r.*"),
+			goqu.I("c.id").As(goqu.C("category.id")),
+			goqu.I("c.name").As(goqu.C("category.name")),
+		).
+		From(goqu.T("resources").As("r")).
+		InnerJoin(
+			goqu.T("categories").As("c"),
+			goqu.On(
+				goqu.And(
+					goqu.I("r.category_id").Eq(goqu.I("c.id")),
+					goqu.I("c.deleted_at").IsNull(),
+				),
+			),
+		).
+		Where(goqu.I("r.id").Eq(id)).
 		ScanStruct(resource)
 
 	if !found {
@@ -53,7 +79,13 @@ func (r *goquRepository) GetById(id uint64) (*Resource, error) {
 }
 
 func (r *goquRepository) SaveResource(resource *Resource) (*Resource, error) {
-	result, err := r.builder.Insert("resources").Rows(resource).Executor().Exec()
+	record := goqu.Record{
+		"name":        resource.Name,
+		"image":       resource.Image,
+		"category_id": resource.CategoryId,
+	}
+
+	result, err := r.builder.Insert("resources").Rows(record).Executor().Exec()
 	if err != nil {
 		return nil, err
 	}
@@ -65,9 +97,15 @@ func (r *goquRepository) SaveResource(resource *Resource) (*Resource, error) {
 }
 
 func (r *goquRepository) UpdateResource(resource *Resource) (*Resource, error) {
+	record := goqu.Record{
+		"name":        resource.Name,
+		"image":       resource.Image,
+		"category_id": resource.CategoryId,
+	}
+
 	_, err := r.builder.Update(goqu.T("resources")).
-		Set(resource).
-		Where(goqu.C("id").Eq(resource.Id)).
+		Set(record).
+		Where(goqu.I("id").Eq(resource.Id)).
 		Executor().Exec()
 
 	if err != nil {

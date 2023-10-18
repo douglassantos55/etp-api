@@ -17,13 +17,16 @@ func TestService(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = conn.DB.Exec(`INSERT INTO resources (id, name) VALUES (1, "Water"), (2, "Seeds")`)
+	_, err = conn.DB.Exec(`
+        INSERT INTO categories (id, name) VALUES (1, "Food");
+        INSERT INTO resources (id, name, category_id) VALUES (1, "Water", 1), (2, "Seeds", 1);
+    `)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Cleanup(func() {
-		if _, err := conn.DB.Exec("DELETE FROM resources"); err != nil {
+		if _, err := conn.DB.Exec("DELETE FROM resources; DELETE FROM categories;"); err != nil {
 			t.Fatalf("could not truncate table: %s", err)
 		}
 	})
@@ -32,7 +35,7 @@ func TestService(t *testing.T) {
 	resource.CreateEndpoints(server, conn)
 
 	t.Run("should return 201 when creating resource", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/resources/", strings.NewReader(`{"name":"Wood","image":"http://placeimg.com/10"}`))
+		req := httptest.NewRequest("POST", "/resources/", strings.NewReader(`{"name":"Wood","category_id":1,"image":"http://placeimg.com/10"}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 
@@ -93,6 +96,21 @@ func TestService(t *testing.T) {
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+		}
+	})
+
+	t.Run("should return 200 when updating resource", func(t *testing.T) {
+		body := strings.NewReader(`{"name":"Iron"}`)
+
+		req := httptest.NewRequest("PUT", "/resources/1", body)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
 		}
 	})
 
