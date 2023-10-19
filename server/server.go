@@ -3,8 +3,15 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"reflect"
+	"strings"
 
-	"github.com/gookit/validate"
+	"github.com/go-playground/locales/en"
+	"github.com/go-playground/locales/pt_BR"
+	uni "github.com/go-playground/universal-translator"
+	"github.com/go-playground/validator/v10"
+	en_translations "github.com/go-playground/validator/v10/translations/en"
+	br_translations "github.com/go-playground/validator/v10/translations/pt_BR"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -29,9 +36,29 @@ var upgrader = websocket.Upgrader{
 }
 
 func (v *Validator) Validate(i any) error {
-	validation := validate.Struct(i)
-	if !validation.Validate() {
-		return echo.NewHTTPError(http.StatusBadRequest, string(validation.Errors.JSON()))
+	uni := uni.New(en.New(), pt_BR.New())
+	trans, _ := uni.GetTranslator("en")
+	validate := validator.New(validator.WithRequiredStructEnabled())
+
+	en_translations.RegisterDefaultTranslations(validate, trans)
+	br_translations.RegisterDefaultTranslations(validate, trans)
+
+	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
+		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+		// skip if tag key says it should be ignored
+		if name == "-" {
+			return ""
+		}
+		return name
+	})
+
+	if err := validate.Struct(i); err != nil {
+		errors := make(map[string]string)
+		for _, e := range err.(validator.ValidationErrors) {
+			errors[e.Field()] = e.Translate(trans)
+		}
+		response := map[string]map[string]string{"errors": errors}
+		return echo.NewHTTPError(http.StatusBadRequest, response)
 	}
 	return nil
 }
