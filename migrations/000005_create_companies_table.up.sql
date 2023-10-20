@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS `companies` (
+    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+    `name` VARCHAR(255) NOT NULL,
+    `email` VARCHAR(255) NOT NULL,
+    `password` VARCHAR(255) NOT NULL,
+    `last_login` INTEGER DEFAULT NULL,
+    `bloked_at` INTEGER DEFAULT NULL,
+    `deleted_at` INTEGER DEFAULT NULL,
+    `created_at` INTEGER DEFAULT CURRENT_TIMESTAMP
+);
