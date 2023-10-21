@@ -49,8 +49,8 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 
 	group.POST("/login", func(c echo.Context) error {
 		credentials := struct {
-			Email string `form:"email" validate:"required,email"`
-			Pass  string `form:"password" validate:"required"`
+			Email string `form:"email" json:"email" validate:"required,email"`
+			Pass  string `form:"password" json:"password" validate:"required"`
 		}{}
 
 		if err := c.Bind(&credentials); err != nil {
@@ -58,7 +58,7 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 		}
 
 		if err := c.Validate(&credentials); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err)
+			return err
 		}
 
 		company, err := repository.GetByEmail(credentials.Email)
@@ -66,7 +66,7 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 			return echo.NewHTTPError(http.StatusUnauthorized, server.Response{
 				Type:   "failure",
 				Status: http.StatusUnauthorized,
-				Data:   map[string]any{"error": "invalid email"},
+				Data:   map[string]any{"error": "invalid credentials"},
 			})
 		}
 
@@ -74,7 +74,7 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 			return echo.NewHTTPError(http.StatusUnauthorized, server.Response{
 				Type:   "failure",
 				Status: http.StatusUnauthorized,
-				Data:   map[string]any{"error": "invalid password"},
+				Data:   map[string]any{"error": "invalid credentials"},
 			})
 		}
 

@@ -12,13 +12,27 @@ import (
 )
 
 func TestCompanyService(t *testing.T) {
-	server := server.NewServer()
+	svr := server.NewServer()
 	conn, err := database.GetConnection(database.SQLITE, "../test.db")
 	if err != nil {
 		t.Fatalf("could not connect to database: %s", err)
 	}
 
-	company.CreateEndpoints(server, conn)
+	_, err = conn.DB.Exec(`
+        INSERT INTO companies (name, email, password)
+        VALUES ("Test", "admin@test.com", "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy")
+    `)
+	if err != nil {
+		t.Fatalf("could not seed database: %s", err)
+	}
+
+	t.Cleanup(func() {
+		if _, err := conn.DB.Exec(`DELETE FROM companies`); err != nil {
+			t.Fatalf("could not cleanup: %s", err)
+		}
+	})
+
+	company.CreateEndpoints(svr, conn)
 
 	t.Run("should validate registration", func(t *testing.T) {
 		t.Parallel()
@@ -30,28 +44,26 @@ func TestCompanyService(t *testing.T) {
 		req.Header.Set("Accept", "application/json")
 
 		rec := httptest.NewRecorder()
-		server.ServeHTTP(rec, req)
+		svr.ServeHTTP(rec, req)
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("expected code %d, got %d", http.StatusBadRequest, rec.Code)
 		}
 
-		response := struct {
-			Errors map[string]string `json:"errors"`
-		}{}
+		var response server.ValidationErrors
 
 		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 			t.Fatalf("could not decode: %s", err)
 		}
 
 		if _, ok := response.Errors["name"]; !ok {
-			t.Error("expected error on name")
+			t.Error("expected validation error for name")
 		}
 		if _, ok := response.Errors["email"]; !ok {
-			t.Error("expected error on email")
+			t.Error("expected validation error for email")
 		}
 		if _, ok := response.Errors["password"]; !ok {
-			t.Error("expected error on password")
+			t.Error("expected validation error for password")
 		}
 	})
 
@@ -65,7 +77,7 @@ func TestCompanyService(t *testing.T) {
 		req.Header.Set("Accept", "application/json")
 
 		rec := httptest.NewRecorder()
-		server.ServeHTTP(rec, req)
+		svr.ServeHTTP(rec, req)
 
 		if rec.Code != http.StatusCreated {
 			t.Errorf("expected code %d, got %d", http.StatusCreated, rec.Code)
@@ -102,6 +114,89 @@ func TestCompanyService(t *testing.T) {
 
 		if err != nil {
 			t.Errorf("error comparing passwords: %s", err)
+		}
+	})
+
+	t.Run("should validate login", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`email=test&password=`)
+
+		req := httptest.NewRequest("POST", "/companies/login", body)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+		}
+
+		var response server.ValidationErrors
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("could not parse json: %s", err)
+		}
+
+		if _, ok := response.Errors["email"]; !ok {
+			t.Error("expected validation error for email")
+		}
+		if _, ok := response.Errors["password"]; !ok {
+			t.Error("expected validation error for password")
+		}
+	})
+
+	t.Run("should return unauthorized when email not found", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`email=test@test.com&password=123`)
+
+		req := httptest.NewRequest("POST", "/companies/login", body)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+		}
+	})
+
+	t.Run("should return unauthorized when password does not match", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`email=admin@test.com&password=123`)
+
+		req := httptest.NewRequest("POST", "/companies/login", body)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+		}
+	})
+
+	t.Run("should send Set-Cookie header when authenticated", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`email=admin@test.com&password=password`)
+
+		req := httptest.NewRequest("POST", "/companies/login", body)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
+		}
+		if rec.Header().Get("Set-Cookie") == "" {
+			t.Fatal("expected Set-Cookie header")
 		}
 	})
 }

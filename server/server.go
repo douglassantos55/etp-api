@@ -28,6 +28,10 @@ type (
 		Location string         `json:"location,omitempty"`
 	}
 
+	ValidationErrors struct {
+		Errors map[string]string `json:"errors"`
+	}
+
 	Message struct {
 		Token   string
 		Message string
@@ -65,8 +69,10 @@ func (v *Validator) Validate(i any) error {
 		for _, e := range err.(validator.ValidationErrors) {
 			errors[e.Field()] = e.Translate(trans)
 		}
-		response := map[string]map[string]string{"errors": errors}
-		return echo.NewHTTPError(http.StatusBadRequest, response)
+		return echo.NewHTTPError(
+			http.StatusBadRequest,
+			ValidationErrors{Errors: errors},
+		)
 	}
 	return nil
 }
