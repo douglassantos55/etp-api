@@ -9,6 +9,8 @@ import (
 type (
 	Repository interface {
 		SaveCompany(company *Company) error
+
+		GetByEmail(email string) (*Company, error)
 	}
 
 	goquRepository struct {
@@ -19,6 +21,38 @@ type (
 func NewRepository(conn *database.Connection) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
 	return &goquRepository{builder}
+}
+
+func (r *goquRepository) GetByEmail(email string) (*Company, error) {
+	company := new(Company)
+
+	found, err := r.builder.Select(
+		goqu.I("c.id"),
+		goqu.I("c.name"),
+		goqu.I("c.email"),
+		goqu.I("c.password"),
+		goqu.I("c.last_login"),
+		goqu.I("c.created_at"),
+	).
+		From(goqu.T("companies").As("c")).
+		Where(
+			goqu.And(
+				goqu.I("email").Eq(email),
+				goqu.I("c.bloked_at").IsNull(),
+				goqu.I("c.deleted_at").IsNull(),
+			),
+		).
+		ScanStruct(company)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !found {
+		return nil, nil
+	}
+
+	return company, nil
 }
 
 func (r *goquRepository) SaveCompany(company *Company) error {

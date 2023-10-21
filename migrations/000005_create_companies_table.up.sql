@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS `companies` (
     `last_login` INTEGER DEFAULT NULL,
     `bloked_at` INTEGER DEFAULT NULL,
     `deleted_at` INTEGER DEFAULT NULL,
-    `created_at` INTEGER DEFAULT CURRENT_TIMESTAMP
+    `created_at` TEXT DEFAULT CURRENT_TIMESTAMP
 );

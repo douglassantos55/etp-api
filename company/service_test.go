@@ -58,4 +58,15 @@ func TestCompanyService(t *testing.T) {
 			t.Errorf("should hash password, got %s", hashed)
 		}
 	})
+
+	t.Run("compare password", func(t *testing.T) {
+		t.Parallel()
+
+		hash := "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy"
+		err := company.ComparePassword(hash, "password")
+
+		if err != nil {
+			t.Errorf("error comparing passwords: %s", err)
+		}
+	})
 }

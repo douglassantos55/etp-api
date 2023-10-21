@@ -20,6 +20,14 @@ import (
 type (
 	Validator struct{}
 
+	Response struct {
+		Type     string         `json:"type"`
+		Status   int            `json:"status"`
+		Data     map[string]any `json:"data,omitempty"`
+		Error    string         `json:"error,omitempty"`
+		Location string         `json:"location,omitempty"`
+	}
+
 	Message struct {
 		Token   string
 		Message string
