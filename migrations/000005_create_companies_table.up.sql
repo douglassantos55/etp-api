@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS `companies` (
     `email` VARCHAR(255) NOT NULL,
     `password` VARCHAR(255) NOT NULL,
     `last_login` INTEGER DEFAULT NULL,
-    `bloked_at` INTEGER DEFAULT NULL,
+    `blocked_at` INTEGER DEFAULT NULL,
     `deleted_at` INTEGER DEFAULT NULL,
     `created_at` TEXT DEFAULT CURRENT_TIMESTAMP
 );

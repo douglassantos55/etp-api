@@ -193,7 +193,7 @@ func TestCompanyService(t *testing.T) {
 		svr.ServeHTTP(rec, req)
 
 		if rec.Code != http.StatusOK {
-			t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
+			t.Errorf("expected status %d, got %d. %s", http.StatusOK, rec.Code, rec.Body.String())
 		}
 		if rec.Header().Get("Set-Cookie") == "" {
 			t.Fatal("expected Set-Cookie header")

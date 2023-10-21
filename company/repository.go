@@ -38,7 +38,7 @@ func (r *goquRepository) GetByEmail(email string) (*Company, error) {
 		Where(
 			goqu.And(
 				goqu.I("email").Eq(email),
-				goqu.I("c.bloked_at").IsNull(),
+				goqu.I("c.blocked_at").IsNull(),
 				goqu.I("c.deleted_at").IsNull(),
 			),
 		).
