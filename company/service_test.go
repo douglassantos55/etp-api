@@ -20,6 +20,41 @@ func TestCompanyService(t *testing.T) {
 
 	company.CreateEndpoints(server, conn)
 
+	t.Run("should validate registration", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`{"name":"","email":"coke","password":""}`)
+
+		req := httptest.NewRequest("POST", "/companies/register", body)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		server.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected code %d, got %d", http.StatusBadRequest, rec.Code)
+		}
+
+		response := struct {
+			Errors map[string]string `json:"errors"`
+		}{}
+
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("could not decode: %s", err)
+		}
+
+		if _, ok := response.Errors["name"]; !ok {
+			t.Error("expected error on name")
+		}
+		if _, ok := response.Errors["email"]; !ok {
+			t.Error("expected error on email")
+		}
+		if _, ok := response.Errors["password"]; !ok {
+			t.Error("expected error on password")
+		}
+	})
+
 	t.Run("should not return password", func(t *testing.T) {
 		t.Parallel()
 
