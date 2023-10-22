@@ -8,7 +8,7 @@ import (
 
 type (
 	Repository interface {
-		SaveCompany(company *Company) error
+		Register(registration *Registration) (*Company, error)
 
 		GetByEmail(email string) (*Company, error)
 	}
@@ -55,11 +55,11 @@ func (r *goquRepository) GetByEmail(email string) (*Company, error) {
 	return company, nil
 }
 
-func (r *goquRepository) SaveCompany(company *Company) error {
+func (r *goquRepository) Register(registration *Registration) (*Company, error) {
 	record := goqu.Record{
-		"name":     company.Name,
-		"email":    company.Email,
-		"password": company.Pass,
+		"name":     registration.Name,
+		"email":    registration.Email,
+		"password": registration.Password,
 	}
 
 	result, err := r.builder.
@@ -69,14 +69,45 @@ func (r *goquRepository) SaveCompany(company *Company) error {
 		Exec()
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	company.Id = uint64(id)
-	return nil
+	return r.getById(uint64(id))
+}
+
+func (r *goquRepository) getById(id uint64) (*Company, error) {
+	company := new(Company)
+
+	found, err := r.builder.Select(
+		goqu.I("c.id"),
+		goqu.I("c.name"),
+		goqu.I("c.email"),
+		goqu.I("c.password"),
+		goqu.I("c.last_login"),
+		goqu.I("c.created_at"),
+	).
+		From(goqu.T("companies").As("c")).
+		Where(
+			goqu.And(
+				goqu.I("c.id").Eq(id),
+				goqu.I("c.blocked_at").IsNull(),
+				goqu.I("c.deleted_at").IsNull(),
+			),
+		).
+		ScanStruct(company)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !found {
+		return nil, nil
+	}
+
+	return company, nil
 }

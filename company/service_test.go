@@ -65,12 +65,43 @@ func TestCompanyService(t *testing.T) {
 		if _, ok := response.Errors["password"]; !ok {
 			t.Error("expected validation error for password")
 		}
+		if _, ok := response.Errors["confirm_password"]; !ok {
+			t.Error("expected validation error for confirm_password")
+		}
+	})
+
+	t.Run("should validate if passwords match", func(t *testing.T) {
+		t.Parallel()
+
+		body := strings.NewReader(`{"name":"Test","email":"test@email.com","password":"123","confirm_password":"122"}`)
+
+		req := httptest.NewRequest("POST", "/companies/register", body)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected code %d, got %d", http.StatusBadRequest, rec.Code)
+		}
+
+		var response server.ValidationErrors
+
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("could not decode: %s", err)
+		}
+
+		expectedMessage := "confirm_password must be equal to Password"
+		if msg, ok := response.Errors["confirm_password"]; !ok || msg != expectedMessage {
+			t.Errorf("expected validation error for confirm_password: %s, got %s", expectedMessage, msg)
+		}
 	})
 
 	t.Run("should not return password", func(t *testing.T) {
 		t.Parallel()
 
-		body := strings.NewReader(`{"name":"Coca-Cola","email":"coke@coke.com","password":"password"}`)
+		body := strings.NewReader(`{"name":"Coca-Cola","email":"coke@coke.com","password":"password","confirm_password":"password"}`)
 
 		req := httptest.NewRequest("POST", "/companies/register", body)
 		req.Header.Set("Content-Type", "application/json")

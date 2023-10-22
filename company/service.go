@@ -11,13 +11,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type Registration struct {
+	Name     string `json:"name" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
+	Confirm  string `json:"confirm_password" validate:"required,eqfield=Password"`
+}
+
 type Company struct {
-	Id        uint64     `db:"id" json:"id" goqu:"skipinsert,skipupdate" validate:"-"`
-	Name      string     `db:"name" json:"name" validate:"required"`
-	Email     string     `db:"email" json:"email,omitempty" validate:"required,email"`
-	Pass      string     `db:"password" json:"password,omitempty" validate:"required"`
-	LastLogin *time.Time `db:"last_login" json:"last_login" validate:"-"`
-	CreatedAt string     `db:"created_at" json:"created_at" validate:"-"`
+	Id        uint64     `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
+	Name      string     `db:"name" json:"name"`
+	Email     string     `db:"email" json:"email"`
+	Pass      string     `db:"password" json:"-"`
+	LastLogin *time.Time `db:"last_login" json:"last_login"`
+	CreatedAt time.Time  `db:"created_at" json:"created_at"`
 }
 
 func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
@@ -25,25 +32,25 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 	repository := NewRepository(conn)
 
 	group.POST("/register", func(c echo.Context) error {
-		company := new(Company)
-		if err := c.Bind(company); err != nil {
+		registration := new(Registration)
+		if err := c.Bind(registration); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
-		if err := c.Validate(company); err != nil {
+		if err := c.Validate(registration); err != nil {
 			return err
 		}
 
-		hashedPassword, err := HashPassword(company.Pass)
+		hashedPassword, err := HashPassword(registration.Password)
 		if err != nil {
 			return err
 		}
 
-		company.Pass = hashedPassword
-		if err := repository.SaveCompany(company); err != nil {
+		registration.Password = hashedPassword
+		company, err := repository.Register(registration)
+		if err != nil {
 			return err
 		}
 
-		company.Pass = ""
 		return c.JSON(http.StatusCreated, company)
 	})
 

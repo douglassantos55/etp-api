@@ -13,8 +13,10 @@ func TestRepository(t *testing.T) {
 	}
 
 	_, err = conn.DB.Exec(`
-        INSERT INTO companies (name, email, password)
-        VALUES ("Coca-Cola", "coke@email.com", "aoeu")
+        INSERT INTO companies (name, email, password, created_at, blocked_at, deleted_at) VALUES
+        ("Coca-Cola", "coke@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, NULL),
+        ("Blocked", "blocked@email.com", "aoeu", "2023-10-22T01:11:53Z", "2023-10-22T01:11:53Z", NULL),
+        ("Deleted", "deleted@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, "2023-10-22T01:11:53Z")
     `)
 	if err != nil {
 		t.Fatalf("could not seed database: %s", err)
@@ -31,13 +33,15 @@ func TestRepository(t *testing.T) {
 	t.Run("should return with id", func(t *testing.T) {
 		t.Parallel()
 
-		company := &company.Company{
-			Name:  "McDonalds",
-			Pass:  "password",
-			Email: "contact@mcdonalds.com",
+		registration := &company.Registration{
+			Name:     "McDonalds",
+			Password: "password",
+			Email:    "contact@mcdonalds.com",
+			Confirm:  "password",
 		}
 
-		if err := repository.SaveCompany(company); err != nil {
+		company, err := repository.Register(registration)
+		if err != nil {
 			t.Fatalf("could not save company: %s", err)
 		}
 
@@ -67,6 +71,30 @@ func TestRepository(t *testing.T) {
 		}
 		if company == nil {
 			t.Error("should find company")
+		}
+	})
+
+	t.Run("should not return blocked company by email", func(t *testing.T) {
+		t.Parallel()
+
+		company, err := repository.GetByEmail("blocked@email.com")
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+		if company != nil {
+			t.Errorf("should not find blocked company, got %+v", company)
+		}
+	})
+
+	t.Run("should not return deleted company by email", func(t *testing.T) {
+		t.Parallel()
+
+		company, err := repository.GetByEmail("deleted@email.com")
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+		if company != nil {
+			t.Errorf("should not find deleted company, got %+v", company)
 		}
 	})
 }

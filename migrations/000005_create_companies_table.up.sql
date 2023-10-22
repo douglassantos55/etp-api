@@ -3,8 +3,8 @@ CREATE TABLE IF NOT EXISTS `companies` (
     `name` VARCHAR(255) NOT NULL,
     `email` VARCHAR(255) NOT NULL,
     `password` VARCHAR(255) NOT NULL,
-    `last_login` INTEGER DEFAULT NULL,
-    `blocked_at` INTEGER DEFAULT NULL,
-    `deleted_at` INTEGER DEFAULT NULL,
-    `created_at` TEXT DEFAULT CURRENT_TIMESTAMP
+    `last_login` TIMESTAMP DEFAULT NULL,
+    `blocked_at` TIMESTAMP DEFAULT NULL,
+    `deleted_at` TIMESTAMP DEFAULT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
