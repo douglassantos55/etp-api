@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 
@@ -74,8 +75,12 @@ func (v *Validator) Validate(i any) error {
 func NewServer() *echo.Echo {
 	e := echo.New()
 
-	e.Use(middleware.CORS())
 	e.Use(middleware.Logger())
+
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowCredentials: true,
+		AllowOrigins:     []string{os.Getenv("WEBAPP_ORIGIN")},
+	}))
 
 	e.Validator = &Validator{}
 
