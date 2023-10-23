@@ -70,34 +70,29 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 
 		company, err := repository.GetByEmail(credentials.Email)
 		if err != nil || company == nil {
-			return echo.NewHTTPError(http.StatusUnauthorized, server.Response{
-				Type:   "failure",
-				Status: http.StatusUnauthorized,
-				Data:   map[string]any{"error": "invalid credentials"},
+			return echo.NewHTTPError(http.StatusBadRequest, server.ValidationErrors{
+				Errors: map[string]string{"email": "invalid credentials"},
 			})
 		}
 
 		if err := ComparePassword(company.Pass, credentials.Pass); err != nil {
-			return echo.NewHTTPError(http.StatusUnauthorized, server.Response{
-				Type:   "failure",
-				Status: http.StatusUnauthorized,
-				Data:   map[string]any{"error": "invalid credentials"},
+			return echo.NewHTTPError(http.StatusBadRequest, server.ValidationErrors{
+				Errors: map[string]string{"email": "invalid credentials"},
 			})
 		}
 
 		c.SetCookie(&http.Cookie{
 			Secure:   true,
 			HttpOnly: false,
+			Path:     "/",
 			Name:     "company_id",
 			SameSite: http.SameSiteNoneMode,
 			Value:    fmt.Sprintf("%d", company.Id),
 			Expires:  time.Now().Add(10 * time.Minute),
 		})
 
-		return c.JSON(http.StatusOK, server.Response{
-			Status:   http.StatusOK,
-			Type:     "redirect",
-			Location: "/",
+		return c.JSON(http.StatusTemporaryRedirect, map[string]string{
+			"location": "/",
 		})
 	})
 }

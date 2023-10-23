@@ -177,7 +177,7 @@ func TestCompanyService(t *testing.T) {
 		}
 	})
 
-	t.Run("should return unauthorized when email not found", func(t *testing.T) {
+	t.Run("should return bad request when email not found", func(t *testing.T) {
 		t.Parallel()
 
 		body := strings.NewReader(`email=test@test.com&password=123`)
@@ -189,12 +189,12 @@ func TestCompanyService(t *testing.T) {
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
 		}
 	})
 
-	t.Run("should return unauthorized when password does not match", func(t *testing.T) {
+	t.Run("should return bad request when password does not match", func(t *testing.T) {
 		t.Parallel()
 
 		body := strings.NewReader(`email=admin@test.com&password=123`)
@@ -206,8 +206,8 @@ func TestCompanyService(t *testing.T) {
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
 		}
 	})
 
@@ -223,8 +223,8 @@ func TestCompanyService(t *testing.T) {
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusOK {
-			t.Errorf("expected status %d, got %d. %s", http.StatusOK, rec.Code, rec.Body.String())
+		if rec.Code != http.StatusTemporaryRedirect {
+			t.Errorf("expected status %d, got %d. %s", http.StatusTemporaryRedirect, rec.Code, rec.Body.String())
 		}
 		if rec.Header().Get("Set-Cookie") == "" {
 			t.Fatal("expected Set-Cookie header")
