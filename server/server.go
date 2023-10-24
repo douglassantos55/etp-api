@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"reflect"
 	"strings"
 
@@ -13,7 +12,9 @@ import (
 	"github.com/go-playground/validator/v10"
 	en_translations "github.com/go-playground/validator/v10/translations/en"
 	br_translations "github.com/go-playground/validator/v10/translations/pt_BR"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
+	"github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -72,14 +73,27 @@ func (v *Validator) Validate(i any) error {
 	return nil
 }
 
-func NewServer() *echo.Echo {
+func NewServer(clientOrigin, jwtSecret string) *echo.Echo {
 	e := echo.New()
 
 	e.Use(middleware.Logger())
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 		AllowCredentials: true,
-		AllowOrigins:     []string{os.Getenv("WEBAPP_ORIGIN")},
+		AllowOrigins:     []string{clientOrigin},
+	}))
+
+	e.Use(echojwt.WithConfig(echojwt.Config{
+		Skipper: func(c echo.Context) bool {
+			isLogin := c.Request().URL.Path == "/companies/login"
+			isRegister := c.Request().URL.Path == "/companies/register"
+
+			return isLogin || isRegister
+		},
+		SigningKey: []byte(jwtSecret),
+		NewClaimsFunc: func(c echo.Context) jwt.Claims {
+			return new(jwt.RegisteredClaims)
+		},
 	}))
 
 	e.Validator = &Validator{}

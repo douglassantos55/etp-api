@@ -6,6 +6,7 @@ import (
 	"api/server"
 	"api/warehouse"
 	"log"
+	"os"
 
 	"github.com/gorilla/websocket"
 )
@@ -20,7 +21,11 @@ func main() {
 	connections := make(chan server.Connection)
 	disconnections := make(chan string)
 
-	svr := server.NewServer()
+	svr := server.NewServer(
+		os.Getenv("CLIENT_ORIGIN"),
+		os.Getenv("JWT_SECRET"),
+	)
+
 	resource.CreateEndpoints(svr, conn)
 	warehouse.CreateEndpoints(svr, conn)
 

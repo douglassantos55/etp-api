@@ -1,14 +1,14 @@
 package company
 
 import (
+	"api/auth"
 	"api/database"
 	"api/server"
-	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Registration struct {
@@ -40,7 +40,7 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 			return err
 		}
 
-		hashedPassword, err := HashPassword(registration.Password)
+		hashedPassword, err := auth.HashPassword(registration.Password)
 		if err != nil {
 			return err
 		}
@@ -75,36 +75,17 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 			})
 		}
 
-		if err := ComparePassword(company.Pass, credentials.Pass); err != nil {
+		if err := auth.ComparePassword(company.Pass, credentials.Pass); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, server.ValidationErrors{
 				Errors: map[string]string{"email": "invalid credentials"},
 			})
 		}
 
-		c.SetCookie(&http.Cookie{
-			Secure:   true,
-			HttpOnly: false,
-			Path:     "/",
-			Name:     "company_id",
-			SameSite: http.SameSiteNoneMode,
-			Value:    fmt.Sprintf("%d", company.Id),
-			Expires:  time.Now().Add(10 * time.Minute),
-		})
+		token, err := auth.GenerateToken(company.Id, os.Getenv("JWT_SECRET"))
+		if err != nil {
+			return err
+		}
 
-		return c.JSON(http.StatusTemporaryRedirect, map[string]string{
-			"location": "/",
-		})
+		return c.JSON(http.StatusOK, map[string]string{"token": token})
 	})
-}
-
-func HashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	return string(hash), nil
-}
-
-func ComparePassword(hash, password string) error {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }

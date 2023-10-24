@@ -1,6 +1,7 @@
 package resource_test
 
 import (
+	"api/auth"
 	"api/database"
 	"api/resource"
 	"api/server"
@@ -31,13 +32,19 @@ func TestService(t *testing.T) {
 		}
 	})
 
-	server := server.NewServer()
+	server := server.NewServer("localhost", "secret")
 	resource.CreateEndpoints(server, conn)
+
+	token, err := auth.GenerateToken(1, "secret")
+	if err != nil {
+		t.Fatalf("could not generate jwt token: %s", err)
+	}
 
 	t.Run("should return 201 when creating resource", func(t *testing.T) {
 		req := httptest.NewRequest("POST", "/resources/", strings.NewReader(`{"name":"Wood","category_id":1,"image":"http://placeimg.com/10"}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		server.ServeHTTP(rec, req)
@@ -51,12 +58,13 @@ func TestService(t *testing.T) {
 		req := httptest.NewRequest("POST", "/resources/", strings.NewReader(`{"name":"","image":""}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		server.ServeHTTP(rec, req)
 
 		if rec.Code != http.StatusBadRequest {
-			t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+			t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
 		}
 	})
 
@@ -64,6 +72,7 @@ func TestService(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/resources/1", strings.NewReader(`{"name":""}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		server.ServeHTTP(rec, req)
@@ -77,6 +86,7 @@ func TestService(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/resources/1052", strings.NewReader(`{"name":"Iron"}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		server.ServeHTTP(rec, req)
@@ -90,6 +100,7 @@ func TestService(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/resources/someid", strings.NewReader(`{"name":"Iron"}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		server.ServeHTTP(rec, req)
@@ -105,6 +116,7 @@ func TestService(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/resources/1", body)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		server.ServeHTTP(rec, req)
@@ -117,6 +129,7 @@ func TestService(t *testing.T) {
 	t.Run("should return 404 if resource is not found", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/resources/2355", nil)
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		server.ServeHTTP(rec, req)
@@ -129,6 +142,7 @@ func TestService(t *testing.T) {
 	t.Run("should return 400 if id is invalid", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/resources/someid", nil)
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		server.ServeHTTP(rec, req)
@@ -141,6 +155,7 @@ func TestService(t *testing.T) {
 	t.Run("should return resource", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/resources/2", nil)
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		server.ServeHTTP(rec, req)

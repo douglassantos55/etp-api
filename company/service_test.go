@@ -1,6 +1,7 @@
 package company_test
 
 import (
+	"api/auth"
 	"api/company"
 	"api/database"
 	"api/server"
@@ -12,7 +13,7 @@ import (
 )
 
 func TestCompanyService(t *testing.T) {
-	svr := server.NewServer()
+	svr := server.NewServer("localhost", "secret")
 	conn, err := database.GetConnection(database.SQLITE, "../test.db")
 	if err != nil {
 		t.Fatalf("could not connect to database: %s", err)
@@ -32,6 +33,11 @@ func TestCompanyService(t *testing.T) {
 		}
 	})
 
+	token, err := auth.GenerateToken(1, "secret")
+	if err != nil {
+		t.Fatalf("could not generate jwt token: %s", err)
+	}
+
 	company.CreateEndpoints(svr, conn)
 
 	t.Run("should validate registration", func(t *testing.T) {
@@ -42,6 +48,7 @@ func TestCompanyService(t *testing.T) {
 		req := httptest.NewRequest("POST", "/companies/register", body)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
@@ -78,6 +85,7 @@ func TestCompanyService(t *testing.T) {
 		req := httptest.NewRequest("POST", "/companies/register", body)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
@@ -106,6 +114,7 @@ func TestCompanyService(t *testing.T) {
 		req := httptest.NewRequest("POST", "/companies/register", body)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
@@ -124,30 +133,6 @@ func TestCompanyService(t *testing.T) {
 		}
 	})
 
-	t.Run("hash password", func(t *testing.T) {
-		t.Parallel()
-
-		hashed, err := company.HashPassword("password")
-		if err != nil {
-			t.Fatalf("could not hash password: %s", err)
-		}
-
-		if hashed == "password" {
-			t.Errorf("should hash password, got %s", hashed)
-		}
-	})
-
-	t.Run("compare password", func(t *testing.T) {
-		t.Parallel()
-
-		hash := "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy"
-		err := company.ComparePassword(hash, "password")
-
-		if err != nil {
-			t.Errorf("error comparing passwords: %s", err)
-		}
-	})
-
 	t.Run("should validate login", func(t *testing.T) {
 		t.Parallel()
 
@@ -156,6 +141,7 @@ func TestCompanyService(t *testing.T) {
 		req := httptest.NewRequest("POST", "/companies/login", body)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
@@ -185,6 +171,7 @@ func TestCompanyService(t *testing.T) {
 		req := httptest.NewRequest("POST", "/companies/login", body)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
@@ -202,6 +189,7 @@ func TestCompanyService(t *testing.T) {
 		req := httptest.NewRequest("POST", "/companies/login", body)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
@@ -211,7 +199,7 @@ func TestCompanyService(t *testing.T) {
 		}
 	})
 
-	t.Run("should send Set-Cookie header when authenticated", func(t *testing.T) {
+	t.Run("should send token when authenticated", func(t *testing.T) {
 		t.Parallel()
 
 		body := strings.NewReader(`email=admin@test.com&password=password`)
@@ -219,15 +207,22 @@ func TestCompanyService(t *testing.T) {
 		req := httptest.NewRequest("POST", "/companies/login", body)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		rec := httptest.NewRecorder()
 		svr.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusTemporaryRedirect {
-			t.Errorf("expected status %d, got %d. %s", http.StatusTemporaryRedirect, rec.Code, rec.Body.String())
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status %d, got %d. %s", http.StatusOK, rec.Code, rec.Body.String())
 		}
-		if rec.Header().Get("Set-Cookie") == "" {
-			t.Fatal("expected Set-Cookie header")
+
+		response := make(map[string]string)
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("could not parse response: %s", err)
+		}
+
+		if _, ok := response["token"]; !ok {
+			t.Error("expected token")
 		}
 	})
 }
