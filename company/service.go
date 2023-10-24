@@ -5,7 +5,6 @@ import (
 	"api/database"
 	"api/server"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -81,7 +80,7 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 			})
 		}
 
-		token, err := auth.GenerateToken(company.Id, os.Getenv("JWT_SECRET"))
+		token, err := auth.GenerateToken(company.Id, server.GetJwtSecret())
 		if err != nil {
 			return err
 		}

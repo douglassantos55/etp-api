@@ -13,7 +13,7 @@ import (
 )
 
 func TestCompanyService(t *testing.T) {
-	svr := server.NewServer("localhost", "secret")
+	svr := server.NewServer()
 	conn, err := database.GetConnection(database.SQLITE, "../test.db")
 	if err != nil {
 		t.Fatalf("could not connect to database: %s", err)

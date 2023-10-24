@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 
@@ -19,10 +20,13 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
+const (
+	JWT_SECRET_KEY    = "JWT_SECRET"
+	CLIENT_ORIGIN_KEY = "CLIENT_ORIGIN"
+)
+
 type (
 	Validator struct{}
-
-	}
 
 	ValidationErrors struct {
 		Errors map[string]string `json:"errors"`
@@ -41,6 +45,38 @@ type (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
+func GetJwtSecret() string {
+	return os.Getenv(JWT_SECRET_KEY)
+}
+
+func NewServer() *echo.Echo {
+	e := echo.New()
+
+	e.Use(middleware.Logger())
+
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowCredentials: true,
+		AllowOrigins:     []string{os.Getenv(CLIENT_ORIGIN_KEY)},
+	}))
+
+	e.Use(echojwt.WithConfig(echojwt.Config{
+		Skipper: func(c echo.Context) bool {
+			isLogin := c.Request().URL.Path == "/companies/login"
+			isRegister := c.Request().URL.Path == "/companies/register"
+
+			return isLogin || isRegister
+		},
+		SigningKey: []byte(GetJwtSecret()),
+		NewClaimsFunc: func(c echo.Context) jwt.Claims {
+			return new(jwt.RegisteredClaims)
+		},
+	}))
+
+	e.Validator = new(Validator)
+
+	return e
 }
 
 func (v *Validator) Validate(i any) error {
@@ -71,34 +107,6 @@ func (v *Validator) Validate(i any) error {
 		)
 	}
 	return nil
-}
-
-func NewServer(clientOrigin, jwtSecret string) *echo.Echo {
-	e := echo.New()
-
-	e.Use(middleware.Logger())
-
-	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowCredentials: true,
-		AllowOrigins:     []string{clientOrigin},
-	}))
-
-	e.Use(echojwt.WithConfig(echojwt.Config{
-		Skipper: func(c echo.Context) bool {
-			isLogin := c.Request().URL.Path == "/companies/login"
-			isRegister := c.Request().URL.Path == "/companies/register"
-
-			return isLogin || isRegister
-		},
-		SigningKey: []byte(jwtSecret),
-		NewClaimsFunc: func(c echo.Context) jwt.Claims {
-			return new(jwt.RegisteredClaims)
-		},
-	}))
-
-	e.Validator = &Validator{}
-
-	return e
 }
 
 func Greeting(events chan<- Message) echo.HandlerFunc {
