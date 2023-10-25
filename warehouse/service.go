@@ -1,10 +1,10 @@
 package warehouse
 
 import (
+	"api/auth"
 	"api/database"
 	"api/resource"
 	"net/http"
-	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
@@ -20,15 +20,17 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 	group := e.Group("/warehouse")
 	repository := NewRepository(conn)
 
-	group.GET("/:company", func(c echo.Context) error {
-		companyId, err := strconv.ParseUint(c.Param("company"), 10, 64)
+	group.GET("", func(c echo.Context) error {
+		companyId, err := auth.ParseToken(c.Get("user"))
 		if err != nil {
 			return err
 		}
+
 		resources, err := repository.FetchInventory(companyId)
 		if err != nil {
 			return err
 		}
+
 		return c.JSON(http.StatusOK, resources)
 	})
 }
