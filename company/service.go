@@ -5,6 +5,7 @@ import (
 	"api/database"
 	"api/server"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -29,6 +30,42 @@ type Company struct {
 func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 	group := e.Group("/companies")
 	repository := NewRepository(conn)
+
+	group.GET("/current", func(c echo.Context) error {
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		company, err := repository.GetById(companyId)
+		if err != nil {
+			return err
+		}
+
+		if company == nil {
+			return echo.NewHTTPError(http.StatusNotFound)
+		}
+
+		return c.JSON(http.StatusOK, company)
+	})
+
+	group.GET("/:id", func(c echo.Context) error {
+		companyId, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+
+		company, err := repository.GetById(companyId)
+		if err != nil {
+			return err
+		}
+
+		if company == nil {
+			return echo.NewHTTPError(http.StatusNotFound)
+		}
+
+		return c.JSON(http.StatusOK, company)
+	})
 
 	group.POST("/register", func(c echo.Context) error {
 		registration := new(Registration)

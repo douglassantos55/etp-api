@@ -13,6 +13,8 @@ import (
 )
 
 func TestCompanyService(t *testing.T) {
+	t.Setenv(server.JWT_SECRET_KEY, "secret")
+
 	svr := server.NewServer()
 	conn, err := database.GetConnection(database.SQLITE, "../test.db")
 	if err != nil {
@@ -20,8 +22,8 @@ func TestCompanyService(t *testing.T) {
 	}
 
 	_, err = conn.DB.Exec(`
-        INSERT INTO companies (name, email, password)
-        VALUES ("Test", "admin@test.com", "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy")
+        INSERT INTO companies (id, name, email, password)
+        VALUES (1, "Test", "admin@test.com", "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy")
     `)
 	if err != nil {
 		t.Fatalf("could not seed database: %s", err)
@@ -223,6 +225,34 @@ func TestCompanyService(t *testing.T) {
 
 		if _, ok := response["token"]; !ok {
 			t.Error("expected token")
+		}
+	})
+
+	t.Run("should return token company", func(t *testing.T) {
+		t.Parallel()
+
+		req := httptest.NewRequest("GET", "/companies/current", nil)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
+		}
+
+		var company company.Company
+		err := json.Unmarshal(rec.Body.Bytes(), &company)
+		if err != nil {
+			t.Fatalf("could not parse json: %s", err)
+		}
+
+		if company.Id != 1 {
+			t.Errorf("expected id %d, got %d", 1, company.Id)
+		}
+		if company.Name != "Test" {
+			t.Errorf("expected name %s, got %s", "Test", company.Name)
 		}
 	})
 }
