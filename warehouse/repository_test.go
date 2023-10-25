@@ -121,4 +121,24 @@ func TestGoquRepository(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("should include resource category", func(t *testing.T) {
+		items, err := repository.FetchInventory(1)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if items == nil {
+			t.Fatal("expected items, got nil")
+		}
+
+		for _, item := range items {
+			if item.Resource.Category == nil {
+				t.Error("expected category, got nil")
+			}
+			if item.Resource.Category.Name == "" {
+				t.Error("expected name, got empty")
+			}
+		}
+	})
 }

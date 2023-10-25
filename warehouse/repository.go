@@ -27,16 +27,24 @@ func (r *goquRepository) FetchInventory(companyId uint64) ([]*StockItem, error) 
 
 	err := r.builder.
 		Select(
-			goqu.I("resource.id").As(goqu.C("resource.id")),
-			goqu.I("resource.name").As(goqu.C("resource.name")),
-			goqu.I("resource.image").As(goqu.C("resource.image")),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+			goqu.I("r.name").As(goqu.C("resource.name")),
+			goqu.I("r.image").As(goqu.C("resource.image")),
+			goqu.I("c.id").As(goqu.C("resource.category.id")),
+			goqu.I("c.name").As(goqu.C("resource.category.name")),
 			goqu.SUM("i.quantity").As("quantity"),
 			goqu.L("? / ?", goqu.SUM(goqu.L("? * ?", goqu.I("i.sourcing_cost"), goqu.I("i.quantity"))), goqu.SUM(goqu.I("i.quantity"))).As("sourcing_cost"),
 		).
 		From(goqu.T("inventories").As("i")).
-		InnerJoin(goqu.T("resources").As("resource"), goqu.On(goqu.I("i.resource_id").Eq(goqu.I("resource.id")))).
+		InnerJoin(goqu.T("resources").As("r"), goqu.On(goqu.I("i.resource_id").Eq(goqu.I("r.id")))).
+		InnerJoin(goqu.T("categories").As("c"), goqu.On(
+			goqu.And(
+				goqu.I("r.category_id").Eq(goqu.I("c.id")),
+				goqu.I("c.deleted_at").IsNull(),
+			),
+		)).
 		Where(goqu.I("i.company_id").Eq(companyId)).
-		GroupBy(goqu.I("resource.id")).
+		GroupBy(goqu.I("r.id")).
 		ScanStructs(&items)
 
 	if err != nil {
