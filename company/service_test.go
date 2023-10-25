@@ -231,7 +231,7 @@ func TestCompanyService(t *testing.T) {
 	t.Run("should return token company", func(t *testing.T) {
 		t.Parallel()
 
-		req := httptest.NewRequest("GET", "/companies/current", nil)
+		req := httptest.NewRequest("GET", "/companies/me", nil)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
 

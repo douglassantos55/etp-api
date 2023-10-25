@@ -1,6 +1,7 @@
 package main
 
 import (
+	"api/company"
 	"api/database"
 	"api/resource"
 	"api/server"
@@ -24,6 +25,7 @@ func main() {
 
 	resource.CreateEndpoints(svr, conn)
 	warehouse.CreateEndpoints(svr, conn)
+	company.CreateEndpoints(svr, conn)
 
 	svr.GET("/", server.Greeting(events))
 	svr.GET("/private", server.Private(events))

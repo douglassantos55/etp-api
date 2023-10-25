@@ -31,7 +31,7 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 	group := e.Group("/companies")
 	repository := NewRepository(conn)
 
-	group.GET("/current", func(c echo.Context) error {
+	group.GET("/me", func(c echo.Context) error {
 		companyId, err := auth.ParseToken(c.Get("user"))
 		if err != nil {
 			return err
