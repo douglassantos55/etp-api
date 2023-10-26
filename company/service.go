@@ -31,10 +31,10 @@ func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
 	group := e.Group("/companies")
 	repository := NewRepository(conn)
 
-	group.GET("/me", func(c echo.Context) error {
-		companyId, err := auth.ParseToken(c.Get("user"))
+	group.GET("/:id", func(c echo.Context) error {
+		companyId, err := strconv.ParseUint(c.Param("id"), 10, 64)
 		if err != nil {
-			return err
+			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
 
 		company, err := repository.GetById(companyId)
