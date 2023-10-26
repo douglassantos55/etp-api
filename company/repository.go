@@ -28,14 +28,15 @@ func NewRepository(conn *database.Connection) Repository {
 func (r *goquRepository) GetById(id uint64) (*Company, error) {
 	company := new(Company)
 
-	_, err := r.builder.Select(
-		goqu.I("c.id"),
-		goqu.I("c.name"),
-		goqu.I("c.email"),
-		goqu.I("c.password"),
-		goqu.I("c.last_login"),
-		goqu.I("c.created_at"),
-	).
+	_, err := r.builder.
+		Select(
+			goqu.I("c.id"),
+			goqu.I("c.name"),
+			goqu.I("c.email"),
+			goqu.I("c.password"),
+			goqu.I("c.last_login"),
+			goqu.I("c.created_at"),
+		).
 		From(goqu.T("companies").As("c")).
 		Where(
 			goqu.And(
@@ -52,14 +53,15 @@ func (r *goquRepository) GetById(id uint64) (*Company, error) {
 func (r *goquRepository) GetByEmail(email string) (*Company, error) {
 	company := new(Company)
 
-	found, err := r.builder.Select(
-		goqu.I("c.id"),
-		goqu.I("c.name"),
-		goqu.I("c.email"),
-		goqu.I("c.password"),
-		goqu.I("c.last_login"),
-		goqu.I("c.created_at"),
-	).
+	found, err := r.builder.
+		Select(
+			goqu.I("c.id"),
+			goqu.I("c.name"),
+			goqu.I("c.email"),
+			goqu.I("c.password"),
+			goqu.I("c.last_login"),
+			goqu.I("c.created_at"),
+		).
 		From(goqu.T("companies").As("c")).
 		Where(
 			goqu.And(
@@ -109,14 +111,15 @@ func (r *goquRepository) Register(registration *Registration) (*Company, error) 
 func (r *goquRepository) getById(id uint64) (*Company, error) {
 	company := new(Company)
 
-	found, err := r.builder.Select(
-		goqu.I("c.id"),
-		goqu.I("c.name"),
-		goqu.I("c.email"),
-		goqu.I("c.password"),
-		goqu.I("c.last_login"),
-		goqu.I("c.created_at"),
-	).
+	found, err := r.builder.
+		Select(
+			goqu.I("c.id"),
+			goqu.I("c.name"),
+			goqu.I("c.email"),
+			goqu.I("c.password"),
+			goqu.I("c.last_login"),
+			goqu.I("c.created_at"),
+		).
 		From(goqu.T("companies").As("c")).
 		Where(
 			goqu.And(
