@@ -71,7 +71,7 @@ func (r *goquRepository) GetById(id uint64) (*Resource, error) {
 		Where(goqu.I("r.id").Eq(id)).
 		ScanStruct(resource)
 
-	if !found {
+	if err != nil || !found {
 		return nil, err
 	}
 

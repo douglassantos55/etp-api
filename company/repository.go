@@ -28,7 +28,7 @@ func NewRepository(conn *database.Connection) Repository {
 func (r *goquRepository) GetById(id uint64) (*Company, error) {
 	company := new(Company)
 
-	_, err := r.builder.
+	found, err := r.builder.
 		Select(
 			goqu.I("c.id"),
 			goqu.I("c.name"),
@@ -46,6 +46,10 @@ func (r *goquRepository) GetById(id uint64) (*Company, error) {
 			),
 		).
 		ScanStruct(company)
+
+	if err != nil || !found {
+		return nil, err
+	}
 
 	return company, err
 }
@@ -72,12 +76,8 @@ func (r *goquRepository) GetByEmail(email string) (*Company, error) {
 		).
 		ScanStruct(company)
 
-	if err != nil {
+	if err != nil || !found {
 		return nil, err
-	}
-
-	if !found {
-		return nil, nil
 	}
 
 	return company, nil
@@ -105,7 +105,7 @@ func (r *goquRepository) Register(registration *Registration) (*Company, error) 
 		return nil, err
 	}
 
-	return r.getById(uint64(id))
+	return r.GetById(uint64(id))
 }
 
 func (r *goquRepository) getById(id uint64) (*Company, error) {

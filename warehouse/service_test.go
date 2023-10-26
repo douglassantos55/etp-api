@@ -28,9 +28,6 @@ func TestWarehouseService(t *testing.T) {
         INSERT INTO categories (id, name)
         VALUES (1, "Food"), (2, "Construction");
 
-        INSERT INTO companies (id, name, email, password)
-        VALUES (1, "Test", "test@test.com", "123"), (2, "Test", "test@test.com", "123");
-
         INSERT INTO resources (id, name, category_id)
         VALUES (1, "Apple", 1), (2, "Iron", 2), (3, "Seed", 1);
 
