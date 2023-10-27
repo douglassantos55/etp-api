@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS `companies_buildings` (
     `name` VARCHAR(255) NOT NULL,
     `company_id` INTEGER NOT NULL,
     `building_id` INTEGER NOT NULL,
-    `level` TINYINT UNSIGNED DEFAULT 0,
+    `level` TINYINT UNSIGNED DEFAULT 1,
     `position` TINYINT UNSIGNED DEFAULT NULL,
     `built_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `demolished_at` TIMESTAMP DEFAULT NULL,

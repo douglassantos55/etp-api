@@ -13,6 +13,8 @@ type (
 		GetById(id uint64) (*Company, error)
 
 		GetByEmail(email string) (*Company, error)
+
+		GetBuildings(companyId uint64) ([]*CompanyBuilding, error)
 	}
 
 	goquRepository struct {
@@ -108,35 +110,38 @@ func (r *goquRepository) Register(registration *Registration) (*Company, error) 
 	return r.GetById(uint64(id))
 }
 
-func (r *goquRepository) getById(id uint64) (*Company, error) {
-	company := new(Company)
+func (r *goquRepository) GetBuildings(companyId uint64) ([]*CompanyBuilding, error) {
+	buildings := make([]*CompanyBuilding, 0)
 
-	found, err := r.builder.
+	err := r.builder.
 		Select(
-			goqu.I("c.id"),
-			goqu.I("c.name"),
-			goqu.I("c.email"),
-			goqu.I("c.password"),
-			goqu.I("c.last_login"),
-			goqu.I("c.created_at"),
+			goqu.I("cb.id"),
+			goqu.I("cb.name"),
+			goqu.I("b.wages_per_hour"),
+			goqu.I("b.admin_per_hour"),
+			goqu.I("b.maintenance_per_hour"),
+			goqu.I("cb.level"),
+			goqu.I("cb.position"),
 		).
-		From(goqu.T("companies").As("c")).
-		Where(
-			goqu.And(
-				goqu.I("c.id").Eq(id),
-				goqu.I("c.blocked_at").IsNull(),
-				goqu.I("c.deleted_at").IsNull(),
+		From(goqu.T("companies_buildings").As("cb")).
+		InnerJoin(
+			goqu.T("buildings").As("b"),
+			goqu.On(
+				goqu.And(
+					goqu.I("b.id").Eq(goqu.I("cb.building_id")),
+					goqu.I("b.deleted_at").IsNull(),
+				),
 			),
 		).
-		ScanStruct(company)
+		Where(goqu.And(
+			goqu.I("cb.company_id").Eq(companyId),
+			goqu.I("cb.demolished_at").IsNull(),
+		)).
+		ScanStructs(&buildings)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if !found {
-		return nil, nil
-	}
-
-	return company, nil
+	return buildings, nil
 }
