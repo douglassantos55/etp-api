@@ -2,7 +2,6 @@ package resource_test
 
 import (
 	"api/auth"
-	"api/database"
 	"api/resource"
 	"api/server"
 	"encoding/json"
@@ -12,30 +11,48 @@ import (
 	"testing"
 )
 
+type fakeRepository struct {
+	data map[uint64]*resource.Resource
+}
+
+func NewFakeRepository() resource.Repository {
+	data := map[uint64]*resource.Resource{
+		1: {Id: 1, Name: "Water", Category: &resource.Category{Id: 1, Name: "Food"}},
+		2: {Id: 2, Name: "Seeds", Category: &resource.Category{Id: 1, Name: "Food"}},
+	}
+	return &fakeRepository{data}
+}
+
+func (r *fakeRepository) FetchResources() ([]*resource.Resource, error) {
+	items := make([]*resource.Resource, 0)
+	for _, item := range r.data {
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (r *fakeRepository) GetById(id uint64) (*resource.Resource, error) {
+	return r.data[id], nil
+}
+
+func (r *fakeRepository) SaveResource(resource *resource.Resource) (*resource.Resource, error) {
+	id := uint64(len(r.data) + 1)
+	resource.Id = id
+	r.data[id] = resource
+	return resource, nil
+}
+
+func (r *fakeRepository) UpdateResource(resource *resource.Resource) (*resource.Resource, error) {
+	r.data[resource.Id] = resource
+	return resource, nil
+}
+
 func TestService(t *testing.T) {
 	t.Setenv("JWT_SECRET", "secret")
 
-	conn, err := database.GetConnection(database.SQLITE, "../test.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = conn.DB.Exec(`
-        INSERT INTO categories (id, name) VALUES (1, "Food");
-        INSERT INTO resources (id, name, category_id) VALUES (1, "Water", 1), (2, "Seeds", 1);
-    `)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Cleanup(func() {
-		if _, err := conn.DB.Exec("DELETE FROM resources; DELETE FROM categories;"); err != nil {
-			t.Fatalf("could not truncate table: %s", err)
-		}
-	})
-
 	svr := server.NewServer()
-	resource.CreateEndpoints(svr, conn)
+	svc := resource.NewService(NewFakeRepository())
+	resource.CreateEndpoints(svr, svc)
 
 	token, err := auth.GenerateToken(1, "secret")
 	if err != nil {
@@ -43,8 +60,6 @@ func TestService(t *testing.T) {
 	}
 
 	t.Run("should return 201 when creating resource", func(t *testing.T) {
-		t.Parallel()
-
 		req := httptest.NewRequest("POST", "/resources/", strings.NewReader(`{"name":"Wood","category_id":1,"image":"http://placeimg.com/10"}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
@@ -75,8 +90,6 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("should validate input when updating resource", func(t *testing.T) {
-		t.Parallel()
-
 		req := httptest.NewRequest("PUT", "/resources/1", strings.NewReader(`{"name":""}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
@@ -123,9 +136,7 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("should return 200 when updating resource", func(t *testing.T) {
-		t.Parallel()
-
-		body := strings.NewReader(`{"name":"Iron"}`)
+		body := strings.NewReader(`{"name":"Iron","category_id":1}`)
 
 		req := httptest.NewRequest("PUT", "/resources/1", body)
 		req.Header.Set("Content-Type", "application/json")

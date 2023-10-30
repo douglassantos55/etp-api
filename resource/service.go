@@ -1,100 +1,53 @@
 package resource
 
-import (
-	"api/database"
-	"net/http"
-	"strconv"
+type (
+	Service interface {
+		GetAll() ([]*Resource, error)
+		GetById(id uint64) (*Resource, error)
+		CreateResource(resource *Resource) (*Resource, error)
+		UpdateResource(resource *Resource) (*Resource, error)
+	}
 
-	"github.com/labstack/echo/v4"
+	Category struct {
+		Id   uint64 `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
+		Name string `db:"name" json:"name" validate:"required"`
+	}
+
+	Item struct {
+		Qty      uint64    `db:"quantity" json:"quantity"`
+		Quality  uint8     `db:"quality" json:"quality"`
+		Resource *Resource `db:"resource" json:"resource"`
+	}
+
+	Resource struct {
+		Id         uint64    `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
+		Name       string    `db:"name" json:"name" validate:"required"`
+		Image      *string   `db:"image" json:"image"`
+		CategoryId uint64    `db:"category_id" json:"category_id" validate:"required"`
+		Category   *Category `db:"category" json:"category" validate:"-"`
+	}
+
+	service struct {
+		repository Repository
+	}
 )
 
-type Category struct {
-	Id   uint64 `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
-	Name string `db:"name" json:"name" validate:"required"`
+func NewService(repository Repository) Service {
+	return &service{repository}
 }
 
-type Item struct {
-	Qty      uint64    `db:"quantity" json:"quantity"`
-	Quality  uint8     `db:"quality" json:"quality"`
-	Resource *Resource `db:"resource" json:"resource"`
+func (s *service) GetAll() ([]*Resource, error) {
+	return s.repository.FetchResources()
 }
 
-type Resource struct {
-	Id         uint64    `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
-	Name       string    `db:"name" json:"name" validate:"required"`
-	Image      *string   `db:"image" json:"image"`
-	CategoryId uint64    `db:"category_id" json:"category_id" validate:"required"`
-	Category   *Category `db:"category" json:"category" validate:"-"`
+func (s *service) GetById(id uint64) (*Resource, error) {
+	return s.repository.GetById(id)
 }
 
-func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
-	group := e.Group("/resources")
-	repository := NewRepository(conn)
+func (s *service) CreateResource(resource *Resource) (*Resource, error) {
+	return s.repository.SaveResource(resource)
+}
 
-	group.GET("/", func(c echo.Context) error {
-		resources, err := repository.FetchResources()
-		if err != nil {
-			return err
-		}
-		return c.JSON(http.StatusOK, resources)
-	})
-
-	group.GET("/:id", func(c echo.Context) error {
-		id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err)
-		}
-		resource, err := repository.GetById(id)
-		if err != nil {
-			return err
-		}
-		if resource == nil {
-			return echo.NewHTTPError(http.StatusNotFound)
-		}
-		return c.JSON(http.StatusOK, resource)
-	})
-
-	group.POST("/", func(c echo.Context) error {
-		resource := new(Resource)
-		if err := c.Bind(resource); err != nil {
-			return err
-		}
-		if err := c.Validate(resource); err != nil {
-			return err
-		}
-		_, err := repository.SaveResource(resource)
-		if err != nil {
-			return err
-		}
-		return c.JSON(http.StatusCreated, resource)
-	})
-
-	group.PUT("/:id", func(c echo.Context) error {
-		id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err)
-		}
-
-		resource, err := repository.GetById(id)
-		if err != nil {
-			return err
-		}
-		if resource == nil {
-			return echo.NewHTTPError(http.StatusNotFound)
-		}
-
-		if err := c.Bind(resource); err != nil {
-			return err
-		}
-		if err := c.Validate(resource); err != nil {
-			return err
-		}
-
-		resource, err = repository.UpdateResource(resource)
-		if err != nil {
-			return err
-		}
-
-		return c.JSON(http.StatusOK, resource)
-	})
+func (s *service) UpdateResource(resource *Resource) (*Resource, error) {
+	return s.repository.UpdateResource(resource)
 }
