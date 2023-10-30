@@ -2,6 +2,7 @@ package warehouse
 
 import (
 	"api/database"
+	"api/resource"
 
 	"github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -9,7 +10,9 @@ import (
 
 type Repository interface {
 	// Fetches the inventory of a company
-	FetchInventory(companyId uint64) ([]*StockItem, error)
+	FetchInventory(companyId uint64) (*Inventory, error)
+
+	ReduceStock(companyId uint64, inventory *Inventory, resources []*resource.Item) error
 }
 
 type goquRepository struct {
@@ -22,7 +25,7 @@ func NewRepository(conn *database.Connection) Repository {
 	return &goquRepository{builder}
 }
 
-func (r *goquRepository) FetchInventory(companyId uint64) ([]*StockItem, error) {
+func (r *goquRepository) FetchInventory(companyId uint64) (*Inventory, error) {
 	items := make([]*StockItem, 0)
 
 	err := r.builder.
@@ -51,7 +54,61 @@ func (r *goquRepository) FetchInventory(companyId uint64) ([]*StockItem, error) 
 		return nil, err
 	}
 
-	return items, nil
+	return &Inventory{items}, nil
+}
+
+func (r *goquRepository) ReduceStock(companyId uint64, inventory *Inventory, resources []*resource.Item) error {
+	tx, err := r.builder.Begin()
+	if err != nil {
+		return err
+	}
+
+	return tx.Wrap(func() error {
+		for _, resource := range resources {
+			for _, item := range inventory.Items {
+				item.Qty -= resource.Qty
+				if item.Qty == 0 {
+					if err := r.removeStock(tx, companyId, item); err != nil {
+						return err
+					}
+				} else {
+					if err := r.updateStock(tx, companyId, item); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	})
+}
+
+func (r *goquRepository) removeStock(tx *goqu.TxDatabase, companyId uint64, item *StockItem) error {
+	_, err := r.builder.
+		Delete(goqu.T("inventories")).
+		Where(goqu.And(
+			goqu.I("quality").Eq(item.Quality),
+			goqu.I("company_id").Eq(companyId),
+			goqu.I("resource_id").Eq(item.Resource.Id),
+		)).
+		Executor().
+		Exec()
+
+	return err
+}
+
+func (r *goquRepository) updateStock(tx *goqu.TxDatabase, companyId uint64, item *StockItem) error {
+	_, err := r.builder.
+		Update(goqu.T("inventories")).
+		Set(goqu.Record{"quantity": item.Qty}).
+		Where(goqu.And(
+			goqu.I("quality").Eq(item.Quality),
+			goqu.I("company_id").Eq(companyId),
+			goqu.I("resource_id").Eq(item.Resource.Id),
+		)).
+		Executor().
+		Exec()
+
+	return err
 }
 
 // Get the stock of a company's resource, grouping by quality

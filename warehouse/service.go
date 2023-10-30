@@ -1,36 +1,51 @@
 package warehouse
 
-import (
-	"api/auth"
-	"api/database"
-	"api/resource"
-	"net/http"
+import "api/resource"
 
-	"github.com/labstack/echo/v4"
+type (
+	Inventory struct {
+		Items []*StockItem
+	}
+
+	StockItem struct {
+		*resource.Item
+		Cost uint64 `db:"sourcing_cost" json:"cost"`
+	}
+
+	Service interface {
+		GetInventory(companyId uint64) (*Inventory, error)
+
+		ReduceStock(companyId uint64, inventory *Inventory, resources []*resource.Item) error
+	}
+
+	service struct {
+		repository Repository
+	}
 )
 
-type StockItem struct {
-	Qty      uint64             `db:"quantity" json:"quantity"`
-	Quality  uint8              `db:"quality" json:"quality"`
-	Cost     uint64             `db:"sourcing_cost" json:"cost"`
-	Resource *resource.Resource `db:"resource" json:"resource"`
+func (i *Inventory) HasResources(resources []*resource.Item) bool {
+	for _, resource := range resources {
+		for _, item := range i.Items {
+			isResource := item.Resource.Id == resource.Resource.Id
+			isSameQuality := item.Quality == resource.Quality
+			hasEnoughQty := item.Qty >= resource.Qty
+
+			if isResource && isSameQuality && hasEnoughQty {
+				return true
+			}
+		}
+	}
+	return false
 }
 
-func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
-	group := e.Group("/warehouse")
-	repository := NewRepository(conn)
+func NewService(repository Repository) Service {
+	return &service{repository}
+}
 
-	group.GET("", func(c echo.Context) error {
-		companyId, err := auth.ParseToken(c.Get("user"))
-		if err != nil {
-			return err
-		}
+func (s *service) GetInventory(companyId uint64) (*Inventory, error) {
+	return s.repository.FetchInventory(companyId)
+}
 
-		resources, err := repository.FetchInventory(companyId)
-		if err != nil {
-			return err
-		}
-
-		return c.JSON(http.StatusOK, resources)
-	})
+func (s *service) ReduceStock(companyId uint64, inventory *Inventory, resources []*resource.Item) error {
+	return s.repository.ReduceStock(companyId, inventory, resources)
 }

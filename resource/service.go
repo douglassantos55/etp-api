@@ -13,6 +13,12 @@ type Category struct {
 	Name string `db:"name" json:"name" validate:"required"`
 }
 
+type Item struct {
+	Qty      uint64    `db:"quantity" json:"quantity"`
+	Quality  uint8     `db:"quality" json:"quality"`
+	Resource *Resource `db:"resource" json:"resource"`
+}
+
 type Resource struct {
 	Id         uint64    `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
 	Name       string    `db:"name" json:"name" validate:"required"`

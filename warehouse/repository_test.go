@@ -82,8 +82,8 @@ func TestGoquRepository(t *testing.T) {
 		if resources == nil {
 			t.Fatal("expected empty list, got nil")
 		}
-		if len(resources) != 0 {
-			t.Errorf("expected no result, got %d", len(resources))
+		if len(resources.Items) != 0 {
+			t.Errorf("expected no result, got %d", len(resources.Items))
 		}
 	})
 
@@ -97,11 +97,11 @@ func TestGoquRepository(t *testing.T) {
 			t.Fatal("expected result, got nil")
 		}
 
-		if len(items) == 0 {
+		if len(items.Items) == 0 {
 			t.Fatal("expected items, got 0")
 		}
 
-		for _, item := range items {
+		for _, item := range items.Items {
 			if item.Resource.Id == 1 {
 				if item.Qty != 1450 {
 					t.Errorf("expected qty %d, got %d", 1450, item.Qty)
@@ -132,7 +132,7 @@ func TestGoquRepository(t *testing.T) {
 			t.Fatal("expected items, got nil")
 		}
 
-		for _, item := range items {
+		for _, item := range items.Items {
 			if item.Resource.Category == nil {
 				t.Error("expected category, got nil")
 			}
