@@ -2,8 +2,8 @@ package company_test
 
 import (
 	"api/auth"
+	"api/building"
 	"api/company"
-	"api/database"
 	"api/server"
 	"encoding/json"
 	"net/http"
@@ -12,35 +12,53 @@ import (
 	"testing"
 )
 
+type fakeRepository struct {
+	data map[uint64]*company.Company
+}
+
+func NewFakeRepository() company.Repository {
+	data := map[uint64]*company.Company{
+		1: {Id: 1, Name: "Test", Email: "admin@test.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy"},
+	}
+	return &fakeRepository{data}
+}
+
+func (r *fakeRepository) Register(registration *company.Registration) (*company.Company, error) {
+	return nil, nil
+}
+
+func (r *fakeRepository) GetById(id uint64) (*company.Company, error) {
+	return r.data[id], nil
+}
+
+func (r *fakeRepository) GetByEmail(email string) (*company.Company, error) {
+	for _, company := range r.data {
+		if company.Email == email {
+			return company, nil
+		}
+	}
+	return nil, nil
+}
+
+func (r *fakeRepository) GetBuildings(companyId uint64) ([]*company.CompanyBuilding, error) {
+	return nil, nil
+}
+
+func (r *fakeRepository) AddBuilding(companyId uint64, building *building.Building, position uint8) (*company.CompanyBuilding, error) {
+	return nil, nil
+}
+
 func TestCompanyService(t *testing.T) {
 	t.Setenv(server.JWT_SECRET_KEY, "secret")
-
-	svr := server.NewServer()
-	conn, err := database.GetConnection(database.SQLITE, "../test.db")
-	if err != nil {
-		t.Fatalf("could not connect to database: %s", err)
-	}
-
-	_, err = conn.DB.Exec(`
-        INSERT INTO companies (id, name, email, password)
-        VALUES (1, "Test", "admin@test.com", "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy")
-    `)
-	if err != nil {
-		t.Fatalf("could not seed database: %s", err)
-	}
-
-	t.Cleanup(func() {
-		if _, err := conn.DB.Exec(`DELETE FROM companies`); err != nil {
-			t.Fatalf("could not cleanup: %s", err)
-		}
-	})
 
 	token, err := auth.GenerateToken(1, "secret")
 	if err != nil {
 		t.Fatalf("could not generate jwt token: %s", err)
 	}
 
-	company.CreateEndpoints(svr, conn)
+	svr := server.NewServer()
+	svc := company.NewService(NewFakeRepository(), nil, nil)
+	company.CreateEndpoints(svr, svc)
 
 	t.Run("should validate registration", func(t *testing.T) {
 		t.Parallel()
@@ -225,6 +243,22 @@ func TestCompanyService(t *testing.T) {
 
 		if _, ok := response["token"]; !ok {
 			t.Error("expected token")
+		}
+	})
+
+	t.Run("should return unauthorized", func(t *testing.T) {
+		body := strings.NewReader(`{"building_id":1,"position":1}`)
+
+		req := httptest.NewRequest("POST", "/companies/2/buildings", body)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("expected status %d, got %d: %s", http.StatusUnauthorized, rec.Code, rec.Body.String())
 		}
 	})
 }

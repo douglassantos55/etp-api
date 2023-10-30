@@ -1,6 +1,7 @@
 package company_test
 
 import (
+	"api/building"
 	"api/company"
 	"api/database"
 	"testing"
@@ -125,8 +126,6 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should ignore demolished buildings", func(t *testing.T) {
-		t.Parallel()
-
 		buildings, err := repository.GetBuildings(1)
 		if err != nil {
 			t.Fatalf("could not fetch buildings: %s", err)
@@ -134,7 +133,6 @@ func TestRepository(t *testing.T) {
 
 		if len(buildings) != 2 {
 			t.Errorf("expected %d buildings, got %d", 2, len(buildings))
-			t.Log(buildings)
 		}
 
 		for _, building := range buildings {
@@ -144,6 +142,28 @@ func TestRepository(t *testing.T) {
 			if building.Name == "" {
 				t.Error("expected a name")
 			}
+		}
+	})
+
+	t.Run("should insert building", func(t *testing.T) {
+		t.Parallel()
+
+        building, err := repository.AddBuilding(1, &building.Building{Id: 1, Name: "Plantation"}, 1)
+		if err != nil {
+			t.Fatalf("could not insert building: %s", err)
+		}
+
+		if building == nil {
+			t.Fatal("expected building, got nil")
+		}
+		if *building.Position != 1 {
+			t.Errorf("expected position %d, got %d", 1, building.Position)
+		}
+		if building.Level != 0 {
+			t.Errorf("expected level %d, got %d", 0, building.Level)
+		}
+		if building.Name != "Plantation" {
+			t.Errorf("expected name %s, got %s", "Plantation", building.Name)
 		}
 	})
 }

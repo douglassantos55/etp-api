@@ -2,13 +2,10 @@ package company
 
 import (
 	"api/auth"
-	"api/database"
-	"api/server"
-	"net/http"
-	"strconv"
+	"api/building"
+	"api/warehouse"
+	"errors"
 	"time"
-
-	"github.com/labstack/echo/v4"
 )
 
 type (
@@ -17,6 +14,11 @@ type (
 		Email    string `json:"email" validate:"required,email"`
 		Password string `json:"password" validate:"required"`
 		Confirm  string `json:"confirm_password" validate:"required,eqfield=Password"`
+	}
+
+	Building struct {
+		BuildingId uint64 `json:"building_id" validate:"required"`
+		Position   uint8  `json:"position" validate:"required,min=0"`
 	}
 
 	Company struct {
@@ -37,99 +39,71 @@ type (
 		Level           uint16  `db:"level" json:"level"`
 		Position        *uint16 `db:"position" json:"position"`
 	}
+
+	Service interface {
+		GetById(id uint64) (*Company, error)
+
+		GetByEmail(email string) (*Company, error)
+
+		Register(registration *Registration) (*Company, error)
+
+		GetBuildings(companyId uint64) ([]*CompanyBuilding, error)
+
+		AddBuilding(companyId, buildingId uint64, position uint8) (*CompanyBuilding, error)
+	}
+
+	service struct {
+		repository Repository
+		building   building.Service
+		warehouse  warehouse.Service
+	}
 )
 
-func CreateEndpoints(e *echo.Echo, conn *database.Connection) {
-	group := e.Group("/companies")
-	repository := NewRepository(conn)
+func NewService(repository Repository, building building.Service, warehouse warehouse.Service) Service {
+	return &service{repository, building, warehouse}
+}
 
-	group.GET("/:id", func(c echo.Context) error {
-		companyId, err := strconv.ParseUint(c.Param("id"), 10, 64)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err)
-		}
+func (s *service) GetById(id uint64) (*Company, error) {
+	return s.repository.GetById(id)
+}
 
-		company, err := repository.GetById(companyId)
-		if err != nil {
-			return err
-		}
+func (s *service) GetByEmail(email string) (*Company, error) {
+	return s.repository.GetByEmail(email)
+}
 
-		if company == nil {
-			return echo.NewHTTPError(http.StatusNotFound)
-		}
+func (s *service) Register(registration *Registration) (*Company, error) {
+	hashedPassword, err := auth.HashPassword(registration.Password)
+	if err != nil {
+		return nil, err
+	}
 
-		return c.JSON(http.StatusOK, company)
-	})
+	registration.Password = hashedPassword
 
-	group.GET("/:id/buildings", func(c echo.Context) error {
-		companyId, err := strconv.ParseUint(c.Param("id"), 10, 64)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err)
-		}
+	return s.repository.Register(registration)
+}
 
-		buildings, err := repository.GetBuildings(companyId)
-		if err != nil {
-			return err
-		}
+func (s *service) GetBuildings(companyId uint64) ([]*CompanyBuilding, error) {
+	return s.repository.GetBuildings(companyId)
+}
 
-		return c.JSON(http.StatusOK, buildings)
-	})
+func (s *service) AddBuilding(companyId, buildingId uint64, position uint8) (*CompanyBuilding, error) {
+	build, err := s.building.GetById(buildingId)
+	if err != nil {
+		return nil, err
+	}
 
-	group.POST("/register", func(c echo.Context) error {
-		registration := new(Registration)
-		if err := c.Bind(registration); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err)
-		}
-		if err := c.Validate(registration); err != nil {
-			return err
-		}
+	inventory, err := s.warehouse.GetInventory(companyId)
+	if err != nil {
+		return nil, err
+	}
 
-		hashedPassword, err := auth.HashPassword(registration.Password)
-		if err != nil {
-			return err
-		}
+	if !inventory.HasResources(build.Requirements) {
+		return nil, errors.New("not enough resources")
+	}
 
-		registration.Password = hashedPassword
-		company, err := repository.Register(registration)
-		if err != nil {
-			return err
-		}
+	if err := s.warehouse.ReduceStock(companyId, inventory, build.Requirements); err != nil {
+		return nil, err
+	}
 
-		return c.JSON(http.StatusCreated, company)
-	})
-
-	group.POST("/login", func(c echo.Context) error {
-		credentials := struct {
-			Email string `form:"email" json:"email" validate:"required,email"`
-			Pass  string `form:"password" json:"password" validate:"required"`
-		}{}
-
-		if err := c.Bind(&credentials); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, err)
-		}
-
-		if err := c.Validate(&credentials); err != nil {
-			return err
-		}
-
-		company, err := repository.GetByEmail(credentials.Email)
-		if err != nil || company == nil {
-			return echo.NewHTTPError(http.StatusBadRequest, server.ValidationErrors{
-				Errors: map[string]string{"email": "invalid credentials"},
-			})
-		}
-
-		if err := auth.ComparePassword(company.Pass, credentials.Pass); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, server.ValidationErrors{
-				Errors: map[string]string{"email": "invalid credentials"},
-			})
-		}
-
-		token, err := auth.GenerateToken(company.Id, server.GetJwtSecret())
-		if err != nil {
-			return err
-		}
-
-		return c.JSON(http.StatusOK, map[string]string{"token": token})
-	})
+	return s.repository.AddBuilding(companyId, build, position)
 }
