@@ -30,12 +30,13 @@ func (r *goquRepository) FetchInventory(companyId uint64) (*Inventory, error) {
 
 	err := r.builder.
 		Select(
+			goqu.I("i.quality").As("quality"),
+			goqu.SUM("i.quantity").As("quantity"),
 			goqu.I("r.id").As(goqu.C("resource.id")),
 			goqu.I("r.name").As(goqu.C("resource.name")),
 			goqu.I("r.image").As(goqu.C("resource.image")),
 			goqu.I("c.id").As(goqu.C("resource.category.id")),
 			goqu.I("c.name").As(goqu.C("resource.category.name")),
-			goqu.SUM("i.quantity").As("quantity"),
 			goqu.L("? / ?", goqu.SUM(goqu.L("? * ?", goqu.I("i.sourcing_cost"), goqu.I("i.quantity"))), goqu.SUM(goqu.I("i.quantity"))).As("sourcing_cost"),
 		).
 		From(goqu.T("inventories").As("i")).
@@ -47,7 +48,7 @@ func (r *goquRepository) FetchInventory(companyId uint64) (*Inventory, error) {
 			),
 		)).
 		Where(goqu.I("i.company_id").Eq(companyId)).
-		GroupBy(goqu.I("r.id")).
+		GroupBy(goqu.I("r.id"), goqu.I("i.quality")).
 		ScanStructs(&items)
 
 	if err != nil {
