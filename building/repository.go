@@ -42,6 +42,14 @@ func (r *goquRepository) GetAll() ([]*Building, error) {
 		return nil, err
 	}
 
+	for _, building := range buildings {
+		requirements, err := r.GetRequirements(building.Id)
+		if err != nil {
+			return nil, err
+		}
+		building.Requirements = requirements
+	}
+
 	return buildings, nil
 }
 
@@ -82,16 +90,18 @@ func (r *goquRepository) GetRequirements(buildingId uint64) ([]*resource.Item, e
 
 	err := r.builder.
 		Select(
-			goqu.I("r.*"),
-			goqu.I("br.quality"),
-			goqu.I("br.qty").As("quantity"),
-			goqu.I("c.id").As(goqu.C("category.id")),
-			goqu.I("c.name").As(goqu.C("category.name")),
+			goqu.I("req.quality"),
+			goqu.I("req.qty").As("quantity"),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+			goqu.I("r.name").As(goqu.C("resource.name")),
+			goqu.I("r.image").As(goqu.C("resource.image")),
+			goqu.I("c.id").As(goqu.C("resource.category.id")),
+			goqu.I("c.name").As(goqu.C("resource.category.name")),
 		).
-		From(goqu.T("resources").As("r")).
+		From(goqu.T("buildings_requirements").As("req")).
 		InnerJoin(
-			goqu.T("buildings_requirements").As("br"),
-			goqu.On(goqu.I("br.resource_id").Eq("r.id")),
+			goqu.T("resources").As("r"),
+			goqu.On(goqu.I("req.resource_id").Eq(goqu.I("r.id"))),
 		).
 		InnerJoin(
 			goqu.T("categories").As("c"),
@@ -102,12 +112,8 @@ func (r *goquRepository) GetRequirements(buildingId uint64) ([]*resource.Item, e
 				),
 			),
 		).
-		Where(goqu.I("br.building_id").Eq(buildingId)).
+		Where(goqu.I("req.building_id").Eq(buildingId)).
 		ScanStructs(&requirements)
 
-	if err != nil {
-		return nil, err
-	}
-
-	return requirements, nil
+	return requirements, err
 }

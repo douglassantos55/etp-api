@@ -17,14 +17,26 @@ func TestBuildingRepository(t *testing.T) {
 		t.Fatalf("could not start transaction: %s", err)
 	}
 
-	tx.Exec(`INSERT INTO buildings (id, name) VALUES (1, "Plantation"), (2, "Factory")`)
+	tx.Exec(`
+        INSERT INTO categories (id, name) VALUES (1, "Construction");
+        INSERT INTO resources (id, name, category_id) VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1);
+        INSERT INTO buildings (id, name) VALUES (1, "Plantation"), (2, "Factory");
+
+        INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
+        VALUES (1, 1, 500, 0), (1, 2, 1000, 0), (1, 3, 100, 1), (2, 1, 1000, 1), (2, 2, 5000, 1);
+    `)
 
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("could not commit transaction: %s", err)
 	}
 
 	t.Cleanup(func() {
-		_, err := conn.DB.Exec(`DELETE FROM buildings`)
+		_, err := conn.DB.Exec(`
+            DELETE FROM buildings_requirements;
+            DELETE FROM resources;
+            DELETE FROM buildings;
+            DELETE FROM categories;
+        `)
 
 		if err != nil {
 			t.Fatalf("could not cleanup database: %s", err)
@@ -46,6 +58,16 @@ func TestBuildingRepository(t *testing.T) {
 		if len(buildings) != 2 {
 			t.Errorf("expected %d buildings, got %d", 2, len(buildings))
 		}
+
+		for _, building := range buildings {
+			if building.Id == 1 && len(building.Requirements) != 3 {
+				t.Errorf("expected %d requirements, got %d", 3, len(building.Requirements))
+			}
+			if building.Id == 2 && len(building.Requirements) != 2 {
+				t.Errorf("expected %d requirements, got %d", 2, len(building.Requirements))
+			}
+		}
+
 	})
 
 	t.Run("should return nil if not found", func(t *testing.T) {
@@ -56,6 +78,21 @@ func TestBuildingRepository(t *testing.T) {
 
 		if building != nil {
 			t.Errorf("expected nil, got %+v", building)
+		}
+	})
+
+	t.Run("should return with requirements", func(t *testing.T) {
+		building, err := repository.GetById(1)
+		if err != nil {
+			t.Fatalf("could not get building: %s", err)
+		}
+
+		if building == nil {
+			t.Error("could not get building")
+		}
+
+		if len(building.Requirements) != 3 {
+			t.Errorf("expected %d requirements, got %d", 3, len(building.Requirements))
 		}
 	})
 }
