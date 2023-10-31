@@ -1,6 +1,7 @@
 package main
 
 import (
+	"api/building"
 	"api/company"
 	"api/database"
 	"api/resource"
@@ -23,9 +24,17 @@ func main() {
 
 	svr := server.NewServer()
 
-	resource.CreateEndpoints(svr, conn)
-	warehouse.CreateEndpoints(svr, conn)
-	company.CreateEndpoints(svr, conn)
+	resourceSvc := resource.NewService(resource.NewRepository(conn))
+	resource.CreateEndpoints(svr, resourceSvc)
+
+	warehouseSvc := warehouse.NewService(warehouse.NewRepository(conn))
+	warehouse.CreateEndpoints(svr, warehouseSvc)
+
+	buildingSvc := building.NewService(building.NewRepository(conn))
+	building.CreateEndpoints(svr, buildingSvc)
+
+	companySvc := company.NewService(company.NewRepository(conn), buildingSvc, warehouseSvc)
+	company.CreateEndpoints(svr, companySvc)
 
 	svr.GET("/", server.Greeting(events))
 	svr.GET("/private", server.Private(events))
