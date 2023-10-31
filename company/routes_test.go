@@ -13,18 +13,28 @@ import (
 )
 
 type fakeRepository struct {
-	data map[uint64]*company.Company
+	data      map[uint64]*company.Company
+	buildings map[uint64]*company.CompanyBuilding
 }
 
 func NewFakeRepository() company.Repository {
 	data := map[uint64]*company.Company{
 		1: {Id: 1, Name: "Test", Email: "admin@test.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy"},
 	}
-	return &fakeRepository{data}
+	buildings := make(map[uint64]*company.CompanyBuilding)
+	return &fakeRepository{data, buildings}
 }
 
 func (r *fakeRepository) Register(registration *company.Registration) (*company.Company, error) {
-	return nil, nil
+	id := uint64(len(r.data) + 1)
+	company := &company.Company{
+		Id:    id,
+		Name:  registration.Name,
+		Email: registration.Email,
+		Pass:  registration.Password,
+	}
+	r.data[id] = company
+	return r.GetById(id)
 }
 
 func (r *fakeRepository) GetById(id uint64) (*company.Company, error) {
@@ -45,10 +55,20 @@ func (r *fakeRepository) GetBuildings(companyId uint64) ([]*company.CompanyBuild
 }
 
 func (r *fakeRepository) AddBuilding(companyId uint64, building *building.Building, position uint8) (*company.CompanyBuilding, error) {
-	return nil, nil
+	companyBuilding := &company.CompanyBuilding{
+		Id:              uint64(len(r.buildings) + 1),
+		Name:            building.Name,
+		Position:        &position,
+		Level:           1,
+		WagesHour:       building.WagesHour,
+		AdminHour:       building.AdminHour,
+		MaintenanceHour: building.MaintenanceHour,
+	}
+	r.buildings[companyId] = companyBuilding
+	return companyBuilding, nil
 }
 
-func TestCompanyService(t *testing.T) {
+func TestCompanyRoutes(t *testing.T) {
 	t.Setenv(server.JWT_SECRET_KEY, "secret")
 
 	token, err := auth.GenerateToken(1, "secret")
@@ -244,6 +264,39 @@ func TestCompanyService(t *testing.T) {
 		if _, ok := response["token"]; !ok {
 			t.Error("expected token")
 		}
+	})
+
+	t.Run("should return bad request invalid data", func(t *testing.T) {
+		body := strings.NewReader(`{"building_id":"a","position":"b"}`)
+
+		req := httptest.NewRequest("POST", "/companies/1/buildings", body)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("should validate building", func(t *testing.T) {
+		body := strings.NewReader(`{"building_id":0,"position":0}`)
+
+		req := httptest.NewRequest("POST", "/companies/1/buildings", body)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+		}
+
 	})
 
 	t.Run("should return unauthorized", func(t *testing.T) {

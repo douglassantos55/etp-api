@@ -24,6 +24,9 @@ type (
 )
 
 func (i *Inventory) HasResources(resources []*resource.Item) bool {
+	if len(resources) == 0 {
+		return true
+	}
 	for _, resource := range resources {
 		for _, item := range i.Items {
 			isResource := item.Resource.Id == resource.Resource.Id

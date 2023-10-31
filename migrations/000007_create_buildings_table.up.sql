@@ -8,6 +8,16 @@ CREATE TABLE IF NOT EXISTS `buildings` (
     `deleted_at` TIMESTAMP DEFAULT NULL
 );
 
+CREATE TABLE IF NOT EXISTS `buildings_requirements` (
+    `building_id` INTEGER NOT NULL,
+    `resource_id` INTEGER NOT NULL,
+    `qty` INTEGER UNSIGNED NOT NULL,
+    `quality` TINYINT UNSIGNED NOT NULL,
+    PRIMARY KEY (`building_id`, `resource_id`),
+    FOREIGN KEY (`building_id`) REFERENCES `buildings`(`id`),
+    FOREIGN KEY (`resource_id`) REFERENCES `resources`(`id`)
+);
+
 CREATE TABLE IF NOT EXISTS `buildings_resources` (
     `building_id` INTEGER NOT NULL,
     `resource_id` INTEGER NOT NULL,

@@ -2,7 +2,6 @@ package warehouse_test
 
 import (
 	"api/auth"
-	"api/resource"
 	"api/server"
 	"api/warehouse"
 	"encoding/json"
@@ -10,32 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 )
-
-type fakeRepository struct {
-	data map[uint64]*warehouse.Inventory
-}
-
-func NewFakeRepository() warehouse.Repository {
-	data := map[uint64]*warehouse.Inventory{
-		1: {Items: []*warehouse.StockItem{
-			{Cost: 137, Item: &resource.Item{Quality: 0, Qty: 100, Resource: &resource.Resource{Id: 1}}},
-			{Cost: 47, Item: &resource.Item{Quality: 1, Qty: 1000, Resource: &resource.Resource{Id: 3}}},
-			{Cost: 1553, Item: &resource.Item{Quality: 0, Qty: 700, Resource: &resource.Resource{Id: 2}}},
-		}},
-		2: {Items: []*warehouse.StockItem{
-			{Cost: 525, Item: &resource.Item{Quality: 1, Qty: 50, Resource: &resource.Resource{Id: 1}}},
-		}},
-	}
-	return &fakeRepository{data}
-}
-
-func (r *fakeRepository) FetchInventory(companyId uint64) (*warehouse.Inventory, error) {
-	return r.data[companyId], nil
-}
-
-func (r *fakeRepository) ReduceStock(companyId uint64, inventory *warehouse.Inventory, items []*resource.Item) error {
-	return nil
-}
 
 func TestWarehouseService(t *testing.T) {
 	t.Setenv(server.JWT_SECRET_KEY, "secret")
@@ -46,7 +19,7 @@ func TestWarehouseService(t *testing.T) {
 	}
 
 	svr := server.NewServer()
-	svc := warehouse.NewService(NewFakeRepository())
+	svc := warehouse.NewService(warehouse.NewFakeRepository())
 	warehouse.CreateEndpoints(svr, svc)
 
 	t.Run("should return authenticated company's inventory", func(t *testing.T) {

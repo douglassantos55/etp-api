@@ -9,35 +9,11 @@ import (
 	"testing"
 )
 
-type fakeRepository struct {
-	data map[uint64]*building.Building
-}
-
-func NewFakeRepository() building.Repository {
-	data := map[uint64]*building.Building{
-		1: {Id: 1, Name: "Plantation"},
-		2: {Id: 2, Name: "Factory"},
-	}
-	return &fakeRepository{data}
-}
-
-func (r *fakeRepository) GetAll() ([]*building.Building, error) {
-	items := make([]*building.Building, 0)
-	for _, item := range r.data {
-		items = append(items, item)
-	}
-	return items, nil
-}
-
-func (r *fakeRepository) GetById(id uint64) (*building.Building, error) {
-	return r.data[id], nil
-}
-
-func TestBuildingService(t *testing.T) {
+func TestBuildingRoutes(t *testing.T) {
 	t.Setenv(server.JWT_SECRET_KEY, "secret")
 
 	svr := server.NewServer()
-	svc := building.NewService(NewFakeRepository())
+	svc := building.NewService(building.NewFakeRepository())
 	building.CreateEndpoints(svr, svc)
 
 	token, err := auth.GenerateToken(1, "secret")

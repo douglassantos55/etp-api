@@ -31,13 +31,13 @@ type (
 	}
 
 	CompanyBuilding struct {
-		Id              uint64  `db:"id" json:"id"`
-		Name            string  `db:"name" json:"name"`
-		WagesHour       uint64  `db:"wages_per_hour" json:"wages_per_hour"`
-		AdminHour       uint64  `db:"admin_per_hour" json:"admin_per_hour"`
-		MaintenanceHour uint64  `db:"maintenance_per_hour" json:"maintenance_per_hour"`
-		Level           uint16  `db:"level" json:"level"`
-		Position        *uint16 `db:"position" json:"position"`
+		Id              uint64 `db:"id" json:"id"`
+		Name            string `db:"name" json:"name"`
+		WagesHour       uint64 `db:"wages_per_hour" json:"wages_per_hour"`
+		AdminHour       uint64 `db:"admin_per_hour" json:"admin_per_hour"`
+		MaintenanceHour uint64 `db:"maintenance_per_hour" json:"maintenance_per_hour"`
+		Level           uint8  `db:"level" json:"level"`
+		Position        *uint8 `db:"position" json:"position"`
 	}
 
 	Service interface {
