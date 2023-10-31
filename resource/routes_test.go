@@ -35,6 +35,10 @@ func (r *fakeRepository) GetById(id uint64) (*resource.Resource, error) {
 	return r.data[id], nil
 }
 
+func (r *fakeRepository) GetRequirements(resourceId uint64) ([]*resource.Item, error) {
+    return nil, nil
+}
+
 func (r *fakeRepository) SaveResource(resource *resource.Resource) (*resource.Resource, error) {
 	id := uint64(len(r.data) + 1)
 	resource.Id = id
@@ -60,7 +64,7 @@ func TestService(t *testing.T) {
 	}
 
 	t.Run("should return 201 when creating resource", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/resources/", strings.NewReader(`{"name":"Wood","category_id":1,"image":"http://placeimg.com/10"}`))
+		req := httptest.NewRequest("POST", "/resources/", strings.NewReader(`{"name":"Wood","category_id":1,"image":"http://placeimg.com/10","requirements":[]}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -77,6 +81,22 @@ func TestService(t *testing.T) {
 		t.Parallel()
 
 		req := httptest.NewRequest("POST", "/resources/", strings.NewReader(`{"name":"","image":""}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("should validate requirements", func(t *testing.T) {
+		body := strings.NewReader(`{"name":"Wood","category_id":1,"image":"http://placeimg.com/10","requirements":[{"quantity":0,"quality":0,"resource_id":0}]}`)
+
+		req := httptest.NewRequest("POST", "/resources/", body)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -136,7 +156,7 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("should return 200 when updating resource", func(t *testing.T) {
-		body := strings.NewReader(`{"name":"Iron","category_id":1}`)
+		body := strings.NewReader(`{"name":"Iron","category_id":1,"requirements":[]}`)
 
 		req := httptest.NewRequest("PUT", "/resources/1", body)
 		req.Header.Set("Content-Type", "application/json")

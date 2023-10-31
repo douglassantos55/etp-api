@@ -13,6 +13,8 @@ type Repository interface {
 	// Get a resource by id, returns nil if it can't be found
 	GetById(id uint64) (*Resource, error)
 
+	GetRequirements(resourceId uint64) ([]*Item, error)
+
 	// Creates a resource
 	SaveResource(resource *Resource) (*Resource, error)
 
@@ -46,6 +48,14 @@ func (r *goquRepository) FetchResources() ([]*Resource, error) {
 		return nil, err
 	}
 
+	for _, resource := range resources {
+		requirements, err := r.GetRequirements(resource.Id)
+		if err != nil {
+			return nil, err
+		}
+		resource.Requirements = requirements
+	}
+
 	return resources, nil
 }
 
@@ -75,25 +85,96 @@ func (r *goquRepository) GetById(id uint64) (*Resource, error) {
 		return nil, err
 	}
 
-	return resource, err
-}
-
-func (r *goquRepository) SaveResource(resource *Resource) (*Resource, error) {
-	record := goqu.Record{
-		"name":        resource.Name,
-		"image":       resource.Image,
-		"category_id": resource.CategoryId,
-	}
-
-	result, err := r.builder.Insert("resources").Rows(record).Executor().Exec()
+	requirements, err := r.GetRequirements(resource.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	resource.Id = uint64(id)
+	resource.Requirements = requirements
+	return resource, err
+}
 
-	return resource, nil
+func (r *goquRepository) GetRequirements(resourceId uint64) ([]*Item, error) {
+	requirements := make([]*Item, 0)
+
+	err := r.builder.
+		Select(
+			goqu.I("req.quality"),
+			goqu.I("req.qty").As("quantity"),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+			goqu.I("r.name").As(goqu.C("resource.name")),
+			goqu.I("r.image").As(goqu.C("resource.image")),
+			goqu.I("c.id").As(goqu.C("resource.category.id")),
+			goqu.I("c.name").As(goqu.C("resource.category.name")),
+		).
+		From(goqu.T("resources_requirements").As("req")).
+		InnerJoin(
+			goqu.T("resources").As("r"),
+			goqu.On(goqu.I("req.requirement_id").Eq(goqu.I("r.id"))),
+		).
+		InnerJoin(
+			goqu.T("categories").As("c"),
+			goqu.On(
+				goqu.And(
+					goqu.I("r.category_id").Eq(goqu.I("c.id")),
+					goqu.I("c.deleted_at").IsNull(),
+				),
+			),
+		).
+		Where(goqu.I("req.resource_id").Eq(resourceId)).
+		ScanStructs(&requirements)
+
+	return requirements, err
+}
+
+func (r *goquRepository) SaveResource(resource *Resource) (*Resource, error) {
+	tx, err := r.builder.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := tx.
+		Insert("resources").
+		Rows(goqu.Record{
+			"name":        resource.Name,
+			"image":       resource.Image,
+			"category_id": resource.CategoryId,
+		}).Executor().Exec()
+
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	if len(resource.Requirements) > 0 {
+		requirements := []goqu.Record{}
+		for _, requirement := range resource.Requirements {
+			requirements = append(requirements, goqu.Record{
+				"qty":            requirement.Qty,
+				"quality":        requirement.Quality,
+				"requirement_id": requirement.ResourceId,
+				"resource_id":    id,
+			})
+		}
+
+		_, err = tx.Insert(goqu.T("resources_requirements")).Rows(requirements).Executor().Exec()
+		if err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return r.GetById(uint64(id))
 }
 
 func (r *goquRepository) UpdateResource(resource *Resource) (*Resource, error) {

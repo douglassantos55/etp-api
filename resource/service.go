@@ -14,17 +14,19 @@ type (
 	}
 
 	Item struct {
-		Qty      uint64    `db:"quantity" json:"quantity"`
-		Quality  uint8     `db:"quality" json:"quality"`
-		Resource *Resource `db:"resource" json:"resource"`
+		Qty        uint64    `db:"quantity" json:"quantity" validate:"required,min=1"`
+		Quality    uint8     `db:"quality" json:"quality" validate:"min=0"`
+		ResourceId uint64    `db:"resource_id" json:"resource_id" validate:"required"`
+		Resource   *Resource `db:"resource" json:"resource" validate:"-"`
 	}
 
 	Resource struct {
-		Id         uint64    `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
-		Name       string    `db:"name" json:"name" validate:"required"`
-		Image      *string   `db:"image" json:"image"`
-		CategoryId uint64    `db:"category_id" json:"category_id" validate:"required"`
-		Category   *Category `db:"category" json:"category" validate:"-"`
+		Id           uint64    `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
+		Name         string    `db:"name" json:"name" validate:"required"`
+		Image        *string   `db:"image" json:"image" validate:"-"`
+		CategoryId   uint64    `db:"category_id" json:"category_id" validate:"required"`
+		Category     *Category `db:"category" json:"category" validate:"-"`
+		Requirements []*Item   `json:"requirements" validate:"dive"`
 	}
 
 	service struct {

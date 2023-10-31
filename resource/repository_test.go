@@ -14,7 +14,12 @@ func TestRepository(t *testing.T) {
 
 	_, err = conn.DB.Exec(`
         INSERT INTO categories (id, name) VALUES (1, "Food");
-        INSERT INTO resources (id, name, category_id) VALUES (1, "Water", 1), (2, "Seeds", 1);
+
+        INSERT INTO resources (id, name, category_id)
+        VALUES (1, "Water", 1), (2, "Seeds", 1), (3, "Apple", 1);
+
+        INSERT INTO resources_requirements (resource_id, requirement_id, qty, quality)
+        VALUES (2, 1, 5, 0), (3, 1, 10, 0), (3, 2, 2, 0);
     `)
 	if err != nil {
 		t.Fatal(err)
@@ -23,8 +28,31 @@ func TestRepository(t *testing.T) {
 	repository := resource.NewRepository(conn)
 
 	t.Cleanup(func() {
-		if _, err := conn.DB.Exec("DELETE FROM resources; DELETE FROM categories"); err != nil {
+		if _, err := conn.DB.Exec(`
+            DELETE FROM resources_requirements;
+            DELETE FROM resources;
+            DELETE FROM categories;
+        `); err != nil {
 			t.Fatalf("could not truncate table: %s", err)
+		}
+	})
+
+	t.Run("should list with requirements", func(t *testing.T) {
+		resources, err := repository.FetchResources()
+		if err != nil {
+			t.Fatalf("could not fetch resources: %s", err)
+		}
+
+		for _, resource := range resources {
+			if resource.Id == 1 && len(resource.Requirements) != 0 {
+				t.Errorf("expected %d requirements, got %d", 0, len(resource.Requirements))
+			}
+			if resource.Id == 2 && len(resource.Requirements) != 1 {
+				t.Errorf("expected %d requirements, got %d", 1, len(resource.Requirements))
+			}
+			if resource.Id == 3 && len(resource.Requirements) != 2 {
+				t.Errorf("expected %d requirements, got %d", 2, len(resource.Requirements))
+			}
 		}
 	})
 
@@ -39,18 +67,21 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should return instance if found", func(t *testing.T) {
-		resource, err := repository.GetById(1)
+		resource, err := repository.GetById(3)
 		if err != nil {
 			t.Fatalf("could not get by id: %s", err)
 		}
 		if resource == nil {
 			t.Fatal("should return an instance, got nil")
 		}
-		if resource.Id != 1 {
-			t.Errorf("expected id %d, got %d", 1, resource.Id)
+		if resource.Id != 3 {
+			t.Errorf("expected id %d, got %d", 3, resource.Id)
 		}
-		if resource.Name != "Water" {
-			t.Errorf("expected name %s, got %s", "Water", resource.Name)
+		if resource.Name != "Apple" {
+			t.Errorf("expected name %s, got %s", "Apple", resource.Name)
+		}
+		if len(resource.Requirements) != 2 {
+			t.Errorf("expected %d requirements, got %d", 2, len(resource.Requirements))
 		}
 	})
 
@@ -68,6 +99,30 @@ func TestRepository(t *testing.T) {
 		}
 		if resource.Image != nil {
 			t.Errorf("expected no image, got \"%s\"", *resource.Image)
+		}
+	})
+
+	t.Run("should save requirements", func(t *testing.T) {
+		resource, err := repository.SaveResource(&resource.Resource{
+			Name:       "water",
+			CategoryId: 1,
+			Requirements: []*resource.Item{
+				{Qty: 10, Quality: 0, ResourceId: 1},
+				{Qty: 20, Quality: 1, ResourceId: 2},
+			},
+		})
+
+		if err != nil || resource == nil {
+			t.Fatalf("could not save resource: %s", err)
+		}
+
+		resource, err = repository.GetById(resource.Id)
+		if err != nil {
+			t.Fatalf("could not save resource: %s", err)
+		}
+
+		if len(resource.Requirements) != 2 {
+			t.Errorf("expected %d requirements, got %d", 2, len(resource.Requirements))
 		}
 	})
 }

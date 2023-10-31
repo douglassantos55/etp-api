@@ -159,8 +159,8 @@ func TestRepository(t *testing.T) {
 		if *building.Position != 1 {
 			t.Errorf("expected position %d, got %d", 1, building.Position)
 		}
-		if building.Level != 0 {
-			t.Errorf("expected level %d, got %d", 0, building.Level)
+		if building.Level != 1 {
+			t.Errorf("expected level %d, got %d", 1, building.Level)
 		}
 		if building.Name != "Plantation" {
 			t.Errorf("expected name %s, got %s", "Plantation", building.Name)
