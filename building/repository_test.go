@@ -3,6 +3,7 @@ package building_test
 import (
 	"api/building"
 	"api/database"
+	"api/resource"
 	"testing"
 )
 
@@ -18,12 +19,18 @@ func TestBuildingRepository(t *testing.T) {
 	}
 
 	tx.Exec(`
-        INSERT INTO categories (id, name) VALUES (1, "Construction");
-        INSERT INTO resources (id, name, category_id) VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1);
+        INSERT INTO categories (id, name) VALUES (1, "Construction"), (2, "Food");
+
+        INSERT INTO resources (id, name, category_id)
+        VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1), (4, "Seeds", 2);
+
         INSERT INTO buildings (id, name) VALUES (1, "Plantation"), (2, "Factory");
 
         INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
         VALUES (1, 1, 500, 0), (1, 2, 1000, 0), (1, 3, 100, 1), (2, 1, 1000, 1), (2, 2, 5000, 1);
+
+        INSERT INTO buildings_resources (building_id, resource_id, qty_per_hour)
+        VALUES (1, 4, 1000), (2, 1, 250), (2, 3, 100);
     `)
 
 	if err := tx.Commit(); err != nil {
@@ -32,6 +39,7 @@ func TestBuildingRepository(t *testing.T) {
 
 	t.Cleanup(func() {
 		_, err := conn.DB.Exec(`
+            DELETE FROM buildings_resources;
             DELETE FROM buildings_requirements;
             DELETE FROM resources;
             DELETE FROM buildings;
@@ -43,7 +51,7 @@ func TestBuildingRepository(t *testing.T) {
 		}
 	})
 
-	repository := building.NewRepository(conn)
+	repository := building.NewRepository(conn, resource.NewRepository(conn))
 
 	t.Run("should list all", func(t *testing.T) {
 		buildings, err := repository.GetAll()
@@ -60,11 +68,21 @@ func TestBuildingRepository(t *testing.T) {
 		}
 
 		for _, building := range buildings {
-			if building.Id == 1 && len(building.Requirements) != 3 {
-				t.Errorf("expected %d requirements, got %d", 3, len(building.Requirements))
+			if building.Id == 1 {
+				if len(building.Requirements) != 3 {
+					t.Errorf("expected %d requirements, got %d", 3, len(building.Requirements))
+				}
+				if len(building.Resources) != 1 {
+					t.Errorf("expected %d resources, got %d", 1, len(building.Resources))
+				}
 			}
-			if building.Id == 2 && len(building.Requirements) != 2 {
-				t.Errorf("expected %d requirements, got %d", 2, len(building.Requirements))
+			if building.Id == 2 {
+				if len(building.Requirements) != 2 {
+					t.Errorf("expected %d requirements, got %d", 2, len(building.Requirements))
+				}
+				if len(building.Resources) != 2 {
+					t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
+				}
 			}
 		}
 
@@ -93,6 +111,10 @@ func TestBuildingRepository(t *testing.T) {
 
 		if len(building.Requirements) != 3 {
 			t.Errorf("expected %d requirements, got %d", 3, len(building.Requirements))
+		}
+
+		if len(building.Resources) != 1 {
+			t.Errorf("expected %d resources, got %d", 1, len(building.Resources))
 		}
 	})
 }

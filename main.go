@@ -24,13 +24,14 @@ func main() {
 
 	svr := server.NewServer()
 
-	resourceSvc := resource.NewService(resource.NewRepository(conn))
+	resourceRepo := resource.NewRepository(conn)
+	resourceSvc := resource.NewService(resourceRepo)
 	resource.CreateEndpoints(svr, resourceSvc)
 
 	warehouseSvc := warehouse.NewService(warehouse.NewRepository(conn))
 	warehouse.CreateEndpoints(svr, warehouseSvc)
 
-	buildingSvc := building.NewService(building.NewRepository(conn))
+	buildingSvc := building.NewService(building.NewRepository(conn, resourceRepo))
 	building.CreateEndpoints(svr, buildingSvc)
 
 	companySvc := company.NewService(company.NewRepository(conn), buildingSvc, warehouseSvc)

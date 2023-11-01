@@ -14,13 +14,14 @@ type (
 	}
 
 	goquRepository struct {
-		builder *goqu.Database
+		builder   *goqu.Database
+		resources resource.Repository
 	}
 )
 
-func NewRepository(conn *database.Connection) Repository {
+func NewRepository(conn *database.Connection, resources resource.Repository) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
-	return &goquRepository{builder}
+	return &goquRepository{builder, resources}
 }
 
 func (r *goquRepository) GetAll() ([]*Building, error) {
@@ -47,6 +48,13 @@ func (r *goquRepository) GetAll() ([]*Building, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		resources, err := r.GetResources(building.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		building.Resources = resources
 		building.Requirements = requirements
 	}
 
@@ -80,9 +88,45 @@ func (r *goquRepository) GetById(id uint64) (*Building, error) {
 		return nil, err
 	}
 
+	resources, err := r.GetResources(id)
+	if err != nil {
+		return nil, err
+	}
+
+	building.Resources = resources
 	building.Requirements = requirements
 
 	return building, err
+}
+
+func (r *goquRepository) GetResources(buildingId uint64) ([]*BuildingResource, error) {
+	resources := make([]*BuildingResource, 0)
+
+	err := r.builder.
+		Select(
+			goqu.I("br.qty_per_hour"),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+			goqu.I("r.name").As(goqu.C("resource.name")),
+			goqu.I("r.image").As(goqu.C("resource.image")),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+		).
+		From(goqu.T("buildings_resources").As("br")).
+		InnerJoin(
+			goqu.T("resources").As("r"),
+			goqu.On(goqu.I("br.resource_id").Eq(goqu.I("r.id"))),
+		).
+		Where(goqu.I("br.building_id").Eq(buildingId)).
+		ScanStructs(&resources)
+
+	for _, resource := range resources {
+		requirements, err := r.resources.GetRequirements(resource.Resource.Id)
+		if err != nil {
+			return nil, err
+		}
+		resource.Resource.Requirements = requirements
+	}
+
+	return resources, err
 }
 
 func (r *goquRepository) GetRequirements(buildingId uint64) ([]*resource.Item, error) {
