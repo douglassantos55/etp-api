@@ -95,10 +95,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 	})
 
 	group.POST("/login", func(c echo.Context) error {
-		credentials := struct {
-			Email string `form:"email" json:"email" validate:"required,email"`
-			Pass  string `form:"password" json:"password" validate:"required"`
-		}{}
+		var credentials Credentials
 
 		if err := c.Bind(&credentials); err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
@@ -108,22 +105,11 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return err
 		}
 
-		company, err := service.GetByEmail(credentials.Email)
-		if err != nil || company == nil {
-			return echo.NewHTTPError(http.StatusBadRequest, server.ValidationErrors{
-				Errors: map[string]string{"email": "invalid credentials"},
-			})
-		}
-
-		if err := auth.ComparePassword(company.Pass, credentials.Pass); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, server.ValidationErrors{
-				Errors: map[string]string{"email": "invalid credentials"},
-			})
-		}
-
-		token, err := auth.GenerateToken(company.Id, server.GetJwtSecret())
+		token, err := service.Login(credentials)
 		if err != nil {
-			return err
+			return echo.NewHTTPError(http.StatusBadRequest, server.ValidationErrors{
+				Errors: map[string]string{"email": err.Error()},
+			})
 		}
 
 		return c.JSON(http.StatusOK, map[string]string{"token": token})

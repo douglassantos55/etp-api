@@ -3,12 +3,18 @@ package company
 import (
 	"api/auth"
 	"api/building"
+	"api/server"
 	"api/warehouse"
 	"errors"
 	"time"
 )
 
 type (
+	Credentials struct {
+		Email string `form:"email" json:"email" validate:"required,email"`
+		Pass  string `form:"password" json:"password" validate:"required"`
+	}
+
 	Registration struct {
 		Name     string `json:"name" validate:"required"`
 		Email    string `json:"email" validate:"required,email"`
@@ -45,6 +51,8 @@ type (
 
 		GetByEmail(email string) (*Company, error)
 
+		Login(credentials Credentials) (string, error)
+
 		Register(registration *Registration) (*Company, error)
 
 		GetBuildings(companyId uint64) ([]*CompanyBuilding, error)
@@ -69,6 +77,24 @@ func (s *service) GetById(id uint64) (*Company, error) {
 
 func (s *service) GetByEmail(email string) (*Company, error) {
 	return s.repository.GetByEmail(email)
+}
+
+func (s *service) Login(credentials Credentials) (string, error) {
+	company, err := s.GetByEmail(credentials.Email)
+	if err != nil || company == nil {
+		return "", errors.New("invalid credentials")
+	}
+
+	if err := auth.ComparePassword(company.Pass, credentials.Pass); err != nil {
+		return "", errors.New("invalid credentials")
+	}
+
+	token, err := auth.GenerateToken(company.Id, server.GetJwtSecret())
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
 
 func (s *service) Register(registration *Registration) (*Company, error) {
