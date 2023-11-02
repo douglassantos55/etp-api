@@ -38,6 +38,8 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should list with requirements", func(t *testing.T) {
+		t.Parallel()
+
 		resources, err := repository.FetchResources()
 		if err != nil {
 			t.Fatalf("could not fetch resources: %s", err)
@@ -57,6 +59,8 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should return nil when not found", func(t *testing.T) {
+		t.Parallel()
+
 		resource, err := repository.GetById(5153)
 		if err != nil {
 			t.Fatalf("could not get by id: %s", err)
@@ -67,6 +71,8 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should return instance if found", func(t *testing.T) {
+		t.Parallel()
+
 		resource, err := repository.GetById(3)
 		if err != nil {
 			t.Fatalf("could not get by id: %s", err)

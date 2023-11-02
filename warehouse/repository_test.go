@@ -8,12 +8,15 @@ import (
 	"github.com/doug-martin/goqu/v9"
 )
 
-func setup(t testing.TB, conn *database.Connection) {
-	t.Helper()
+func TestGoquRepository(t *testing.T) {
+	conn, err := database.GetConnection(database.SQLITE, "../test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	builder := goqu.New(conn.Driver, conn.DB)
 
-	err := builder.WithTx(func(td *goqu.TxDatabase) error {
+	err = builder.WithTx(func(td *goqu.TxDatabase) error {
 		_, err := td.Insert("categories").Rows(
 			goqu.Record{"id": 1, "name": "Food"},
 			goqu.Record{"id": 2, "name": "Infrastructure"},
@@ -63,18 +66,12 @@ func setup(t testing.TB, conn *database.Connection) {
 			t.Fatal(err)
 		}
 	})
-}
 
-func TestGoquRepository(t *testing.T) {
-	db, err := database.GetConnection(database.SQLITE, "../test.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	setup(t, db)
-	repository := warehouse.NewRepository(db)
+	repository := warehouse.NewRepository(conn)
 
 	t.Run("should return empty list", func(t *testing.T) {
+		t.Parallel()
+
 		resources, err := repository.FetchInventory(2)
 		if err != nil {
 			t.Fatal(err)
@@ -88,6 +85,8 @@ func TestGoquRepository(t *testing.T) {
 	})
 
 	t.Run("should list inventory grouped by resource/quality", func(t *testing.T) {
+		t.Parallel()
+
 		items, err := repository.FetchInventory(1)
 		if err != nil {
 			t.Fatal(err)
@@ -132,6 +131,8 @@ func TestGoquRepository(t *testing.T) {
 	})
 
 	t.Run("should include resource category", func(t *testing.T) {
+		t.Parallel()
+
 		items, err := repository.FetchInventory(1)
 		if err != nil {
 			t.Fatal(err)

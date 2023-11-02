@@ -54,6 +54,8 @@ func TestBuildingRepository(t *testing.T) {
 	repository := building.NewRepository(conn, resource.NewRepository(conn))
 
 	t.Run("should list all", func(t *testing.T) {
+		t.Parallel()
+
 		buildings, err := repository.GetAll()
 		if err != nil {
 			t.Fatalf("could not fetch buildings: %s", err)
@@ -89,6 +91,8 @@ func TestBuildingRepository(t *testing.T) {
 	})
 
 	t.Run("should return nil if not found", func(t *testing.T) {
+		t.Parallel()
+
 		building, err := repository.GetById(999)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
@@ -100,6 +104,8 @@ func TestBuildingRepository(t *testing.T) {
 	})
 
 	t.Run("should return with requirements", func(t *testing.T) {
+		t.Parallel()
+
 		building, err := repository.GetById(1)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)

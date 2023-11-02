@@ -34,7 +34,7 @@ func main() {
 	buildingSvc := building.NewService(building.NewRepository(conn, resourceRepo))
 	building.CreateEndpoints(svr, buildingSvc)
 
-	companySvc := company.NewService(company.NewRepository(conn), buildingSvc, warehouseSvc)
+	companySvc := company.NewService(company.NewRepository(conn, resourceRepo), buildingSvc, warehouseSvc)
 	company.CreateEndpoints(svr, companySvc)
 
 	svr.GET("/", server.Greeting(events))
