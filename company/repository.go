@@ -3,6 +3,7 @@ package company
 import (
 	"api/building"
 	"api/database"
+	"api/resource"
 
 	"github.com/doug-martin/goqu/v9"
 )
@@ -17,17 +18,20 @@ type (
 
 		GetBuildings(companyId uint64) ([]*CompanyBuilding, error)
 
+		GetBuilding(buildingId uint64) (*CompanyBuilding, error)
+
 		AddBuilding(companyId uint64, building *building.Building, position uint8) (*CompanyBuilding, error)
 	}
 
 	goquRepository struct {
-		builder *goqu.Database
+		builder   *goqu.Database
+		resources resource.Repository
 	}
 )
 
-func NewRepository(conn *database.Connection) Repository {
+func NewRepository(conn *database.Connection, resources resource.Repository) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
-	return &goquRepository{builder}
+	return &goquRepository{builder, resources}
 }
 
 func (r *goquRepository) GetById(id uint64) (*Company, error) {
@@ -146,10 +150,18 @@ func (r *goquRepository) GetBuildings(companyId uint64) ([]*CompanyBuilding, err
 		return nil, err
 	}
 
+	for _, building := range buildings {
+		resources, err := r.GetResources(building.Id)
+		if err != nil {
+			return nil, err
+		}
+		building.Resources = resources
+	}
+
 	return buildings, nil
 }
 
-func (r *goquRepository) GetBuildingById(id uint64) (*CompanyBuilding, error) {
+func (r *goquRepository) GetBuilding(id uint64) (*CompanyBuilding, error) {
 	building := new(CompanyBuilding)
 
 	found, err := r.builder.
@@ -182,7 +194,47 @@ func (r *goquRepository) GetBuildingById(id uint64) (*CompanyBuilding, error) {
 		return nil, err
 	}
 
+	resources, err := r.GetResources(building.Id)
+	if err != nil {
+		return nil, err
+	}
+	building.Resources = resources
+
 	return building, nil
+}
+
+func (r *goquRepository) GetResources(buildingId uint64) ([]*building.BuildingResource, error) {
+	resources := make([]*building.BuildingResource, 0)
+
+	err := r.builder.
+		Select(
+			goqu.L("? * ?", goqu.I("cb.level"), goqu.I("br.qty_per_hour")).As("qty_per_hour"),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+			goqu.I("r.name").As(goqu.C("resource.name")),
+			goqu.I("r.image").As(goqu.C("resource.image")),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+		).
+		From(goqu.T("buildings_resources").As("br")).
+		InnerJoin(
+			goqu.T("resources").As("r"),
+			goqu.On(goqu.I("br.resource_id").Eq(goqu.I("r.id"))),
+		).
+		InnerJoin(
+			goqu.T("companies_buildings").As("cb"),
+			goqu.On(goqu.I("br.building_id").Eq(goqu.I("cb.building_id"))),
+		).
+		Where(goqu.I("cb.id").Eq(buildingId)).
+		ScanStructs(&resources)
+
+	for _, resource := range resources {
+		requirements, err := r.resources.GetRequirements(resource.Resource.Id)
+		if err != nil {
+			return nil, err
+		}
+		resource.Resource.Requirements = requirements
+	}
+
+	return resources, err
 }
 
 func (r *goquRepository) AddBuilding(companyId uint64, building *building.Building, position uint8) (*CompanyBuilding, error) {
@@ -206,5 +258,5 @@ func (r *goquRepository) AddBuilding(companyId uint64, building *building.Buildi
 		return nil, err
 	}
 
-	return r.GetBuildingById(uint64(id))
+	return r.GetBuilding(uint64(id))
 }

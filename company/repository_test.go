@@ -4,6 +4,7 @@ import (
 	"api/building"
 	"api/company"
 	"api/database"
+	"api/resource"
 	"testing"
 )
 
@@ -19,10 +20,18 @@ func TestRepository(t *testing.T) {
         ("Blocked", "blocked@email.com", "aoeu", "2023-10-22T01:11:53Z", "2023-10-22T01:11:53Z", NULL),
         ("Deleted", "deleted@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, "2023-10-22T01:11:53Z");
 
+        INSERT INTO categories (id, name) VALUES (1, "Construction"), (2, "Food");
+
+        INSERT INTO resources (id, name, category_id)
+        VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1), (4, "Seeds", 2);
+
         INSERT INTO buildings (id, name) VALUES (1, "Plantation"), (2, "Factory");
 
         INSERT INTO companies_buildings (id, name, company_id, building_id, demolished_at)
         VALUES (1, "Plantation", 1, 1, NULL), (2, "Factory", 1, 2, NULL), (3, "Plantation", 1, 1, "2023-10-25 22:36:21");
+
+        INSERT INTO buildings_resources (building_id, resource_id, qty_per_hour)
+        VALUES (1, 4, 1000), (2, 1, 500), (2, 3, 250);
     `)
 	if err != nil {
 		t.Fatalf("could not seed database: %s", err)
@@ -30,19 +39,21 @@ func TestRepository(t *testing.T) {
 
 	t.Cleanup(func() {
 		if _, err := conn.DB.Exec(`
+            DELETE FROM buildings_resources;
             DELETE FROM companies_buildings;
             DELETE FROM buildings;
+            DELETE FROM resources;
+            DELETE FROM categories;
             DELETE FROM companies;
         `); err != nil {
 			t.Fatalf("could not cleanup: %s", err)
 		}
 	})
 
-	repository := company.NewRepository(conn)
+	resourcesRepository := resource.NewRepository(conn)
+	repository := company.NewRepository(conn, resourcesRepository)
 
 	t.Run("should return with id", func(t *testing.T) {
-		t.Parallel()
-
 		registration := &company.Registration{
 			Name:     "McDonalds",
 			Password: "password",
@@ -126,13 +137,15 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should ignore demolished buildings", func(t *testing.T) {
+		t.Parallel()
+
 		buildings, err := repository.GetBuildings(1)
 		if err != nil {
 			t.Fatalf("could not fetch buildings: %s", err)
 		}
 
-		if len(buildings) != 2 {
-			t.Errorf("expected %d buildings, got %d", 2, len(buildings))
+		if len(buildings) != 3 {
+			t.Errorf("expected %d buildings, got %d", 3, len(buildings))
 		}
 
 		for _, building := range buildings {
@@ -145,10 +158,47 @@ func TestRepository(t *testing.T) {
 		}
 	})
 
-	t.Run("should insert building", func(t *testing.T) {
+	t.Run("should list buildings with resources", func(t *testing.T) {
 		t.Parallel()
 
-        building, err := repository.AddBuilding(1, &building.Building{Id: 1, Name: "Plantation"}, 1)
+		buildings, err := repository.GetBuildings(1)
+		if err != nil {
+			t.Fatalf("could not get buildings: %s", err)
+		}
+
+		if len(buildings) == 0 {
+			t.Fatal("expected buildings")
+		}
+
+		for _, building := range buildings {
+			if building.Id == 1 && len(building.Resources) != 1 {
+				t.Errorf("expected %d resources, got %d", 1, len(building.Resources))
+			}
+			if building.Id == 2 && len(building.Resources) != 2 {
+				t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
+			}
+		}
+	})
+
+	t.Run("should get building with resources", func(t *testing.T) {
+		t.Parallel()
+
+		building, err := repository.GetBuilding(2)
+		if err != nil {
+			t.Fatalf("could not get building: %s", err)
+		}
+
+		if building == nil {
+			t.Fatal("could not get building")
+		}
+
+		if len(building.Resources) != 2 {
+			t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
+		}
+	})
+
+	t.Run("should insert building", func(t *testing.T) {
+		building, err := repository.AddBuilding(1, &building.Building{Id: 1, Name: "Plantation"}, 1)
 		if err != nil {
 			t.Fatalf("could not insert building: %s", err)
 		}

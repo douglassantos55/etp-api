@@ -54,6 +54,10 @@ func (r *fakeRepository) GetBuildings(companyId uint64) ([]*company.CompanyBuild
 	return nil, nil
 }
 
+func (r *fakeRepository) GetBuilding(buildingId uint64) (*company.CompanyBuilding, error) {
+	return nil, nil
+}
+
 func (r *fakeRepository) AddBuilding(companyId uint64, building *building.Building, position uint8) (*company.CompanyBuilding, error) {
 	companyBuilding := &company.CompanyBuilding{
 		Id:              uint64(len(r.buildings) + 1),

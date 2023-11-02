@@ -44,6 +44,7 @@ type (
 		MaintenanceHour uint64 `db:"maintenance_per_hour" json:"maintenance_per_hour"`
 		Level           uint8  `db:"level" json:"level"`
 		Position        *uint8 `db:"position" json:"position"`
+		Resources       []*building.BuildingResource
 	}
 
 	Service interface {
