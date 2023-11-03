@@ -25,10 +25,11 @@ func TestRepository(t *testing.T) {
         INSERT INTO resources (id, name, category_id)
         VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1), (4, "Seeds", 2);
 
-        INSERT INTO buildings (id, name) VALUES (1, "Plantation"), (2, "Factory");
+        INSERT INTO buildings (id, name, wages_per_hour, admin_per_hour, maintenance_per_hour)
+        VALUES (1, "Plantation", 500, 1000, 200), (2, "Factory", 1500, 5000, 500);
 
-        INSERT INTO companies_buildings (id, name, company_id, building_id, demolished_at)
-        VALUES (1, "Plantation", 1, 1, NULL), (2, "Factory", 1, 2, NULL), (3, "Plantation", 1, 1, "2023-10-25 22:36:21");
+        INSERT INTO companies_buildings (id, name, company_id, building_id, level, demolished_at)
+        VALUES (1, "Plantation", 1, 1, 2, NULL), (2, "Factory", 1, 2, 3, NULL), (3, "Plantation", 1, 1, 1, "2023-10-25 22:36:21");
 
         INSERT INTO buildings_resources (building_id, resource_id, qty_per_hour)
         VALUES (1, 4, 1000), (2, 1, 500), (2, 3, 250);
@@ -171,11 +172,31 @@ func TestRepository(t *testing.T) {
 		}
 
 		for _, building := range buildings {
-			if building.Id == 1 && len(building.Resources) != 1 {
-				t.Errorf("expected %d resources, got %d", 1, len(building.Resources))
+			if building.Id == 1 {
+				if len(building.Resources) != 1 {
+					t.Errorf("expected %d resources, got %d", 1, len(building.Resources))
+				}
+
+				for _, resource := range building.Resources {
+					if resource.Resource.Id == 4 && resource.QtyPerHours != 2000 {
+						t.Errorf("expected qty per hour %d, got %d", 2000, resource.QtyPerHours)
+					}
+				}
 			}
-			if building.Id == 2 && len(building.Resources) != 2 {
-				t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
+
+			if building.Id == 2 {
+				if len(building.Resources) != 2 {
+					t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
+				}
+
+				for _, resource := range building.Resources {
+					if resource.Resource.Id == 1 && resource.QtyPerHours != 1500 {
+						t.Errorf("expected qty per hour %d, got %d", 1500, resource.QtyPerHours)
+					}
+					if resource.Resource.Id == 3 && resource.QtyPerHours != 750 {
+						t.Errorf("expected qty per hour %d, got %d", 750, resource.QtyPerHours)
+					}
+				}
 			}
 		}
 	})
@@ -183,7 +204,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should get building with resources", func(t *testing.T) {
 		t.Parallel()
 
-		building, err := repository.GetBuilding(2)
+		building, err := repository.GetBuilding(2, 1)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
 		}
@@ -194,6 +215,26 @@ func TestRepository(t *testing.T) {
 
 		if len(building.Resources) != 2 {
 			t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
+		}
+
+		for _, resource := range building.Resources {
+			if resource.Resource.Id == 1 && resource.QtyPerHours != 1500 {
+				t.Errorf("expected qty per hour %d, got %d", 1500, resource.QtyPerHours)
+			}
+			if resource.Resource.Id == 3 && resource.QtyPerHours != 750 {
+				t.Errorf("expected qty per hour %d, got %d", 750, resource.QtyPerHours)
+			}
+		}
+	})
+
+	t.Run("should return nil if not found", func(t *testing.T) {
+		building, err := repository.GetBuilding(3, 1)
+		if err != nil {
+			t.Fatalf("could not get building: %s", err)
+		}
+
+		if building != nil {
+			t.Errorf("should not find building: %+v", building)
 		}
 	})
 

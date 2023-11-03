@@ -54,7 +54,7 @@ func (r *fakeRepository) GetBuildings(companyId uint64) ([]*company.CompanyBuild
 	return nil, nil
 }
 
-func (r *fakeRepository) GetBuilding(buildingId uint64) (*company.CompanyBuilding, error) {
+func (r *fakeRepository) GetBuilding(buildingId, companyId uint64) (*company.CompanyBuilding, error) {
 	return nil, nil
 }
 

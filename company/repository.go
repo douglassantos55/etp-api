@@ -18,7 +18,7 @@ type (
 
 		GetBuildings(companyId uint64) ([]*CompanyBuilding, error)
 
-		GetBuilding(buildingId uint64) (*CompanyBuilding, error)
+		GetBuilding(buildingId, companyId uint64) (*CompanyBuilding, error)
 
 		AddBuilding(companyId uint64, building *building.Building, position uint8) (*CompanyBuilding, error)
 	}
@@ -161,7 +161,7 @@ func (r *goquRepository) GetBuildings(companyId uint64) ([]*CompanyBuilding, err
 	return buildings, nil
 }
 
-func (r *goquRepository) GetBuilding(id uint64) (*CompanyBuilding, error) {
+func (r *goquRepository) GetBuilding(id, companyId uint64) (*CompanyBuilding, error) {
 	building := new(CompanyBuilding)
 
 	found, err := r.builder.
@@ -186,6 +186,7 @@ func (r *goquRepository) GetBuilding(id uint64) (*CompanyBuilding, error) {
 		).
 		Where(goqu.And(
 			goqu.I("cb.id").Eq(id),
+			goqu.I("cb.company_id").Eq(companyId),
 			goqu.I("cb.demolished_at").IsNull(),
 		)).
 		ScanStruct(building)
@@ -258,5 +259,5 @@ func (r *goquRepository) AddBuilding(companyId uint64, building *building.Buildi
 		return nil, err
 	}
 
-	return r.GetBuilding(uint64(id))
+	return r.GetBuilding(uint64(id), companyId)
 }
