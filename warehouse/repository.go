@@ -59,12 +59,7 @@ func (r *goquRepository) FetchInventory(companyId uint64) (*Inventory, error) {
 }
 
 func (r *goquRepository) ReduceStock(companyId uint64, inventory *Inventory, resources []*resource.Item) error {
-	tx, err := r.builder.Begin()
-	if err != nil {
-		return err
-	}
-
-	return tx.Wrap(func() error {
+	return r.builder.WithTx(func(tx *goqu.TxDatabase) error {
 		for _, resource := range resources {
 			for _, item := range inventory.Items {
 				item.Qty -= resource.Qty
@@ -84,7 +79,7 @@ func (r *goquRepository) ReduceStock(companyId uint64, inventory *Inventory, res
 }
 
 func (r *goquRepository) removeStock(tx *goqu.TxDatabase, companyId uint64, item *StockItem) error {
-	_, err := r.builder.
+	_, err := tx.
 		Delete(goqu.T("inventories")).
 		Where(goqu.And(
 			goqu.I("quality").Eq(item.Quality),
@@ -98,7 +93,7 @@ func (r *goquRepository) removeStock(tx *goqu.TxDatabase, companyId uint64, item
 }
 
 func (r *goquRepository) updateStock(tx *goqu.TxDatabase, companyId uint64, item *StockItem) error {
-	_, err := r.builder.
+	_, err := tx.
 		Update(goqu.T("inventories")).
 		Set(goqu.Record{"quantity": item.Qty}).
 		Where(goqu.And(
