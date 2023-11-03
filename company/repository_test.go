@@ -15,10 +15,10 @@ func TestRepository(t *testing.T) {
 	}
 
 	_, err = conn.DB.Exec(`
-        INSERT INTO companies (name, email, password, created_at, blocked_at, deleted_at) VALUES
-        ("Coca-Cola", "coke@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, NULL),
-        ("Blocked", "blocked@email.com", "aoeu", "2023-10-22T01:11:53Z", "2023-10-22T01:11:53Z", NULL),
-        ("Deleted", "deleted@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, "2023-10-22T01:11:53Z");
+        INSERT INTO companies (id, name, email, password, created_at, blocked_at, deleted_at) VALUES
+        (1, "Coca-Cola", "coke@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, NULL),
+        (2, "Blocked", "blocked@email.com", "aoeu", "2023-10-22T01:11:53Z", "2023-10-22T01:11:53Z", NULL),
+        (3, "Deleted", "deleted@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, "2023-10-22T01:11:53Z");
 
         INSERT INTO categories (id, name) VALUES (1, "Construction"), (2, "Food");
 
@@ -33,6 +33,9 @@ func TestRepository(t *testing.T) {
 
         INSERT INTO buildings_resources (building_id, resource_id, qty_per_hour)
         VALUES (1, 4, 1000), (2, 1, 500), (2, 3, 250);
+
+        INSERT INTO transactions (company_id, value)
+        VALUES (1, 1000000);
     `)
 	if err != nil {
 		t.Fatalf("could not seed database: %s", err)
@@ -53,6 +56,17 @@ func TestRepository(t *testing.T) {
 
 	resourcesRepository := resource.NewRepository(conn)
 	repository := company.NewRepository(conn, resourcesRepository)
+
+	t.Run("should return with cash", func(t *testing.T) {
+		company, err := repository.GetById(1)
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+
+		if company.AvailableCash != 1_000_000 {
+			t.Errorf("expected cash %d, got %d", 1_000_000, company.AvailableCash)
+		}
+	})
 
 	t.Run("should return with id", func(t *testing.T) {
 		registration := &company.Registration{

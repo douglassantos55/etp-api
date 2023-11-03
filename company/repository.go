@@ -45,8 +45,13 @@ func (r *goquRepository) GetById(id uint64) (*Company, error) {
 			goqu.I("c.password"),
 			goqu.I("c.last_login"),
 			goqu.I("c.created_at"),
+			goqu.COALESCE(goqu.SUM("t.value"), 0).As("cash"),
 		).
 		From(goqu.T("companies").As("c")).
+		LeftJoin(
+			goqu.T("transactions").As("t"),
+			goqu.On(goqu.I("t.company_id").Eq(goqu.I("c.id"))),
+		).
 		Where(
 			goqu.And(
 				goqu.I("c.id").Eq(id),
@@ -54,6 +59,7 @@ func (r *goquRepository) GetById(id uint64) (*Company, error) {
 				goqu.I("c.deleted_at").IsNull(),
 			),
 		).
+		GroupBy(goqu.I("c.id")).
 		ScanStruct(company)
 
 	if err != nil || !found {
