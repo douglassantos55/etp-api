@@ -85,6 +85,11 @@ func TestBuildingRepository(t *testing.T) {
 				if len(building.Resources) != 2 {
 					t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
 				}
+				for _, resource := range building.Resources {
+					if resource.Name == "" {
+						t.Error("should have a name")
+					}
+				}
 			}
 		}
 

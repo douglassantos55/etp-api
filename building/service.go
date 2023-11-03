@@ -14,8 +14,8 @@ type (
 	}
 
 	BuildingResource struct {
-		Resource    *resource.Resource `db:"resource" json:"resource"`
-		QtyPerHours uint64             `db:"qty_per_hour" json:"qty_per_hour"`
+		*resource.Resource `db:"resource" json:"resource"`
+		QtyPerHours        uint64 `db:"qty_per_hour" json:"qty_per_hour"`
 	}
 
 	Service interface {
