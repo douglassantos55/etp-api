@@ -38,6 +38,9 @@ func TestRepository(t *testing.T) {
 
         INSERT INTO transactions (company_id, value)
         VALUES (1, 1000000);
+
+        INSERT INTO productions (resource_id, building_id, qty, quality, finishes_at)
+        VALUES (3, 2, 250, 0, '2034-12-31 15:59:59');
     `)
 	if err != nil {
 		t.Fatalf("could not seed database: %s", err)
@@ -219,6 +222,22 @@ func TestRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("should list buildings with busy until", func(t *testing.T) {
+		buildings, err := repository.GetBuildings(1)
+		if err != nil {
+			t.Fatalf("could not get buildings: %s", err)
+		}
+		for _, building := range buildings {
+			if building.Id == 1 && building.BusyUntil != nil {
+				t.Errorf("should not be busy, got %+v", *building.BusyUntil)
+			}
+
+			if building.Id == 2 && building.BusyUntil == nil {
+				t.Error("should be busy")
+			}
+		}
+	})
+
 	t.Run("should get building with resources", func(t *testing.T) {
 		t.Parallel()
 
@@ -242,6 +261,21 @@ func TestRepository(t *testing.T) {
 			if resource.Resource.Id == 3 && resource.QtyPerHours != 750 {
 				t.Errorf("expected qty per hour %d, got %d", 750, resource.QtyPerHours)
 			}
+		}
+	})
+
+	t.Run("should get building with busy until", func(t *testing.T) {
+		building, err := repository.GetBuilding(2, 1)
+		if err != nil {
+			t.Fatalf("could not get building: %s", err)
+		}
+
+		if building == nil {
+			t.Fatal("could not get building")
+		}
+
+		if building.BusyUntil == nil {
+			t.Error("should be busy")
 		}
 	})
 

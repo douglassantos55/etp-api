@@ -149,6 +149,7 @@ func (r *goquRepository) GetBuildings(companyId uint64) ([]*CompanyBuilding, err
 		Select(
 			goqu.I("cb.id"),
 			goqu.I("cb.name"),
+			goqu.I("bp.finishes_at").As("busy_until"),
 			goqu.L("? * ?", goqu.I("b.wages_per_hour"), goqu.I("cb.level")).As("wages_per_hour"),
 			goqu.L("? * ?", goqu.I("b.admin_per_hour"), goqu.I("cb.level")).As("admin_per_hour"),
 			goqu.L("? * ?", goqu.I("b.maintenance_per_hour"), goqu.I("cb.level")).As("maintenance_per_hour"),
@@ -162,6 +163,15 @@ func (r *goquRepository) GetBuildings(companyId uint64) ([]*CompanyBuilding, err
 				goqu.And(
 					goqu.I("b.id").Eq(goqu.I("cb.building_id")),
 					goqu.I("b.deleted_at").IsNull(),
+				),
+			),
+		).
+		LeftJoin(
+			goqu.T("productions").As("bp"),
+			goqu.On(
+				goqu.And(
+					goqu.I("bp.building_id").Eq(goqu.I("cb.id")),
+					goqu.I("bp.finishes_at").Gt(goqu.L("CURRENT_TIMESTAMP")),
 				),
 			),
 		).
@@ -193,6 +203,7 @@ func (r *goquRepository) GetBuilding(id, companyId uint64) (*CompanyBuilding, er
 		Select(
 			goqu.I("cb.id"),
 			goqu.I("cb.name"),
+			goqu.I("bp.finishes_at").As("busy_until"),
 			goqu.L("? * ?", goqu.I("b.wages_per_hour"), goqu.I("cb.level")).As("wages_per_hour"),
 			goqu.L("? * ?", goqu.I("b.admin_per_hour"), goqu.I("cb.level")).As("admin_per_hour"),
 			goqu.L("? * ?", goqu.I("b.maintenance_per_hour"), goqu.I("cb.level")).As("maintenance_per_hour"),
@@ -206,6 +217,15 @@ func (r *goquRepository) GetBuilding(id, companyId uint64) (*CompanyBuilding, er
 				goqu.And(
 					goqu.I("b.id").Eq(goqu.I("cb.building_id")),
 					goqu.I("b.deleted_at").IsNull(),
+				),
+			),
+		).
+		LeftJoin(
+			goqu.T("productions").As("bp"),
+			goqu.On(
+				goqu.And(
+					goqu.I("bp.building_id").Eq(goqu.I("cb.id")),
+					goqu.I("bp.finishes_at").Gt(goqu.L("CURRENT_TIMESTAMP")),
 				),
 			),
 		).

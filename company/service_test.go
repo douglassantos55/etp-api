@@ -106,9 +106,16 @@ func TestCompanyService(t *testing.T) {
 				t.Fatalf("could not get company: %s", err)
 			}
 
-			expectedCash := 40
+			expectedCash := 360
 			if company.AvailableCash != expectedCash {
 				t.Errorf("expected %d cash, got %d", expectedCash, company.AvailableCash)
+			}
+		})
+
+		t.Run("should not produce on busy building", func(t *testing.T) {
+			_, err := service.Produce(1, 1, &resource.Item{Qty: 1, Quality: 0, ResourceId: 1})
+			if err.Error() != "building is busy" {
+				t.Errorf("expected building is busy, got %s", err)
 			}
 		})
 	})

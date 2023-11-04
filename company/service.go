@@ -48,6 +48,7 @@ type (
 		Level           uint8  `db:"level" json:"level"`
 		Position        *uint8 `db:"position" json:"position"`
 		Resources       []*building.BuildingResource
+		BusyUntil       *time.Time `db:"busy_until" json:"busy_until"`
 	}
 
 	Production struct {
@@ -163,6 +164,10 @@ func (s *service) Produce(companyId, buildingId uint64, item *resource.Item) (*P
 
 	if building == nil {
 		return nil, errors.New("building not found")
+	}
+
+	if building.BusyUntil != nil {
+		return nil, errors.New("building is busy")
 	}
 
 	resourceToProduce, err := building.GetResource(item.ResourceId)

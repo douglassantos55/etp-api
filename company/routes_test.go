@@ -21,7 +21,7 @@ type fakeRepository struct {
 
 func NewFakeRepository() company.Repository {
 	data := map[uint64]*company.Company{
-		1: {Id: 1, Name: "Test", Email: "admin@test.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy", AvailableCash: 400},
+		1: {Id: 1, Name: "Test", Email: "admin@test.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy", AvailableCash: 720},
 	}
 
 	buildings := map[uint64]map[uint64]*company.CompanyBuilding{
@@ -145,6 +145,7 @@ func (r *fakeRepository) GetBuilding(buildingId, companyId uint64) (*company.Com
 		MaintenanceHour: companyBuilding.MaintenanceHour,
 		Level:           companyBuilding.Level,
 		Position:        companyBuilding.Position,
+		BusyUntil:       companyBuilding.BusyUntil,
 		Resources:       resources,
 	}, nil
 }
@@ -165,10 +166,13 @@ func (r *fakeRepository) AddBuilding(companyId uint64, building *building.Buildi
 }
 
 func (r *fakeRepository) Produce(companyId uint64, building *company.CompanyBuilding, item *resource.Item) (*company.Production, error) {
+	finishesAt := time.Now().Add(time.Hour)
+	r.buildings[companyId][building.Id].BusyUntil = &finishesAt
+
 	return &company.Production{
 		Item:       item,
 		Id:         1,
-		FinishesAt: time.Now().Add(time.Hour),
+		FinishesAt: finishesAt,
 	}, nil
 }
 
