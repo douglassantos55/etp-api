@@ -5,7 +5,9 @@ import (
 	"api/company"
 	"api/database"
 	"api/resource"
+	"math"
 	"testing"
+	"time"
 )
 
 func TestRepository(t *testing.T) {
@@ -43,6 +45,8 @@ func TestRepository(t *testing.T) {
 
 	t.Cleanup(func() {
 		if _, err := conn.DB.Exec(`
+            DELETE FROM productions;
+            DELETE FROM transactions;
             DELETE FROM buildings_resources;
             DELETE FROM companies_buildings;
             DELETE FROM buildings;
@@ -269,6 +273,28 @@ func TestRepository(t *testing.T) {
 		}
 		if building.Name != "Plantation" {
 			t.Errorf("expected name %s, got %s", "Plantation", building.Name)
+		}
+	})
+
+	t.Run("should set finishes at", func(t *testing.T) {
+		building, err := repository.GetBuilding(1, 1)
+		if err != nil {
+			t.Fatalf("could not get building: %s", err)
+		}
+
+		item := &resource.Item{Qty: 2000, Quality: 0, ResourceId: 4}
+		production, err := repository.Produce(1, building, item)
+		if err != nil {
+			t.Fatalf("could not produce: %s", err)
+		}
+
+		if production == nil {
+			t.Fatal("production not found")
+		}
+
+		diff := production.FinishesAt.Sub(time.Now())
+		if math.Round(diff.Minutes()) != 60 {
+			t.Errorf("expected 60, got %f", math.Round(diff.Minutes()))
 		}
 	})
 }

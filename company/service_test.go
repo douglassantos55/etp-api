@@ -3,6 +3,7 @@ package company_test
 import (
 	"api/building"
 	"api/company"
+	"api/resource"
 	"api/warehouse"
 	"testing"
 )
@@ -57,6 +58,57 @@ func TestCompanyService(t *testing.T) {
 			}
 			if building.Name != "Plantation" {
 				t.Errorf("expected name %s, got %s", "Plantation", building.Name)
+			}
+		})
+	})
+
+	t.Run("produce", func(t *testing.T) {
+		t.Run("should not produce on building from other companies", func(t *testing.T) {
+			_, err := service.Produce(1, 2, &resource.Item{Qty: 10, Quality: 0, ResourceId: 1})
+			if err.Error() != "building not found" {
+				t.Errorf("expected building not found got %s", err)
+			}
+		})
+
+		t.Run("should not produce resource that is not in building", func(t *testing.T) {
+			_, err := service.Produce(1, 1, &resource.Item{Qty: 10, Quality: 0, ResourceId: 2})
+			if err.Error() != "resource not found" {
+				t.Errorf("expected resource not found, got %s", err)
+			}
+		})
+
+		t.Run("should not produce without enough resources", func(t *testing.T) {
+			_, err := service.Produce(1, 1, &resource.Item{Qty: 100, Quality: 0, ResourceId: 1})
+			if err.Error() != "not enough resources" {
+				t.Errorf("expected not enough resources, got %s", err)
+			}
+		})
+
+		t.Run("should not produce without enough cash", func(t *testing.T) {
+			_, err := service.Produce(1, 1, &resource.Item{Qty: 10, Quality: 0, ResourceId: 1})
+			if err.Error() != "not enough cash" {
+				t.Errorf("expected not enough cash, got %s", err)
+			}
+		})
+
+		t.Run("should reduce cash", func(t *testing.T) {
+			production, err := service.Produce(1, 1, &resource.Item{Qty: 1, Quality: 0, ResourceId: 1})
+			if err != nil {
+				t.Fatalf("could not produce: %s", err)
+			}
+
+			if production == nil {
+				t.Fatal("should return a production instance")
+			}
+
+			company, err := service.GetById(1)
+			if err != nil {
+				t.Fatalf("could not get company: %s", err)
+			}
+
+			expectedCash := 40
+			if company.AvailableCash != expectedCash {
+				t.Errorf("expected %d cash, got %d", expectedCash, company.AvailableCash)
 			}
 		})
 	})

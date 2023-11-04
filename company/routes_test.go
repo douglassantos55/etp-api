@@ -4,24 +4,70 @@ import (
 	"api/auth"
 	"api/building"
 	"api/company"
+	"api/resource"
 	"api/server"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 type fakeRepository struct {
 	data      map[uint64]*company.Company
-	buildings map[uint64]*company.CompanyBuilding
+	buildings map[uint64]map[uint64]*company.CompanyBuilding
 }
 
 func NewFakeRepository() company.Repository {
 	data := map[uint64]*company.Company{
-		1: {Id: 1, Name: "Test", Email: "admin@test.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy"},
+		1: {Id: 1, Name: "Test", Email: "admin@test.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy", AvailableCash: 400},
 	}
-	buildings := make(map[uint64]*company.CompanyBuilding)
+
+	buildings := map[uint64]map[uint64]*company.CompanyBuilding{
+		1: {
+			1: {
+				Id:        1,
+				Name:      "Plantation",
+				Level:     1,
+				WagesHour: 100,
+				AdminHour: 500,
+				Resources: []*building.BuildingResource{
+					{
+						QtyPerHours: 1000,
+						Resource: &resource.Resource{
+							Id:   1,
+							Name: "Seeds",
+							Requirements: []*resource.Item{
+								{Qty: 15, Quality: 0, Resource: &resource.Resource{Id: 2}},
+							},
+						},
+					},
+				},
+			},
+		},
+		2: {
+			2: {
+				Id:        2,
+				Name:      "Plantation",
+				Level:     1,
+				WagesHour: 100,
+				AdminHour: 500,
+				Resources: []*building.BuildingResource{
+					{
+						QtyPerHours: 1000,
+						Resource: &resource.Resource{
+							Id:   1,
+							Name: "Seeds",
+							Requirements: []*resource.Item{
+								{Qty: 15, Quality: 0, Resource: &resource.Resource{Id: 2}},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 	return &fakeRepository{data, buildings}
 }
 
@@ -51,16 +97,62 @@ func (r *fakeRepository) GetByEmail(email string) (*company.Company, error) {
 }
 
 func (r *fakeRepository) GetBuildings(companyId uint64) ([]*company.CompanyBuilding, error) {
-	return nil, nil
+	buildings := make([]*company.CompanyBuilding, 0)
+	for _, building := range r.buildings[companyId] {
+		buildings = append(buildings, building)
+	}
+	return buildings, nil
 }
 
 func (r *fakeRepository) GetBuilding(buildingId, companyId uint64) (*company.CompanyBuilding, error) {
-	return nil, nil
+	buildings, ok := r.buildings[companyId]
+	if !ok {
+		return nil, nil
+	}
+
+	companyBuilding, ok := buildings[buildingId]
+	if !ok {
+		return nil, nil
+	}
+
+	resources := make([]*building.BuildingResource, 0)
+	for _, buildingResource := range companyBuilding.Resources {
+		requirements := make([]*resource.Item, 0)
+		for _, req := range buildingResource.Requirements {
+			requirements = append(requirements, &resource.Item{
+				Qty:        req.Qty,
+				Quality:    req.Quality,
+				ResourceId: req.ResourceId,
+				Resource:   req.Resource,
+			})
+		}
+
+		resources = append(resources, &building.BuildingResource{
+			Resource: &resource.Resource{
+				Id:           buildingResource.Id,
+				Name:         buildingResource.Name,
+				Requirements: requirements,
+			},
+			QtyPerHours: buildingResource.QtyPerHours,
+		})
+	}
+
+	return &company.CompanyBuilding{
+		Id:              companyBuilding.Id,
+		Name:            companyBuilding.Name,
+		WagesHour:       companyBuilding.WagesHour,
+		AdminHour:       companyBuilding.AdminHour,
+		MaintenanceHour: companyBuilding.MaintenanceHour,
+		Level:           companyBuilding.Level,
+		Position:        companyBuilding.Position,
+		Resources:       resources,
+	}, nil
 }
 
 func (r *fakeRepository) AddBuilding(companyId uint64, building *building.Building, position uint8) (*company.CompanyBuilding, error) {
+	id := uint64(len(r.buildings) + 1)
 	companyBuilding := &company.CompanyBuilding{
-		Id:              uint64(len(r.buildings) + 1),
+		Id:              id,
 		Name:            building.Name,
 		Position:        &position,
 		Level:           1,
@@ -68,8 +160,21 @@ func (r *fakeRepository) AddBuilding(companyId uint64, building *building.Buildi
 		AdminHour:       building.AdminHour,
 		MaintenanceHour: building.MaintenanceHour,
 	}
-	r.buildings[companyId] = companyBuilding
+	r.buildings[companyId][id] = companyBuilding
 	return companyBuilding, nil
+}
+
+func (r *fakeRepository) Produce(companyId uint64, building *company.CompanyBuilding, item *resource.Item) (*company.Production, error) {
+	return &company.Production{
+		Item:       item,
+		Id:         1,
+		FinishesAt: time.Now().Add(time.Hour),
+	}, nil
+}
+
+func (r *fakeRepository) RegisterTransaction(companyId, classificationId uint64, amount int, description string) error {
+	r.data[companyId].AvailableCash += amount
+	return nil
 }
 
 func TestCompanyRoutes(t *testing.T) {

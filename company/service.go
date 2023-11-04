@@ -3,9 +3,11 @@ package company
 import (
 	"api/auth"
 	"api/building"
+	"api/resource"
 	"api/server"
 	"api/warehouse"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -28,12 +30,13 @@ type (
 	}
 
 	Company struct {
-		Id        uint64     `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
-		Name      string     `db:"name" json:"name"`
-		Email     string     `db:"email" json:"email"`
-		Pass      string     `db:"password" json:"-"`
-		LastLogin *time.Time `db:"last_login" json:"last_login"`
-		CreatedAt time.Time  `db:"created_at" json:"created_at"`
+		Id            uint64     `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
+		Name          string     `db:"name" json:"name"`
+		Email         string     `db:"email" json:"email"`
+		Pass          string     `db:"password" json:"-"`
+		LastLogin     *time.Time `db:"last_login" json:"last_login"`
+		CreatedAt     time.Time  `db:"created_at" json:"created_at"`
+		AvailableCash int        `db:"cash" json:"available_cash"`
 	}
 
 	CompanyBuilding struct {
@@ -45,6 +48,12 @@ type (
 		Level           uint8  `db:"level" json:"level"`
 		Position        *uint8 `db:"position" json:"position"`
 		Resources       []*building.BuildingResource
+	}
+
+	Production struct {
+		*resource.Item
+		Id         uint64    `db:"id" json:"id"`
+		FinishesAt time.Time `db:"finishes_at" json:"finishes_at"`
 	}
 
 	Service interface {
@@ -59,6 +68,8 @@ type (
 		GetBuildings(companyId uint64) ([]*CompanyBuilding, error)
 
 		AddBuilding(companyId, buildingId uint64, position uint8) (*CompanyBuilding, error)
+
+		Produce(companyId, companyBuildingId uint64, item *resource.Item) (*Production, error)
 	}
 
 	service struct {
@@ -67,6 +78,15 @@ type (
 		warehouse  warehouse.Service
 	}
 )
+
+func (b *CompanyBuilding) GetResource(resourceId uint64) (*building.BuildingResource, error) {
+	for _, resource := range b.Resources {
+		if resource.Id == resourceId {
+			return resource, nil
+		}
+	}
+	return nil, errors.New("resource not found")
+}
 
 func NewService(repository Repository, building building.Service, warehouse warehouse.Service) Service {
 	return &service{repository, building, warehouse}
@@ -133,4 +153,61 @@ func (s *service) AddBuilding(companyId, buildingId uint64, position uint8) (*Co
 	}
 
 	return s.repository.AddBuilding(companyId, build, position)
+}
+
+func (s *service) Produce(companyId, buildingId uint64, item *resource.Item) (*Production, error) {
+	building, err := s.repository.GetBuilding(buildingId, companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	if building == nil {
+		return nil, errors.New("building not found")
+	}
+
+	resourceToProduce, err := building.GetResource(item.ResourceId)
+	if err != nil {
+		return nil, err
+	}
+
+	inventory, err := s.warehouse.GetInventory(companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Considers the qty
+	for _, requirement := range resourceToProduce.Requirements {
+		requirement.Qty *= item.Qty
+	}
+
+	if !inventory.HasResources(resourceToProduce.Requirements) {
+		return nil, errors.New("not enough resources")
+	}
+
+	timeToProduce := float64(item.Qty) / (float64(resourceToProduce.QtyPerHours) / 60.0)
+	adminCost := uint64(float64(building.AdminHour) * timeToProduce * 10)
+	wagesCost := uint64(float64(building.WagesHour) * timeToProduce * 10)
+	totalCost := int(adminCost + wagesCost)
+
+	company, err := s.GetById(companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	if company.AvailableCash < totalCost {
+		return nil, errors.New("not enough cash")
+	}
+
+	if err := s.warehouse.ReduceStock(companyId, inventory, resourceToProduce.Requirements); err != nil {
+		return nil, err
+	}
+
+	description := fmt.Sprintf("Production of %s", resourceToProduce.Name)
+
+	err = s.repository.RegisterTransaction(companyId, WAGES, totalCost*-1, description)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repository.Produce(companyId, building, item)
 }

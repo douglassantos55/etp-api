@@ -4,8 +4,14 @@ import (
 	"api/building"
 	"api/database"
 	"api/resource"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
+)
+
+const (
+	WAGES          = 1
+	SOCIAL_CAPITAL = 2
 )
 
 type (
@@ -21,6 +27,10 @@ type (
 		GetBuilding(buildingId, companyId uint64) (*CompanyBuilding, error)
 
 		AddBuilding(companyId uint64, building *building.Building, position uint8) (*CompanyBuilding, error)
+
+		Produce(companyId uint64, building *CompanyBuilding, item *resource.Item) (*Production, error)
+
+		RegisterTransaction(companyId, classificationId uint64, amount int, description string) error
 	}
 
 	goquRepository struct {
@@ -117,6 +127,15 @@ func (r *goquRepository) Register(registration *Registration) (*Company, error) 
 
 	id, err := result.LastInsertId()
 	if err != nil {
+		return nil, err
+	}
+
+	if err = r.RegisterTransaction(
+		uint64(id),
+		SOCIAL_CAPITAL,
+		1_000_000,
+		"Initial capital",
+	); err != nil {
 		return nil, err
 	}
 
@@ -266,4 +285,81 @@ func (r *goquRepository) AddBuilding(companyId uint64, building *building.Buildi
 	}
 
 	return r.GetBuilding(uint64(id), companyId)
+}
+
+func (r *goquRepository) Produce(companyId uint64, building *CompanyBuilding, item *resource.Item) (*Production, error) {
+	resourceToProduce, err := building.GetResource(item.ResourceId)
+	if err != nil {
+		return nil, err
+	}
+
+	timeToProduce := float64(item.Qty) / (float64(resourceToProduce.QtyPerHours) / 60.0)
+	finishesAt := time.Now().Add(time.Second * time.Duration(timeToProduce*60))
+
+	result, err := r.builder.
+		Insert(goqu.T("productions")).
+		Rows(goqu.Record{
+			"qty":         item.Qty,
+			"quality":     item.Quality,
+			"building_id": building.Id,
+			"resource_id": item.ResourceId,
+			"finishes_at": finishesAt,
+		}).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	return r.GetProduction(uint64(id))
+}
+
+func (r *goquRepository) GetProduction(id uint64) (*Production, error) {
+	production := new(Production)
+
+	found, err := r.builder.
+		Select(
+			goqu.I("p.id"),
+			goqu.I("p.quality"),
+			goqu.I("p.finishes_at"),
+			goqu.I("p.qty").As("quantity"),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+			goqu.I("r.name").As(goqu.C("resource.name")),
+			goqu.I("r.image").As(goqu.C("resource.image")),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+		).
+		From(goqu.T("productions").As("p")).
+		InnerJoin(
+			goqu.T("resources").As("r"),
+			goqu.On(goqu.I("p.resource_id").Eq(goqu.I("r.id"))),
+		).
+		Where(goqu.I("p.id").Eq(id)).
+		ScanStruct(production)
+
+	if err != nil || !found {
+		return nil, err
+	}
+
+	return production, nil
+}
+
+func (r *goquRepository) RegisterTransaction(companyId, classificationId uint64, amount int, description string) error {
+	_, err := r.builder.
+		Insert(goqu.T("transactions")).
+		Rows(goqu.Record{
+			"company_id":        companyId,
+			"classification_id": classificationId,
+			"description":       description,
+			"value":             amount,
+		}).
+		Executor().
+		Exec()
+
+	return err
 }
