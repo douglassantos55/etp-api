@@ -1,6 +1,9 @@
 package warehouse
 
-import "api/resource"
+import (
+	"api/resource"
+	"context"
+)
 
 type (
 	Inventory struct {
@@ -13,7 +16,7 @@ type (
 	}
 
 	Service interface {
-		GetInventory(companyId uint64) (*Inventory, error)
+		GetInventory(ctx context.Context, companyId uint64) (*Inventory, error)
 	}
 
 	service struct {
@@ -43,6 +46,6 @@ func NewService(repository Repository) Service {
 	return &service{repository}
 }
 
-func (s *service) GetInventory(companyId uint64) (*Inventory, error) {
-	return s.repository.FetchInventory(companyId)
+func (s *service) GetInventory(ctx context.Context, companyId uint64) (*Inventory, error) {
+	return s.repository.FetchInventory(ctx, companyId)
 }

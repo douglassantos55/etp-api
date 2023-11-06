@@ -3,6 +3,7 @@ package warehouse
 import (
 	"api/database"
 	"api/resource"
+	"context"
 	"errors"
 )
 
@@ -24,7 +25,7 @@ func NewFakeRepository() Repository {
 	return &fakeRepository{data}
 }
 
-func (r *fakeRepository) FetchInventory(companyId uint64) (*Inventory, error) {
+func (r *fakeRepository) FetchInventory(ctx context.Context, companyId uint64) (*Inventory, error) {
 	inventory, ok := r.data[companyId]
 	if !ok {
 		return nil, errors.New("inventory not found")
@@ -32,7 +33,7 @@ func (r *fakeRepository) FetchInventory(companyId uint64) (*Inventory, error) {
 	return inventory, nil
 }
 
-func (r *fakeRepository) ReduceStock(tx *database.DB, companyId uint64, inventory *Inventory, items []*resource.Item) error {
+func (r *fakeRepository) ReduceStock(ctx context.Context, tx *database.DB, companyId uint64, inventory *Inventory, items []*resource.Item) error {
 	for _, item := range items {
 		for _, inv := range inventory.Items {
 			isResource := item.Resource.Id == inv.Resource.Id

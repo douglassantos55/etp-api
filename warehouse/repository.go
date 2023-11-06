@@ -3,6 +3,7 @@ package warehouse
 import (
 	"api/database"
 	"api/resource"
+	"context"
 
 	"github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -10,9 +11,10 @@ import (
 
 type Repository interface {
 	// Fetches the inventory of a company
-	FetchInventory(companyId uint64) (*Inventory, error)
+	FetchInventory(ctx context.Context, companyId uint64) (*Inventory, error)
 
-	ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error
+	// Reduces the stock for the given resources
+	ReduceStock(ctx context.Context, db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error
 }
 
 type goquRepository struct {
@@ -25,7 +27,7 @@ func NewRepository(conn *database.Connection) Repository {
 	return &goquRepository{builder}
 }
 
-func (r *goquRepository) FetchInventory(companyId uint64) (*Inventory, error) {
+func (r *goquRepository) FetchInventory(ctx context.Context, companyId uint64) (*Inventory, error) {
 	items := make([]*StockItem, 0)
 
 	err := r.builder.
@@ -49,7 +51,7 @@ func (r *goquRepository) FetchInventory(companyId uint64) (*Inventory, error) {
 		)).
 		Where(goqu.I("i.company_id").Eq(companyId)).
 		GroupBy(goqu.I("r.id"), goqu.I("i.quality")).
-		ScanStructs(&items)
+		ScanStructsContext(ctx, &items)
 
 	if err != nil {
 		return nil, err
@@ -58,17 +60,17 @@ func (r *goquRepository) FetchInventory(companyId uint64) (*Inventory, error) {
 	return &Inventory{items}, nil
 }
 
-func (r *goquRepository) ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error {
+func (r *goquRepository) ReduceStock(ctx context.Context, db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error {
 	for _, resource := range resources {
 		for _, item := range inventory.Items {
 			if item.Resource.Id == resource.Resource.Id && item.Quality == resource.Quality {
 				item.Qty -= resource.Qty
 				if item.Qty == 0 {
-					if err := r.removeStock(db, companyId, item); err != nil {
+					if err := r.removeStock(ctx, db, companyId, item); err != nil {
 						return err
 					}
 				} else {
-					if err := r.updateStock(db, companyId, item); err != nil {
+					if err := r.updateStock(ctx, db, companyId, item); err != nil {
 						return err
 					}
 				}
@@ -78,7 +80,7 @@ func (r *goquRepository) ReduceStock(db *database.DB, companyId uint64, inventor
 	return nil
 }
 
-func (r *goquRepository) removeStock(tx *database.DB, companyId uint64, item *StockItem) error {
+func (r *goquRepository) removeStock(ctx context.Context, tx *database.DB, companyId uint64, item *StockItem) error {
 	_, err := tx.
 		Delete(goqu.T("inventories")).
 		Where(goqu.And(
@@ -87,12 +89,12 @@ func (r *goquRepository) removeStock(tx *database.DB, companyId uint64, item *St
 			goqu.I("resource_id").Eq(item.Resource.Id),
 		)).
 		Executor().
-		Exec()
+		ExecContext(ctx)
 
 	return err
 }
 
-func (r *goquRepository) updateStock(tx *database.DB, companyId uint64, item *StockItem) error {
+func (r *goquRepository) updateStock(ctx context.Context, tx *database.DB, companyId uint64, item *StockItem) error {
 	_, err := tx.
 		Update(goqu.T("inventories")).
 		Set(goqu.Record{"quantity": item.Qty}).
@@ -102,7 +104,7 @@ func (r *goquRepository) updateStock(tx *database.DB, companyId uint64, item *St
 			goqu.I("resource_id").Eq(item.Resource.Id),
 		)).
 		Executor().
-		Exec()
+		ExecContext(ctx)
 
 	return err
 }

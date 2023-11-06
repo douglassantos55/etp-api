@@ -3,12 +3,14 @@ package warehouse_test
 import (
 	"api/database"
 	"api/warehouse"
+	"context"
 	"testing"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 )
 
-func TestGoquRepository(t *testing.T) {
+func TestWarehouseRepository(t *testing.T) {
 	conn, err := database.GetConnection(database.SQLITE, "../test.db")
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +50,11 @@ func TestGoquRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
 	t.Cleanup(func() {
+		cancel()
+
 		err := builder.WithTx(func(td *goqu.TxDatabase) error {
 			if _, err := td.Delete("inventories").Executor().Exec(); err != nil {
 				return err
@@ -72,7 +78,7 @@ func TestGoquRepository(t *testing.T) {
 	t.Run("should return empty list", func(t *testing.T) {
 		t.Parallel()
 
-		resources, err := repository.FetchInventory(2)
+		resources, err := repository.FetchInventory(ctx, 2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -87,7 +93,7 @@ func TestGoquRepository(t *testing.T) {
 	t.Run("should list inventory grouped by resource/quality", func(t *testing.T) {
 		t.Parallel()
 
-		items, err := repository.FetchInventory(1)
+		items, err := repository.FetchInventory(ctx, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,7 +139,7 @@ func TestGoquRepository(t *testing.T) {
 	t.Run("should include resource category", func(t *testing.T) {
 		t.Parallel()
 
-		items, err := repository.FetchInventory(1)
+		items, err := repository.FetchInventory(ctx, 1)
 		if err != nil {
 			t.Fatal(err)
 		}

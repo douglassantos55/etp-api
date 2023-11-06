@@ -16,7 +16,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return err
 		}
 
-		resources, err := service.GetInventory(companyId)
+		resources, err := service.GetInventory(c.Request().Context(), companyId)
 		if err != nil {
 			return err
 		}
