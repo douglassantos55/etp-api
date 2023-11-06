@@ -1,6 +1,9 @@
 package building
 
-import "api/resource"
+import (
+	"api/resource"
+	"context"
+)
 
 type (
 	Building struct {
@@ -19,8 +22,11 @@ type (
 	}
 
 	Service interface {
-		GetAll() ([]*Building, error)
-		GetById(id uint64) (*Building, error)
+		// List all buildings
+		GetAll(ctx context.Context) ([]*Building, error)
+
+		// Get a building by ID
+		GetById(ctx context.Context, id uint64) (*Building, error)
 	}
 
 	service struct {
@@ -32,10 +38,10 @@ func NewService(repository Repository) Service {
 	return &service{repository}
 }
 
-func (s *service) GetAll() ([]*Building, error) {
-	return s.repository.GetAll()
+func (s *service) GetAll(ctx context.Context) ([]*Building, error) {
+	return s.repository.GetAll(ctx)
 }
 
-func (s *service) GetById(id uint64) (*Building, error) {
-	return s.repository.GetById(id)
+func (s *service) GetById(ctx context.Context, id uint64) (*Building, error) {
+	return s.repository.GetById(ctx, id)
 }

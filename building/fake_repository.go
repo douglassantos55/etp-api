@@ -2,6 +2,7 @@ package building
 
 import (
 	"api/resource"
+	"context"
 	"errors"
 )
 
@@ -29,7 +30,7 @@ func NewFakeRepository() Repository {
 	return &fakeRepository{data}
 }
 
-func (r *fakeRepository) GetAll() ([]*Building, error) {
+func (r *fakeRepository) GetAll(ctx context.Context) ([]*Building, error) {
 	items := make([]*Building, 0)
 	for _, item := range r.data {
 		items = append(items, item)
@@ -37,7 +38,7 @@ func (r *fakeRepository) GetAll() ([]*Building, error) {
 	return items, nil
 }
 
-func (r *fakeRepository) GetById(id uint64) (*Building, error) {
+func (r *fakeRepository) GetById(ctx context.Context, id uint64) (*Building, error) {
 	building, ok := r.data[id]
 	if !ok {
 		return nil, errors.New("building not found")

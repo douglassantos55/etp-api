@@ -4,7 +4,9 @@ import (
 	"api/building"
 	"api/database"
 	"api/resource"
+	"context"
 	"testing"
+	"time"
 )
 
 func TestBuildingRepository(t *testing.T) {
@@ -37,7 +39,11 @@ func TestBuildingRepository(t *testing.T) {
 		t.Fatalf("could not commit transaction: %s", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+
 	t.Cleanup(func() {
+		cancel()
+
 		_, err := conn.DB.Exec(`
             DELETE FROM buildings_resources;
             DELETE FROM buildings_requirements;
@@ -56,7 +62,7 @@ func TestBuildingRepository(t *testing.T) {
 	t.Run("should list all", func(t *testing.T) {
 		t.Parallel()
 
-		buildings, err := repository.GetAll()
+		buildings, err := repository.GetAll(ctx)
 		if err != nil {
 			t.Fatalf("could not fetch buildings: %s", err)
 		}
@@ -98,7 +104,7 @@ func TestBuildingRepository(t *testing.T) {
 	t.Run("should return nil if not found", func(t *testing.T) {
 		t.Parallel()
 
-		building, err := repository.GetById(999)
+		building, err := repository.GetById(ctx, 999)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
 		}
@@ -111,7 +117,7 @@ func TestBuildingRepository(t *testing.T) {
 	t.Run("should return with requirements", func(t *testing.T) {
 		t.Parallel()
 
-		building, err := repository.GetById(1)
+		building, err := repository.GetById(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
 		}

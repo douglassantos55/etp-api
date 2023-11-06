@@ -11,7 +11,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 	group := e.Group("/buildings")
 
 	group.GET("", func(c echo.Context) error {
-		buildings, err := service.GetAll()
+		buildings, err := service.GetAll(c.Request().Context())
 		if err != nil {
 			return err
 		}
@@ -24,7 +24,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
 
-		buildings, err := service.GetById(id)
+		buildings, err := service.GetById(c.Request().Context(), id)
 		if err != nil {
 			return err
 		}

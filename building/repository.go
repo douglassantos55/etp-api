@@ -3,14 +3,18 @@ package building
 import (
 	"api/database"
 	"api/resource"
+	"context"
 
 	"github.com/doug-martin/goqu/v9"
 )
 
 type (
 	Repository interface {
-		GetAll() ([]*Building, error)
-		GetById(uint64) (*Building, error)
+		// Lists all registered buildings
+		GetAll(ctx context.Context) ([]*Building, error)
+
+		// Get building by ID
+		GetById(ctx context.Context, id uint64) (*Building, error)
 	}
 
 	goquRepository struct {
@@ -24,7 +28,7 @@ func NewRepository(conn *database.Connection, resources resource.Repository) Rep
 	return &goquRepository{builder, resources}
 }
 
-func (r *goquRepository) GetAll() ([]*Building, error) {
+func (r *goquRepository) GetAll(ctx context.Context) ([]*Building, error) {
 	buildings := make([]*Building, 0)
 
 	err := r.builder.
@@ -37,19 +41,19 @@ func (r *goquRepository) GetAll() ([]*Building, error) {
 		).
 		From(goqu.T("buildings")).
 		Where(goqu.I("deleted_at").IsNull()).
-		ScanStructs(&buildings)
+		ScanStructsContext(ctx, &buildings)
 
 	if err != nil {
 		return nil, err
 	}
 
 	for _, building := range buildings {
-		requirements, err := r.GetRequirements(building.Id)
+		requirements, err := r.GetRequirements(ctx, building.Id)
 		if err != nil {
 			return nil, err
 		}
 
-		resources, err := r.GetResources(building.Id)
+		resources, err := r.GetResources(ctx, building.Id)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +65,7 @@ func (r *goquRepository) GetAll() ([]*Building, error) {
 	return buildings, nil
 }
 
-func (r *goquRepository) GetById(id uint64) (*Building, error) {
+func (r *goquRepository) GetById(ctx context.Context, id uint64) (*Building, error) {
 	building := new(Building)
 
 	found, err := r.builder.
@@ -77,18 +81,18 @@ func (r *goquRepository) GetById(id uint64) (*Building, error) {
 			goqu.I("id").Eq(id),
 			goqu.I("deleted_at").IsNull(),
 		)).
-		ScanStruct(building)
+		ScanStructContext(ctx, building)
 
 	if err != nil || !found {
 		return nil, err
 	}
 
-	requirements, err := r.GetRequirements(id)
+	requirements, err := r.GetRequirements(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	resources, err := r.GetResources(id)
+	resources, err := r.GetResources(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +103,8 @@ func (r *goquRepository) GetById(id uint64) (*Building, error) {
 	return building, err
 }
 
-func (r *goquRepository) GetResources(buildingId uint64) ([]*BuildingResource, error) {
+// Get the resources available for production in a given building
+func (r *goquRepository) GetResources(ctx context.Context, buildingId uint64) ([]*BuildingResource, error) {
 	resources := make([]*BuildingResource, 0)
 
 	err := r.builder.
@@ -116,7 +121,7 @@ func (r *goquRepository) GetResources(buildingId uint64) ([]*BuildingResource, e
 			goqu.On(goqu.I("br.resource_id").Eq(goqu.I("r.id"))),
 		).
 		Where(goqu.I("br.building_id").Eq(buildingId)).
-		ScanStructs(&resources)
+		ScanStructsContext(ctx, &resources)
 
 	for _, resource := range resources {
 		requirements, err := r.resources.GetRequirements(resource.Resource.Id)
@@ -129,7 +134,8 @@ func (r *goquRepository) GetResources(buildingId uint64) ([]*BuildingResource, e
 	return resources, err
 }
 
-func (r *goquRepository) GetRequirements(buildingId uint64) ([]*resource.Item, error) {
+// Get the resources required to construct a given building
+func (r *goquRepository) GetRequirements(ctx context.Context, buildingId uint64) ([]*resource.Item, error) {
 	requirements := make([]*resource.Item, 0)
 
 	err := r.builder.
@@ -157,7 +163,7 @@ func (r *goquRepository) GetRequirements(buildingId uint64) ([]*resource.Item, e
 			),
 		).
 		Where(goqu.I("req.building_id").Eq(buildingId)).
-		ScanStructs(&requirements)
+		ScanStructsContext(ctx, &requirements)
 
 	return requirements, err
 }
