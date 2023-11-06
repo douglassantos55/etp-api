@@ -19,21 +19,19 @@ const (
 
 type (
 	Repository interface {
-		Register(registration *Registration) (*Company, error)
+		Register(ctx context.Context, registration *Registration) (*Company, error)
 
-		GetById(id uint64) (*Company, error)
+		GetById(ctx context.Context, id uint64) (*Company, error)
 
-		GetByEmail(email string) (*Company, error)
+		GetByEmail(ctx context.Context, email string) (*Company, error)
 
-		GetBuildings(companyId uint64) ([]*CompanyBuilding, error)
+		GetBuildings(ctx context.Context, companyId uint64) ([]*CompanyBuilding, error)
 
-		GetBuilding(buildingId, companyId uint64) (*CompanyBuilding, error)
+		GetBuilding(ctx context.Context, buildingId, companyId uint64) (*CompanyBuilding, error)
 
-		AddBuilding(companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error)
+		AddBuilding(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error)
 
-		Produce(companyId uint64, inventory *warehouse.Inventory, building *CompanyBuilding, item *resource.Item, totalCost int) (*Production, error)
-
-		RegisterTransaction(db *database.DB, companyId, classificationId uint64, amount int, description string) error
+		Produce(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *CompanyBuilding, item *resource.Item, totalCost int) (*Production, error)
 	}
 
 	goquRepository struct {
@@ -48,7 +46,7 @@ func NewRepository(conn *database.Connection, resources resource.Repository, war
 	return &goquRepository{builder, resources, warehouse}
 }
 
-func (r *goquRepository) GetById(id uint64) (*Company, error) {
+func (r *goquRepository) GetById(ctx context.Context, id uint64) (*Company, error) {
 	company := new(Company)
 
 	found, err := r.builder.
@@ -74,7 +72,7 @@ func (r *goquRepository) GetById(id uint64) (*Company, error) {
 			),
 		).
 		GroupBy(goqu.I("c.id")).
-		ScanStruct(company)
+		ScanStructContext(ctx, company)
 
 	if err != nil || !found {
 		return nil, err
@@ -83,7 +81,7 @@ func (r *goquRepository) GetById(id uint64) (*Company, error) {
 	return company, err
 }
 
-func (r *goquRepository) GetByEmail(email string) (*Company, error) {
+func (r *goquRepository) GetByEmail(ctx context.Context, email string) (*Company, error) {
 	company := new(Company)
 
 	found, err := r.builder.
@@ -103,7 +101,7 @@ func (r *goquRepository) GetByEmail(email string) (*Company, error) {
 				goqu.I("c.deleted_at").IsNull(),
 			),
 		).
-		ScanStruct(company)
+		ScanStructContext(ctx, company)
 
 	if err != nil || !found {
 		return nil, err
@@ -112,21 +110,19 @@ func (r *goquRepository) GetByEmail(email string) (*Company, error) {
 	return company, nil
 }
 
-func (r *goquRepository) Register(registration *Registration) (*Company, error) {
-	tx, err := r.builder.Begin()
+func (r *goquRepository) Register(ctx context.Context, registration *Registration) (*Company, error) {
+	tx, err := r.builder.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	record := goqu.Record{
-		"name":     registration.Name,
-		"email":    registration.Email,
-		"password": registration.Password,
-	}
-
 	result, err := tx.
 		Insert(goqu.T("companies")).
-		Rows(record).
+		Rows(goqu.Record{
+			"name":     registration.Name,
+			"email":    registration.Email,
+			"password": registration.Password,
+		}).
 		Executor().
 		Exec()
 
@@ -139,7 +135,7 @@ func (r *goquRepository) Register(registration *Registration) (*Company, error) 
 		return nil, err
 	}
 
-	if err = r.RegisterTransaction(
+	if err = r.registerTransaction(
 		&database.DB{TxDatabase: tx},
 		uint64(id),
 		SOCIAL_CAPITAL,
@@ -153,10 +149,10 @@ func (r *goquRepository) Register(registration *Registration) (*Company, error) 
 		return nil, err
 	}
 
-	return r.GetById(uint64(id))
+	return r.GetById(ctx, uint64(id))
 }
 
-func (r *goquRepository) GetBuildings(companyId uint64) ([]*CompanyBuilding, error) {
+func (r *goquRepository) GetBuildings(ctx context.Context, companyId uint64) ([]*CompanyBuilding, error) {
 	buildings := make([]*CompanyBuilding, 0)
 
 	err := r.builder.
@@ -193,14 +189,14 @@ func (r *goquRepository) GetBuildings(companyId uint64) ([]*CompanyBuilding, err
 			goqu.I("cb.company_id").Eq(companyId),
 			goqu.I("cb.demolished_at").IsNull(),
 		)).
-		ScanStructs(&buildings)
+		ScanStructsContext(ctx, &buildings)
 
 	if err != nil {
 		return nil, err
 	}
 
 	for _, building := range buildings {
-		resources, err := r.GetResources(building.Id)
+		resources, err := r.getResources(ctx, building.Id)
 		if err != nil {
 			return nil, err
 		}
@@ -210,7 +206,7 @@ func (r *goquRepository) GetBuildings(companyId uint64) ([]*CompanyBuilding, err
 	return buildings, nil
 }
 
-func (r *goquRepository) GetBuilding(id, companyId uint64) (*CompanyBuilding, error) {
+func (r *goquRepository) GetBuilding(ctx context.Context, id, companyId uint64) (*CompanyBuilding, error) {
 	building := new(CompanyBuilding)
 
 	found, err := r.builder.
@@ -248,13 +244,13 @@ func (r *goquRepository) GetBuilding(id, companyId uint64) (*CompanyBuilding, er
 			goqu.I("cb.company_id").Eq(companyId),
 			goqu.I("cb.demolished_at").IsNull(),
 		)).
-		ScanStruct(building)
+		ScanStructContext(ctx, building)
 
 	if err != nil || !found {
 		return nil, err
 	}
 
-	resources, err := r.GetResources(building.Id)
+	resources, err := r.getResources(ctx, building.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +259,7 @@ func (r *goquRepository) GetBuilding(id, companyId uint64) (*CompanyBuilding, er
 	return building, nil
 }
 
-func (r *goquRepository) GetResources(buildingId uint64) ([]*building.BuildingResource, error) {
+func (r *goquRepository) getResources(ctx context.Context, buildingId uint64) ([]*building.BuildingResource, error) {
 	resources := make([]*building.BuildingResource, 0)
 
 	err := r.builder.
@@ -284,10 +280,10 @@ func (r *goquRepository) GetResources(buildingId uint64) ([]*building.BuildingRe
 			goqu.On(goqu.I("br.building_id").Eq(goqu.I("cb.building_id"))),
 		).
 		Where(goqu.I("cb.id").Eq(buildingId)).
-		ScanStructs(&resources)
+		ScanStructsContext(ctx, &resources)
 
 	for _, resource := range resources {
-		requirements, err := r.resources.GetRequirements(context.Background(), resource.Resource.Id)
+		requirements, err := r.resources.GetRequirements(ctx, resource.Resource.Id)
 		if err != nil {
 			return nil, err
 		}
@@ -297,8 +293,8 @@ func (r *goquRepository) GetResources(buildingId uint64) ([]*building.BuildingRe
 	return resources, err
 }
 
-func (r *goquRepository) AddBuilding(companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error) {
-	tx, err := r.builder.Begin()
+func (r *goquRepository) AddBuilding(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error) {
+	tx, err := r.builder.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +302,6 @@ func (r *goquRepository) AddBuilding(companyId uint64, inventory *warehouse.Inve
 	defer tx.Rollback()
 
 	if err := r.warehouse.ReduceStock(
-		context.Background(),
 		&database.DB{TxDatabase: tx},
 		companyId,
 		inventory,
@@ -339,10 +334,10 @@ func (r *goquRepository) AddBuilding(companyId uint64, inventory *warehouse.Inve
 		return nil, err
 	}
 
-	return r.GetBuilding(uint64(id), companyId)
+	return r.GetBuilding(ctx, uint64(id), companyId)
 }
 
-func (r *goquRepository) Produce(companyId uint64, inventory *warehouse.Inventory, building *CompanyBuilding, item *resource.Item, totalCost int) (*Production, error) {
+func (r *goquRepository) Produce(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *CompanyBuilding, item *resource.Item, totalCost int) (*Production, error) {
 	resourceToProduce, err := building.GetResource(item.ResourceId)
 	if err != nil {
 		return nil, err
@@ -351,7 +346,7 @@ func (r *goquRepository) Produce(companyId uint64, inventory *warehouse.Inventor
 	timeToProduce := float64(item.Qty) / (float64(resourceToProduce.QtyPerHours) / 60.0)
 	finishesAt := time.Now().Add(time.Second * time.Duration(timeToProduce*60))
 
-	tx, err := r.builder.Begin()
+	tx, err := r.builder.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +355,6 @@ func (r *goquRepository) Produce(companyId uint64, inventory *warehouse.Inventor
 
 	dbTx := &database.DB{TxDatabase: tx}
 	if err := r.warehouse.ReduceStock(
-		context.Background(),
 		dbTx,
 		companyId,
 		inventory,
@@ -369,7 +363,7 @@ func (r *goquRepository) Produce(companyId uint64, inventory *warehouse.Inventor
 		return nil, err
 	}
 
-	if err := r.RegisterTransaction(
+	if err := r.registerTransaction(
 		dbTx,
 		companyId,
 		WAGES,
@@ -404,10 +398,10 @@ func (r *goquRepository) Produce(companyId uint64, inventory *warehouse.Inventor
 		return nil, err
 	}
 
-	return r.GetProduction(uint64(id))
+	return r.getProduction(ctx, uint64(id))
 }
 
-func (r *goquRepository) GetProduction(id uint64) (*Production, error) {
+func (r *goquRepository) getProduction(ctx context.Context, id uint64) (*Production, error) {
 	production := new(Production)
 
 	found, err := r.builder.
@@ -427,7 +421,7 @@ func (r *goquRepository) GetProduction(id uint64) (*Production, error) {
 			goqu.On(goqu.I("p.resource_id").Eq(goqu.I("r.id"))),
 		).
 		Where(goqu.I("p.id").Eq(id)).
-		ScanStruct(production)
+		ScanStructContext(ctx, production)
 
 	if err != nil || !found {
 		return nil, err
@@ -436,7 +430,7 @@ func (r *goquRepository) GetProduction(id uint64) (*Production, error) {
 	return production, nil
 }
 
-func (r *goquRepository) RegisterTransaction(tx *database.DB, companyId, classificationId uint64, amount int, description string) error {
+func (r *goquRepository) registerTransaction(tx *database.DB, companyId, classificationId uint64, amount int, description string) error {
 	_, err := tx.
 		Insert(goqu.T("transactions")).
 		Rows(goqu.Record{

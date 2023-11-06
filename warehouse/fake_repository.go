@@ -33,7 +33,7 @@ func (r *fakeRepository) FetchInventory(ctx context.Context, companyId uint64) (
 	return inventory, nil
 }
 
-func (r *fakeRepository) ReduceStock(ctx context.Context, tx *database.DB, companyId uint64, inventory *Inventory, items []*resource.Item) error {
+func (r *fakeRepository) ReduceStock(tx *database.DB, companyId uint64, inventory *Inventory, items []*resource.Item) error {
 	for _, item := range items {
 		for _, inv := range inventory.Items {
 			isResource := item.Resource.Id == inv.Resource.Id

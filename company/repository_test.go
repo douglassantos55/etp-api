@@ -6,6 +6,7 @@ import (
 	"api/database"
 	"api/resource"
 	"api/warehouse"
+	"context"
 	"math"
 	"testing"
 	"time"
@@ -53,7 +54,11 @@ func TestRepository(t *testing.T) {
 		t.Fatalf("could not seed database: %s", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+
 	t.Cleanup(func() {
+		cancel()
+
 		if _, err := conn.DB.Exec(`
             DELETE FROM inventories;
             DELETE FROM productions;
@@ -75,7 +80,7 @@ func TestRepository(t *testing.T) {
 	repository := company.NewRepository(conn, resourcesRepository, warehouseRepository)
 
 	t.Run("should return with cash", func(t *testing.T) {
-		company, err := repository.GetById(1)
+		company, err := repository.GetById(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not get company: %s", err)
 		}
@@ -93,7 +98,7 @@ func TestRepository(t *testing.T) {
 			Confirm:  "password",
 		}
 
-		company, err := repository.Register(registration)
+		company, err := repository.Register(ctx, registration)
 		if err != nil {
 			t.Fatalf("could not save company: %s", err)
 		}
@@ -106,7 +111,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should return nil when not found by email", func(t *testing.T) {
 		t.Parallel()
 
-		company, err := repository.GetByEmail("test@test.com")
+		company, err := repository.GetByEmail(ctx, "test@test.com")
 		if err != nil {
 			t.Fatalf("could not get company: %s", err)
 		}
@@ -118,7 +123,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should return company by email", func(t *testing.T) {
 		t.Parallel()
 
-		company, err := repository.GetByEmail("coke@email.com")
+		company, err := repository.GetByEmail(ctx, "coke@email.com")
 		if err != nil {
 			t.Fatalf("could not get company: %s", err)
 		}
@@ -130,7 +135,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should not return blocked company by email", func(t *testing.T) {
 		t.Parallel()
 
-		company, err := repository.GetByEmail("blocked@email.com")
+		company, err := repository.GetByEmail(ctx, "blocked@email.com")
 		if err != nil {
 			t.Fatalf("could not get company: %s", err)
 		}
@@ -142,7 +147,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should not return deleted company by email", func(t *testing.T) {
 		t.Parallel()
 
-		company, err := repository.GetByEmail("deleted@email.com")
+		company, err := repository.GetByEmail(ctx, "deleted@email.com")
 		if err != nil {
 			t.Fatalf("could not get company: %s", err)
 		}
@@ -154,7 +159,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should return empty list when no buildings are found", func(t *testing.T) {
 		t.Parallel()
 
-		buildings, err := repository.GetBuildings(100)
+		buildings, err := repository.GetBuildings(ctx, 100)
 		if err != nil {
 			t.Fatalf("could not fetch buildings: %s", err)
 		}
@@ -171,7 +176,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should ignore demolished buildings", func(t *testing.T) {
 		t.Parallel()
 
-		buildings, err := repository.GetBuildings(1)
+		buildings, err := repository.GetBuildings(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not fetch buildings: %s", err)
 		}
@@ -193,7 +198,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should list buildings with resources", func(t *testing.T) {
 		t.Parallel()
 
-		buildings, err := repository.GetBuildings(1)
+		buildings, err := repository.GetBuildings(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not get buildings: %s", err)
 		}
@@ -233,10 +238,11 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should list buildings with busy until", func(t *testing.T) {
-		buildings, err := repository.GetBuildings(1)
+		buildings, err := repository.GetBuildings(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not get buildings: %s", err)
 		}
+
 		for _, building := range buildings {
 			if building.Id == 1 && building.BusyUntil != nil {
 				t.Errorf("should not be busy, got %+v", *building.BusyUntil)
@@ -251,7 +257,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should get building with resources", func(t *testing.T) {
 		t.Parallel()
 
-		building, err := repository.GetBuilding(2, 1)
+		building, err := repository.GetBuilding(ctx, 2, 1)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
 		}
@@ -275,7 +281,9 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should get building with busy until", func(t *testing.T) {
-		building, err := repository.GetBuilding(2, 1)
+		t.Parallel()
+
+		building, err := repository.GetBuilding(ctx, 2, 1)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
 		}
@@ -290,7 +298,9 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should return nil if not found", func(t *testing.T) {
-		building, err := repository.GetBuilding(3, 1)
+		t.Parallel()
+
+		building, err := repository.GetBuilding(ctx, 3, 1)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
 		}
@@ -309,7 +319,7 @@ func TestRepository(t *testing.T) {
 			},
 		}
 
-		inventory, err := warehouseRepository.FetchInventory(1)
+		inventory, err := warehouseRepository.FetchInventory(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not fetch inventory: %s", err)
 		}
@@ -318,7 +328,7 @@ func TestRepository(t *testing.T) {
 			t.Fatal("could not fetch inventory")
 		}
 
-		building, err := repository.AddBuilding(1, inventory, plantation, 1)
+		building, err := repository.AddBuilding(ctx, 1, inventory, plantation, 1)
 		if err != nil {
 			t.Fatalf("could not insert building: %s", err)
 		}
@@ -356,18 +366,18 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should set finishes at", func(t *testing.T) {
-		building, err := repository.GetBuilding(1, 1)
+		building, err := repository.GetBuilding(ctx, 1, 1)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
 		}
 
-		inventory, err := warehouseRepository.FetchInventory(1)
+		inventory, err := warehouseRepository.FetchInventory(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not fetch inventory: %s", err)
 		}
 
 		item := &resource.Item{Qty: 2000, Quality: 0, ResourceId: 4}
-		production, err := repository.Produce(1, inventory, building, item, 500_000)
+		production, err := repository.Produce(ctx, 1, inventory, building, item, 500_000)
 		if err != nil {
 			t.Fatalf("could not produce: %s", err)
 		}
@@ -381,7 +391,7 @@ func TestRepository(t *testing.T) {
 			t.Errorf("expected 60, got %f", math.Round(diff.Minutes()))
 		}
 
-		company, err := repository.GetById(1)
+		company, err := repository.GetById(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not get company: %s", err)
 		}

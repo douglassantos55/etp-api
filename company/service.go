@@ -6,8 +6,8 @@ import (
 	"api/resource"
 	"api/server"
 	"api/warehouse"
+	"context"
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -58,19 +58,19 @@ type (
 	}
 
 	Service interface {
-		GetById(id uint64) (*Company, error)
+		GetById(ctx context.Context, id uint64) (*Company, error)
 
-		GetByEmail(email string) (*Company, error)
+		GetByEmail(ctx context.Context, email string) (*Company, error)
 
-		Login(credentials Credentials) (string, error)
+		Login(ctx context.Context, credentials Credentials) (string, error)
 
-		Register(registration *Registration) (*Company, error)
+		Register(ctx context.Context, registration *Registration) (*Company, error)
 
-		GetBuildings(companyId uint64) ([]*CompanyBuilding, error)
+		GetBuildings(ctx context.Context, companyId uint64) ([]*CompanyBuilding, error)
 
-		AddBuilding(companyId, buildingId uint64, position uint8) (*CompanyBuilding, error)
+		AddBuilding(ctx context.Context, companyId, buildingId uint64, position uint8) (*CompanyBuilding, error)
 
-		Produce(companyId, companyBuildingId uint64, item *resource.Item) (*Production, error)
+		Produce(ctx context.Context, companyId, companyBuildingId uint64, item *resource.Item) (*Production, error)
 	}
 
 	service struct {
@@ -93,16 +93,16 @@ func NewService(repository Repository, building building.Service, warehouse ware
 	return &service{repository, building, warehouse}
 }
 
-func (s *service) GetById(id uint64) (*Company, error) {
-	return s.repository.GetById(id)
+func (s *service) GetById(ctx context.Context, id uint64) (*Company, error) {
+	return s.repository.GetById(ctx, id)
 }
 
-func (s *service) GetByEmail(email string) (*Company, error) {
-	return s.repository.GetByEmail(email)
+func (s *service) GetByEmail(ctx context.Context, email string) (*Company, error) {
+	return s.repository.GetByEmail(ctx, email)
 }
 
-func (s *service) Login(credentials Credentials) (string, error) {
-	company, err := s.GetByEmail(credentials.Email)
+func (s *service) Login(ctx context.Context, credentials Credentials) (string, error) {
+	company, err := s.GetByEmail(ctx, credentials.Email)
 	if err != nil || company == nil {
 		return "", errors.New("invalid credentials")
 	}
@@ -119,7 +119,7 @@ func (s *service) Login(credentials Credentials) (string, error) {
 	return token, nil
 }
 
-func (s *service) Register(registration *Registration) (*Company, error) {
+func (s *service) Register(ctx context.Context, registration *Registration) (*Company, error) {
 	hashedPassword, err := auth.HashPassword(registration.Password)
 	if err != nil {
 		return nil, err
@@ -127,20 +127,20 @@ func (s *service) Register(registration *Registration) (*Company, error) {
 
 	registration.Password = hashedPassword
 
-	return s.repository.Register(registration)
+	return s.repository.Register(ctx, registration)
 }
 
-func (s *service) GetBuildings(companyId uint64) ([]*CompanyBuilding, error) {
-	return s.repository.GetBuildings(companyId)
+func (s *service) GetBuildings(ctx context.Context, companyId uint64) ([]*CompanyBuilding, error) {
+	return s.repository.GetBuildings(ctx, companyId)
 }
 
-func (s *service) AddBuilding(companyId, buildingId uint64, position uint8) (*CompanyBuilding, error) {
-	build, err := s.building.GetById(buildingId)
+func (s *service) AddBuilding(ctx context.Context, companyId, buildingId uint64, position uint8) (*CompanyBuilding, error) {
+	build, err := s.building.GetById(ctx, buildingId)
 	if err != nil {
 		return nil, err
 	}
 
-	inventory, err := s.warehouse.GetInventory(companyId)
+	inventory, err := s.warehouse.GetInventory(ctx, companyId)
 	if err != nil {
 		return nil, err
 	}
@@ -149,11 +149,11 @@ func (s *service) AddBuilding(companyId, buildingId uint64, position uint8) (*Co
 		return nil, errors.New("not enough resources")
 	}
 
-	return s.repository.AddBuilding(companyId, inventory, build, position)
+	return s.repository.AddBuilding(ctx, companyId, inventory, build, position)
 }
 
-func (s *service) Produce(companyId, buildingId uint64, item *resource.Item) (*Production, error) {
-	building, err := s.repository.GetBuilding(buildingId, companyId)
+func (s *service) Produce(ctx context.Context, companyId, buildingId uint64, item *resource.Item) (*Production, error) {
+	building, err := s.repository.GetBuilding(ctx, buildingId, companyId)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func (s *service) Produce(companyId, buildingId uint64, item *resource.Item) (*P
 		return nil, err
 	}
 
-	inventory, err := s.warehouse.GetInventory(companyId)
+	inventory, err := s.warehouse.GetInventory(ctx, companyId)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (s *service) Produce(companyId, buildingId uint64, item *resource.Item) (*P
 	wagesCost := uint64(float64(building.WagesHour) * timeToProduce * 10)
 	totalCost := int(adminCost + wagesCost)
 
-	company, err := s.GetById(companyId)
+	company, err := s.GetById(ctx, companyId)
 	if err != nil {
 		return nil, err
 	}
@@ -199,5 +199,5 @@ func (s *service) Produce(companyId, buildingId uint64, item *resource.Item) (*P
 		return nil, errors.New("not enough cash")
 	}
 
-	return s.repository.Produce(companyId, inventory, building, item, totalCost)
+	return s.repository.Produce(ctx, companyId, inventory, building, item, totalCost)
 }

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestRepository(t *testing.T) {
+func TestResourceRepository(t *testing.T) {
 	conn, err := database.GetConnection(database.SQLITE, "../test.db")
 	if err != nil {
 		t.Fatalf("could not connect to database: %s", err)

@@ -8,6 +8,7 @@ import (
 	"api/resource"
 	"api/server"
 	"api/warehouse"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -73,7 +74,7 @@ func NewFakeRepository() company.Repository {
 	return &fakeRepository{data, buildings}
 }
 
-func (r *fakeRepository) Register(registration *company.Registration) (*company.Company, error) {
+func (r *fakeRepository) Register(ctx context.Context, registration *company.Registration) (*company.Company, error) {
 	id := uint64(len(r.data) + 1)
 	company := &company.Company{
 		Id:    id,
@@ -82,14 +83,14 @@ func (r *fakeRepository) Register(registration *company.Registration) (*company.
 		Pass:  registration.Password,
 	}
 	r.data[id] = company
-	return r.GetById(id)
+	return r.GetById(ctx, id)
 }
 
-func (r *fakeRepository) GetById(id uint64) (*company.Company, error) {
+func (r *fakeRepository) GetById(ctx context.Context, id uint64) (*company.Company, error) {
 	return r.data[id], nil
 }
 
-func (r *fakeRepository) GetByEmail(email string) (*company.Company, error) {
+func (r *fakeRepository) GetByEmail(ctx context.Context, email string) (*company.Company, error) {
 	for _, company := range r.data {
 		if company.Email == email {
 			return company, nil
@@ -98,7 +99,7 @@ func (r *fakeRepository) GetByEmail(email string) (*company.Company, error) {
 	return nil, nil
 }
 
-func (r *fakeRepository) GetBuildings(companyId uint64) ([]*company.CompanyBuilding, error) {
+func (r *fakeRepository) GetBuildings(ctx context.Context, companyId uint64) ([]*company.CompanyBuilding, error) {
 	buildings := make([]*company.CompanyBuilding, 0)
 	for _, building := range r.buildings[companyId] {
 		buildings = append(buildings, building)
@@ -106,7 +107,7 @@ func (r *fakeRepository) GetBuildings(companyId uint64) ([]*company.CompanyBuild
 	return buildings, nil
 }
 
-func (r *fakeRepository) GetBuilding(buildingId, companyId uint64) (*company.CompanyBuilding, error) {
+func (r *fakeRepository) GetBuilding(ctx context.Context, buildingId, companyId uint64) (*company.CompanyBuilding, error) {
 	buildings, ok := r.buildings[companyId]
 	if !ok {
 		return nil, nil
@@ -152,7 +153,7 @@ func (r *fakeRepository) GetBuilding(buildingId, companyId uint64) (*company.Com
 	}, nil
 }
 
-func (r *fakeRepository) AddBuilding(companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*company.CompanyBuilding, error) {
+func (r *fakeRepository) AddBuilding(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*company.CompanyBuilding, error) {
 	id := uint64(len(r.buildings) + 1)
 	companyBuilding := &company.CompanyBuilding{
 		Id:              id,
@@ -167,7 +168,7 @@ func (r *fakeRepository) AddBuilding(companyId uint64, inventory *warehouse.Inve
 	return companyBuilding, nil
 }
 
-func (r *fakeRepository) Produce(companyId uint64, inventory *warehouse.Inventory, building *company.CompanyBuilding, item *resource.Item, totalCost int) (*company.Production, error) {
+func (r *fakeRepository) Produce(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *company.CompanyBuilding, item *resource.Item, totalCost int) (*company.Production, error) {
 	finishesAt := time.Now().Add(time.Hour)
 	r.buildings[companyId][building.Id].BusyUntil = &finishesAt
 

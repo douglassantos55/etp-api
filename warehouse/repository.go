@@ -14,7 +14,7 @@ type Repository interface {
 	FetchInventory(ctx context.Context, companyId uint64) (*Inventory, error)
 
 	// Reduces the stock for the given resources
-	ReduceStock(ctx context.Context, db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error
+	ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error
 }
 
 type goquRepository struct {
@@ -60,17 +60,17 @@ func (r *goquRepository) FetchInventory(ctx context.Context, companyId uint64) (
 	return &Inventory{items}, nil
 }
 
-func (r *goquRepository) ReduceStock(ctx context.Context, db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error {
+func (r *goquRepository) ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error {
 	for _, resource := range resources {
 		for _, item := range inventory.Items {
 			if item.Resource.Id == resource.Resource.Id && item.Quality == resource.Quality {
 				item.Qty -= resource.Qty
 				if item.Qty == 0 {
-					if err := r.removeStock(ctx, db, companyId, item); err != nil {
+					if err := r.removeStock(db, companyId, item); err != nil {
 						return err
 					}
 				} else {
-					if err := r.updateStock(ctx, db, companyId, item); err != nil {
+					if err := r.updateStock(db, companyId, item); err != nil {
 						return err
 					}
 				}
@@ -80,7 +80,7 @@ func (r *goquRepository) ReduceStock(ctx context.Context, db *database.DB, compa
 	return nil
 }
 
-func (r *goquRepository) removeStock(ctx context.Context, tx *database.DB, companyId uint64, item *StockItem) error {
+func (r *goquRepository) removeStock(tx *database.DB, companyId uint64, item *StockItem) error {
 	_, err := tx.
 		Delete(goqu.T("inventories")).
 		Where(goqu.And(
@@ -89,12 +89,12 @@ func (r *goquRepository) removeStock(ctx context.Context, tx *database.DB, compa
 			goqu.I("resource_id").Eq(item.Resource.Id),
 		)).
 		Executor().
-		ExecContext(ctx)
+		Exec()
 
 	return err
 }
 
-func (r *goquRepository) updateStock(ctx context.Context, tx *database.DB, companyId uint64, item *StockItem) error {
+func (r *goquRepository) updateStock(tx *database.DB, companyId uint64, item *StockItem) error {
 	_, err := tx.
 		Update(goqu.T("inventories")).
 		Set(goqu.Record{"quantity": item.Qty}).
@@ -104,7 +104,7 @@ func (r *goquRepository) updateStock(ctx context.Context, tx *database.DB, compa
 			goqu.I("resource_id").Eq(item.Resource.Id),
 		)).
 		Executor().
-		ExecContext(ctx)
+		Exec()
 
 	return err
 }

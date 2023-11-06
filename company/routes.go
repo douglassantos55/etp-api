@@ -20,7 +20,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
 
-		company, err := service.GetById(companyId)
+		company, err := service.GetById(c.Request().Context(), companyId)
 		if err != nil {
 			return err
 		}
@@ -38,7 +38,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
 
-		buildings, err := service.GetBuildings(companyId)
+		buildings, err := service.GetBuildings(c.Request().Context(), companyId)
 		if err != nil {
 			return err
 		}
@@ -70,7 +70,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return echo.NewHTTPError(http.StatusUnauthorized)
 		}
 
-		companyBuilding, err := service.AddBuilding(companyId, data.BuildingId, data.Position)
+		companyBuilding, err := service.AddBuilding(c.Request().Context(), companyId, data.BuildingId, data.Position)
 		if err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return echo.NewHTTPError(http.StatusUnauthorized)
 		}
 
-		production, err := service.Produce(companyId, buildingId, item)
+		production, err := service.Produce(c.Request().Context(), companyId, buildingId, item)
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return err
 		}
 
-		company, err := service.Register(registration)
+		company, err := service.Register(c.Request().Context(), registration)
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return err
 		}
 
-		token, err := service.Login(credentials)
+		token, err := service.Login(c.Request().Context(), credentials)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, server.ValidationErrors{
 				Errors: map[string]string{"email": err.Error()},
