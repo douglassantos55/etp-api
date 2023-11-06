@@ -4,8 +4,10 @@ import (
 	"api/auth"
 	"api/building"
 	"api/company"
+	"api/database"
 	"api/resource"
 	"api/server"
+	"api/warehouse"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -150,7 +152,7 @@ func (r *fakeRepository) GetBuilding(buildingId, companyId uint64) (*company.Com
 	}, nil
 }
 
-func (r *fakeRepository) AddBuilding(companyId uint64, building *building.Building, position uint8) (*company.CompanyBuilding, error) {
+func (r *fakeRepository) AddBuilding(companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*company.CompanyBuilding, error) {
 	id := uint64(len(r.buildings) + 1)
 	companyBuilding := &company.CompanyBuilding{
 		Id:              id,
@@ -165,7 +167,7 @@ func (r *fakeRepository) AddBuilding(companyId uint64, building *building.Buildi
 	return companyBuilding, nil
 }
 
-func (r *fakeRepository) Produce(companyId uint64, building *company.CompanyBuilding, item *resource.Item) (*company.Production, error) {
+func (r *fakeRepository) Produce(companyId uint64, inventory *warehouse.Inventory, building *company.CompanyBuilding, item *resource.Item, totalCost int) (*company.Production, error) {
 	finishesAt := time.Now().Add(time.Hour)
 	r.buildings[companyId][building.Id].BusyUntil = &finishesAt
 
@@ -176,7 +178,7 @@ func (r *fakeRepository) Produce(companyId uint64, building *company.CompanyBuil
 	}, nil
 }
 
-func (r *fakeRepository) RegisterTransaction(companyId, classificationId uint64, amount int, description string) error {
+func (r *fakeRepository) RegisterTransaction(tx *database.DB, companyId, classificationId uint64, amount int, description string) error {
 	r.data[companyId].AvailableCash += amount
 	return nil
 }

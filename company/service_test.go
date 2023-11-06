@@ -34,32 +34,6 @@ func TestCompanyService(t *testing.T) {
 				t.Errorf("should not have enough resources: %s", err)
 			}
 		})
-
-		t.Run("should reduce stocks", func(t *testing.T) {
-			building, err := service.AddBuilding(1, 1, 1)
-			if err != nil {
-				t.Errorf("should not fail: %s", err)
-			}
-
-			inventory, err := warehouseSvc.GetInventory(1)
-			if err != nil {
-				t.Fatalf("could not fetch inventory: %s", err)
-			}
-
-			if inventory.Items[0].Qty != 50 {
-				t.Errorf("expected stock %d, got %d", 50, inventory.Items[0].Qty)
-			}
-
-			if building == nil {
-				t.Fatal("should add building")
-			}
-			if *building.Position != 1 {
-				t.Errorf("expected position %d, got %d", 1, *building.Position)
-			}
-			if building.Name != "Plantation" {
-				t.Errorf("expected name %s, got %s", "Plantation", building.Name)
-			}
-		})
 	})
 
 	t.Run("produce", func(t *testing.T) {
@@ -88,27 +62,6 @@ func TestCompanyService(t *testing.T) {
 			_, err := service.Produce(1, 1, &resource.Item{Qty: 10, Quality: 0, ResourceId: 1})
 			if err.Error() != "not enough cash" {
 				t.Errorf("expected not enough cash, got %s", err)
-			}
-		})
-
-		t.Run("should reduce cash", func(t *testing.T) {
-			production, err := service.Produce(1, 1, &resource.Item{Qty: 1, Quality: 0, ResourceId: 1})
-			if err != nil {
-				t.Fatalf("could not produce: %s", err)
-			}
-
-			if production == nil {
-				t.Fatal("should return a production instance")
-			}
-
-			company, err := service.GetById(1)
-			if err != nil {
-				t.Fatalf("could not get company: %s", err)
-			}
-
-			expectedCash := 360
-			if company.AvailableCash != expectedCash {
-				t.Errorf("expected %d cash, got %d", expectedCash, company.AvailableCash)
 			}
 		})
 

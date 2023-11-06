@@ -149,11 +149,7 @@ func (s *service) AddBuilding(companyId, buildingId uint64, position uint8) (*Co
 		return nil, errors.New("not enough resources")
 	}
 
-	if err := s.warehouse.ReduceStock(companyId, inventory, build.Requirements); err != nil {
-		return nil, err
-	}
-
-	return s.repository.AddBuilding(companyId, build, position)
+	return s.repository.AddBuilding(companyId, inventory, build, position)
 }
 
 func (s *service) Produce(companyId, buildingId uint64, item *resource.Item) (*Production, error) {
@@ -203,16 +199,5 @@ func (s *service) Produce(companyId, buildingId uint64, item *resource.Item) (*P
 		return nil, errors.New("not enough cash")
 	}
 
-	if err := s.warehouse.ReduceStock(companyId, inventory, resourceToProduce.Requirements); err != nil {
-		return nil, err
-	}
-
-	description := fmt.Sprintf("Production of %s", resourceToProduce.Name)
-
-	err = s.repository.RegisterTransaction(companyId, WAGES, totalCost*-1, description)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.repository.Produce(companyId, building, item)
+	return s.repository.Produce(companyId, inventory, building, item, totalCost)
 }

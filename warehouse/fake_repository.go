@@ -1,6 +1,7 @@
 package warehouse
 
 import (
+	"api/database"
 	"api/resource"
 	"errors"
 )
@@ -31,7 +32,7 @@ func (r *fakeRepository) FetchInventory(companyId uint64) (*Inventory, error) {
 	return inventory, nil
 }
 
-func (r *fakeRepository) ReduceStock(companyId uint64, inventory *Inventory, items []*resource.Item) error {
+func (r *fakeRepository) ReduceStock(tx *database.DB, companyId uint64, inventory *Inventory, items []*resource.Item) error {
 	for _, item := range items {
 		for _, inv := range inventory.Items {
 			isResource := item.Resource.Id == inv.Resource.Id

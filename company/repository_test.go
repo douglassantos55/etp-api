@@ -5,6 +5,7 @@ import (
 	"api/company"
 	"api/database"
 	"api/resource"
+	"api/warehouse"
 	"math"
 	"testing"
 	"time"
@@ -36,11 +37,17 @@ func TestRepository(t *testing.T) {
         INSERT INTO buildings_resources (building_id, resource_id, qty_per_hour)
         VALUES (1, 4, 1000), (2, 1, 500), (2, 3, 250);
 
+        INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
+        VALUES (1, 1, 50, 0), (2, 1, 150, 0);
+
         INSERT INTO transactions (company_id, value)
         VALUES (1, 1000000);
 
         INSERT INTO productions (resource_id, building_id, qty, quality, finishes_at)
         VALUES (3, 2, 250, 0, '2034-12-31 15:59:59');
+
+        INSERT INTO inventories (company_id, resource_id, quantity, quality, sourcing_cost)
+        VALUES (1, 1, 100, 0, 137), (1, 3, 1000, 1, 470), (1, 2, 700, 0, 1553);
     `)
 	if err != nil {
 		t.Fatalf("could not seed database: %s", err)
@@ -48,8 +55,10 @@ func TestRepository(t *testing.T) {
 
 	t.Cleanup(func() {
 		if _, err := conn.DB.Exec(`
+            DELETE FROM inventories;
             DELETE FROM productions;
             DELETE FROM transactions;
+            DELETE FROM buildings_requirements;
             DELETE FROM buildings_resources;
             DELETE FROM companies_buildings;
             DELETE FROM buildings;
@@ -62,7 +71,8 @@ func TestRepository(t *testing.T) {
 	})
 
 	resourcesRepository := resource.NewRepository(conn)
-	repository := company.NewRepository(conn, resourcesRepository)
+	warehouseRepository := warehouse.NewRepository(conn)
+	repository := company.NewRepository(conn, resourcesRepository, warehouseRepository)
 
 	t.Run("should return with cash", func(t *testing.T) {
 		company, err := repository.GetById(1)
@@ -291,7 +301,24 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should insert building", func(t *testing.T) {
-		building, err := repository.AddBuilding(1, &building.Building{Id: 1, Name: "Plantation"}, 1)
+		plantation := &building.Building{
+			Id:   1,
+			Name: "Plantation",
+			Requirements: []*resource.Item{
+				{ResourceId: 1, Qty: 50, Quality: 0, Resource: &resource.Resource{Id: 1}},
+			},
+		}
+
+		inventory, err := warehouseRepository.FetchInventory(1)
+		if err != nil {
+			t.Fatalf("could not fetch inventory: %s", err)
+		}
+
+		if inventory == nil {
+			t.Fatal("could not fetch inventory")
+		}
+
+		building, err := repository.AddBuilding(1, inventory, plantation, 1)
 		if err != nil {
 			t.Fatalf("could not insert building: %s", err)
 		}
@@ -308,6 +335,24 @@ func TestRepository(t *testing.T) {
 		if building.Name != "Plantation" {
 			t.Errorf("expected name %s, got %s", "Plantation", building.Name)
 		}
+
+		if inventory == nil {
+			t.Fatal("could not fetch inventory")
+		}
+
+		for _, item := range inventory.Items {
+			if item.Resource.Id == 1 && item.Qty != 50 {
+				t.Errorf("expected stock %d, got %d", 50, item.Qty)
+			}
+
+			if item.Resource.Id == 2 && item.Qty != 700 {
+				t.Errorf("expected stock %d, got %d", 700, item.Qty)
+			}
+
+			if item.Resource.Id == 3 && item.Qty != 1000 {
+				t.Errorf("expected stock %d, got %d", 1000, item.Qty)
+			}
+		}
 	})
 
 	t.Run("should set finishes at", func(t *testing.T) {
@@ -316,8 +361,13 @@ func TestRepository(t *testing.T) {
 			t.Fatalf("could not get building: %s", err)
 		}
 
+		inventory, err := warehouseRepository.FetchInventory(1)
+		if err != nil {
+			t.Fatalf("could not fetch inventory: %s", err)
+		}
+
 		item := &resource.Item{Qty: 2000, Quality: 0, ResourceId: 4}
-		production, err := repository.Produce(1, building, item)
+		production, err := repository.Produce(1, inventory, building, item, 500_000)
 		if err != nil {
 			t.Fatalf("could not produce: %s", err)
 		}
@@ -329,6 +379,16 @@ func TestRepository(t *testing.T) {
 		diff := production.FinishesAt.Sub(time.Now())
 		if math.Round(diff.Minutes()) != 60 {
 			t.Errorf("expected 60, got %f", math.Round(diff.Minutes()))
+		}
+
+		company, err := repository.GetById(1)
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+
+		expectedCash := 500_000
+		if company.AvailableCash != expectedCash {
+			t.Errorf("expected %d cash, got %d", expectedCash, company.AvailableCash)
 		}
 	})
 }

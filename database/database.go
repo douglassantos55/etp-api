@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 
+	"github.com/doug-martin/goqu/v9"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -15,6 +16,10 @@ const (
 type Connection struct {
 	Driver string
 	DB     *sql.DB
+}
+
+type DB struct {
+	*goqu.TxDatabase
 }
 
 // Establishes and returns a connection to the database. If a connection

@@ -4,6 +4,8 @@ import (
 	"api/building"
 	"api/database"
 	"api/resource"
+	"api/warehouse"
+	"fmt"
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
@@ -26,22 +28,23 @@ type (
 
 		GetBuilding(buildingId, companyId uint64) (*CompanyBuilding, error)
 
-		AddBuilding(companyId uint64, building *building.Building, position uint8) (*CompanyBuilding, error)
+		AddBuilding(companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error)
 
-		Produce(companyId uint64, building *CompanyBuilding, item *resource.Item) (*Production, error)
+		Produce(companyId uint64, inventory *warehouse.Inventory, building *CompanyBuilding, item *resource.Item, totalCost int) (*Production, error)
 
-		RegisterTransaction(companyId, classificationId uint64, amount int, description string) error
+		RegisterTransaction(db *database.DB, companyId, classificationId uint64, amount int, description string) error
 	}
 
 	goquRepository struct {
 		builder   *goqu.Database
 		resources resource.Repository
+		warehouse warehouse.Repository
 	}
 )
 
-func NewRepository(conn *database.Connection, resources resource.Repository) Repository {
+func NewRepository(conn *database.Connection, resources resource.Repository, warehouse warehouse.Repository) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
-	return &goquRepository{builder, resources}
+	return &goquRepository{builder, resources, warehouse}
 }
 
 func (r *goquRepository) GetById(id uint64) (*Company, error) {
@@ -109,13 +112,18 @@ func (r *goquRepository) GetByEmail(email string) (*Company, error) {
 }
 
 func (r *goquRepository) Register(registration *Registration) (*Company, error) {
+	tx, err := r.builder.Begin()
+	if err != nil {
+		return nil, err
+	}
+
 	record := goqu.Record{
 		"name":     registration.Name,
 		"email":    registration.Email,
 		"password": registration.Password,
 	}
 
-	result, err := r.builder.
+	result, err := tx.
 		Insert(goqu.T("companies")).
 		Rows(record).
 		Executor().
@@ -131,11 +139,16 @@ func (r *goquRepository) Register(registration *Registration) (*Company, error) 
 	}
 
 	if err = r.RegisterTransaction(
+		&database.DB{TxDatabase: tx},
 		uint64(id),
 		SOCIAL_CAPITAL,
 		1_000_000,
 		"Initial capital",
 	); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -283,8 +296,24 @@ func (r *goquRepository) GetResources(buildingId uint64) ([]*building.BuildingRe
 	return resources, err
 }
 
-func (r *goquRepository) AddBuilding(companyId uint64, building *building.Building, position uint8) (*CompanyBuilding, error) {
-	result, err := r.builder.
+func (r *goquRepository) AddBuilding(companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error) {
+	tx, err := r.builder.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	if err := r.warehouse.ReduceStock(
+		&database.DB{TxDatabase: tx},
+		companyId,
+		inventory,
+		building.Requirements,
+	); err != nil {
+		return nil, err
+	}
+
+	result, err := tx.
 		Insert(goqu.T("companies_buildings")).
 		Rows(goqu.Record{
 			"name":        building.Name,
@@ -304,10 +333,14 @@ func (r *goquRepository) AddBuilding(companyId uint64, building *building.Buildi
 		return nil, err
 	}
 
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
 	return r.GetBuilding(uint64(id), companyId)
 }
 
-func (r *goquRepository) Produce(companyId uint64, building *CompanyBuilding, item *resource.Item) (*Production, error) {
+func (r *goquRepository) Produce(companyId uint64, inventory *warehouse.Inventory, building *CompanyBuilding, item *resource.Item, totalCost int) (*Production, error) {
 	resourceToProduce, err := building.GetResource(item.ResourceId)
 	if err != nil {
 		return nil, err
@@ -316,7 +349,34 @@ func (r *goquRepository) Produce(companyId uint64, building *CompanyBuilding, it
 	timeToProduce := float64(item.Qty) / (float64(resourceToProduce.QtyPerHours) / 60.0)
 	finishesAt := time.Now().Add(time.Second * time.Duration(timeToProduce*60))
 
-	result, err := r.builder.
+	tx, err := r.builder.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	dbTx := &database.DB{TxDatabase: tx}
+	if err := r.warehouse.ReduceStock(
+		dbTx,
+		companyId,
+		inventory,
+		resourceToProduce.Requirements,
+	); err != nil {
+		return nil, err
+	}
+
+	if err := r.RegisterTransaction(
+		dbTx,
+		companyId,
+		WAGES,
+		-totalCost,
+		fmt.Sprintf("Production of %s", resourceToProduce.Name),
+	); err != nil {
+		return nil, err
+	}
+
+	result, err := tx.
 		Insert(goqu.T("productions")).
 		Rows(goqu.Record{
 			"qty":         item.Qty,
@@ -329,6 +389,10 @@ func (r *goquRepository) Produce(companyId uint64, building *CompanyBuilding, it
 		Exec()
 
 	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 
@@ -369,8 +433,8 @@ func (r *goquRepository) GetProduction(id uint64) (*Production, error) {
 	return production, nil
 }
 
-func (r *goquRepository) RegisterTransaction(companyId, classificationId uint64, amount int, description string) error {
-	_, err := r.builder.
+func (r *goquRepository) RegisterTransaction(tx *database.DB, companyId, classificationId uint64, amount int, description string) error {
+	_, err := tx.
 		Insert(goqu.T("transactions")).
 		Rows(goqu.Record{
 			"company_id":        companyId,

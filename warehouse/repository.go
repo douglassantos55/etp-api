@@ -12,7 +12,7 @@ type Repository interface {
 	// Fetches the inventory of a company
 	FetchInventory(companyId uint64) (*Inventory, error)
 
-	ReduceStock(companyId uint64, inventory *Inventory, resources []*resource.Item) error
+	ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error
 }
 
 type goquRepository struct {
@@ -58,27 +58,27 @@ func (r *goquRepository) FetchInventory(companyId uint64) (*Inventory, error) {
 	return &Inventory{items}, nil
 }
 
-func (r *goquRepository) ReduceStock(companyId uint64, inventory *Inventory, resources []*resource.Item) error {
-	return r.builder.WithTx(func(tx *goqu.TxDatabase) error {
-		for _, resource := range resources {
-			for _, item := range inventory.Items {
+func (r *goquRepository) ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error {
+	for _, resource := range resources {
+		for _, item := range inventory.Items {
+			if item.Resource.Id == resource.Resource.Id && item.Quality == resource.Quality {
 				item.Qty -= resource.Qty
 				if item.Qty == 0 {
-					if err := r.removeStock(tx, companyId, item); err != nil {
+					if err := r.removeStock(db, companyId, item); err != nil {
 						return err
 					}
 				} else {
-					if err := r.updateStock(tx, companyId, item); err != nil {
+					if err := r.updateStock(db, companyId, item); err != nil {
 						return err
 					}
 				}
 			}
 		}
-		return nil
-	})
+	}
+	return nil
 }
 
-func (r *goquRepository) removeStock(tx *goqu.TxDatabase, companyId uint64, item *StockItem) error {
+func (r *goquRepository) removeStock(tx *database.DB, companyId uint64, item *StockItem) error {
 	_, err := tx.
 		Delete(goqu.T("inventories")).
 		Where(goqu.And(
@@ -92,7 +92,7 @@ func (r *goquRepository) removeStock(tx *goqu.TxDatabase, companyId uint64, item
 	return err
 }
 
-func (r *goquRepository) updateStock(tx *goqu.TxDatabase, companyId uint64, item *StockItem) error {
+func (r *goquRepository) updateStock(tx *database.DB, companyId uint64, item *StockItem) error {
 	_, err := tx.
 		Update(goqu.T("inventories")).
 		Set(goqu.Record{"quantity": item.Qty}).

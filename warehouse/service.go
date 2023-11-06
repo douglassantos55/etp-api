@@ -14,8 +14,6 @@ type (
 
 	Service interface {
 		GetInventory(companyId uint64) (*Inventory, error)
-
-		ReduceStock(companyId uint64, inventory *Inventory, resources []*resource.Item) error
 	}
 
 	service struct {
@@ -47,8 +45,4 @@ func NewService(repository Repository) Service {
 
 func (s *service) GetInventory(companyId uint64) (*Inventory, error) {
 	return s.repository.FetchInventory(companyId)
-}
-
-func (s *service) ReduceStock(companyId uint64, inventory *Inventory, resources []*resource.Item) error {
-	return s.repository.ReduceStock(companyId, inventory, resources)
 }
