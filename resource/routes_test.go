@@ -4,6 +4,7 @@ import (
 	"api/auth"
 	"api/resource"
 	"api/server"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -23,7 +24,7 @@ func NewFakeRepository() resource.Repository {
 	return &fakeRepository{data}
 }
 
-func (r *fakeRepository) FetchResources() ([]*resource.Resource, error) {
+func (r *fakeRepository) FetchResources(ctx context.Context) ([]*resource.Resource, error) {
 	items := make([]*resource.Resource, 0)
 	for _, item := range r.data {
 		items = append(items, item)
@@ -31,22 +32,22 @@ func (r *fakeRepository) FetchResources() ([]*resource.Resource, error) {
 	return items, nil
 }
 
-func (r *fakeRepository) GetById(id uint64) (*resource.Resource, error) {
+func (r *fakeRepository) GetById(ctx context.Context, id uint64) (*resource.Resource, error) {
 	return r.data[id], nil
 }
 
-func (r *fakeRepository) GetRequirements(resourceId uint64) ([]*resource.Item, error) {
-    return nil, nil
+func (r *fakeRepository) GetRequirements(ctx context.Context, resourceId uint64) ([]*resource.Item, error) {
+	return nil, nil
 }
 
-func (r *fakeRepository) SaveResource(resource *resource.Resource) (*resource.Resource, error) {
+func (r *fakeRepository) SaveResource(ctx context.Context, resource *resource.Resource) (*resource.Resource, error) {
 	id := uint64(len(r.data) + 1)
 	resource.Id = id
 	r.data[id] = resource
 	return resource, nil
 }
 
-func (r *fakeRepository) UpdateResource(resource *resource.Resource) (*resource.Resource, error) {
+func (r *fakeRepository) UpdateResource(ctx context.Context, resource *resource.Resource) (*resource.Resource, error) {
 	r.data[resource.Id] = resource
 	return resource, nil
 }
@@ -94,6 +95,8 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("should validate requirements", func(t *testing.T) {
+        t.Parallel()
+
 		body := strings.NewReader(`{"name":"Wood","category_id":1,"image":"http://placeimg.com/10","requirements":[{"quantity":0,"quality":0,"resource_id":0}]}`)
 
 		req := httptest.NewRequest("POST", "/resources/", body)
@@ -110,6 +113,8 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("should validate input when updating resource", func(t *testing.T) {
+        t.Parallel()
+
 		req := httptest.NewRequest("PUT", "/resources/1", strings.NewReader(`{"name":""}`))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")

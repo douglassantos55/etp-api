@@ -2,24 +2,25 @@ package resource
 
 import (
 	"api/database"
+	"context"
 
 	"github.com/doug-martin/goqu/v9"
 )
 
 type Repository interface {
 	// Returns the list of registered resources
-	FetchResources() ([]*Resource, error)
+	FetchResources(ctx context.Context) ([]*Resource, error)
 
 	// Get a resource by id, returns nil if it can't be found
-	GetById(id uint64) (*Resource, error)
+	GetById(ctx context.Context, id uint64) (*Resource, error)
 
-	GetRequirements(resourceId uint64) ([]*Item, error)
+	GetRequirements(ctx context.Context, resourceId uint64) ([]*Item, error)
 
 	// Creates a resource
-	SaveResource(resource *Resource) (*Resource, error)
+	SaveResource(ctx context.Context, resource *Resource) (*Resource, error)
 
 	// Updates a resource
-	UpdateResource(resource *Resource) (*Resource, error)
+	UpdateResource(ctx context.Context, resource *Resource) (*Resource, error)
 }
 
 type goquRepository struct {
@@ -31,7 +32,7 @@ func NewRepository(conn *database.Connection) Repository {
 	return &goquRepository{builder}
 }
 
-func (r *goquRepository) FetchResources() ([]*Resource, error) {
+func (r *goquRepository) FetchResources(ctx context.Context) ([]*Resource, error) {
 	resources := make([]*Resource, 0)
 
 	err := r.builder.
@@ -42,14 +43,14 @@ func (r *goquRepository) FetchResources() ([]*Resource, error) {
 		).
 		From(goqu.T("resources").As("r")).
 		InnerJoin(goqu.T("categories").As("c"), goqu.On(goqu.I("r.category_id").Eq(goqu.I("c.id")))).
-		ScanStructs(&resources)
+		ScanStructsContext(ctx, &resources)
 
 	if err != nil {
 		return nil, err
 	}
 
 	for _, resource := range resources {
-		requirements, err := r.GetRequirements(resource.Id)
+		requirements, err := r.GetRequirements(ctx, resource.Id)
 		if err != nil {
 			return nil, err
 		}
@@ -59,7 +60,7 @@ func (r *goquRepository) FetchResources() ([]*Resource, error) {
 	return resources, nil
 }
 
-func (r *goquRepository) GetById(id uint64) (*Resource, error) {
+func (r *goquRepository) GetById(ctx context.Context, id uint64) (*Resource, error) {
 	resource := new(Resource)
 
 	found, err := r.builder.
@@ -79,13 +80,13 @@ func (r *goquRepository) GetById(id uint64) (*Resource, error) {
 			),
 		).
 		Where(goqu.I("r.id").Eq(id)).
-		ScanStruct(resource)
+		ScanStructContext(ctx, resource)
 
 	if err != nil || !found {
 		return nil, err
 	}
 
-	requirements, err := r.GetRequirements(resource.Id)
+	requirements, err := r.GetRequirements(ctx, resource.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +95,7 @@ func (r *goquRepository) GetById(id uint64) (*Resource, error) {
 	return resource, err
 }
 
-func (r *goquRepository) GetRequirements(resourceId uint64) ([]*Item, error) {
+func (r *goquRepository) GetRequirements(ctx context.Context, resourceId uint64) ([]*Item, error) {
 	requirements := make([]*Item, 0)
 
 	err := r.builder.
@@ -122,16 +123,18 @@ func (r *goquRepository) GetRequirements(resourceId uint64) ([]*Item, error) {
 			),
 		).
 		Where(goqu.I("req.resource_id").Eq(resourceId)).
-		ScanStructs(&requirements)
+		ScanStructsContext(ctx, &requirements)
 
 	return requirements, err
 }
 
-func (r *goquRepository) SaveResource(resource *Resource) (*Resource, error) {
-	tx, err := r.builder.Begin()
+func (r *goquRepository) SaveResource(ctx context.Context, resource *Resource) (*Resource, error) {
+	tx, err := r.builder.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
+
+	defer tx.Rollback()
 
 	result, err := tx.
 		Insert("resources").
@@ -139,23 +142,81 @@ func (r *goquRepository) SaveResource(resource *Resource) (*Resource, error) {
 			"name":        resource.Name,
 			"image":       resource.Image,
 			"category_id": resource.CategoryId,
-		}).Executor().Exec()
+		}).
+		Executor().
+		Exec()
 
 	if err != nil {
-		tx.Rollback()
 		return nil, err
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		tx.Rollback()
 		return nil, err
 	}
 
-	if len(resource.Requirements) > 0 {
-		requirements := []goqu.Record{}
-		for _, requirement := range resource.Requirements {
-			requirements = append(requirements, goqu.Record{
+	if err := r.saveRequirements(tx, id, resource.Requirements); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return r.GetById(ctx, uint64(id))
+}
+
+func (r *goquRepository) UpdateResource(ctx context.Context, resource *Resource) (*Resource, error) {
+	tx, err := r.builder.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	record := goqu.Record{
+		"name":        resource.Name,
+		"image":       resource.Image,
+		"category_id": resource.CategoryId,
+	}
+
+	_, err = tx.
+		Update(goqu.T("resources")).
+		Set(record).
+		Where(goqu.I("id").Eq(resource.Id)).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.saveRequirements(tx, int64(resource.Id), resource.Requirements); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return resource, nil
+}
+
+func (r *goquRepository) saveRequirements(tx *goqu.TxDatabase, id int64, requirements []*Item) error {
+	_, err := tx.Delete(goqu.T("resources_requirements")).
+		Where(goqu.I("resource_id").Eq(id)).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return err
+	}
+
+	if len(requirements) > 0 {
+		reqs := []goqu.Record{}
+
+		for _, requirement := range requirements {
+			reqs = append(reqs, goqu.Record{
 				"qty":            requirement.Qty,
 				"quality":        requirement.Quality,
 				"requirement_id": requirement.ResourceId,
@@ -163,35 +224,16 @@ func (r *goquRepository) SaveResource(resource *Resource) (*Resource, error) {
 			})
 		}
 
-		_, err = tx.Insert(goqu.T("resources_requirements")).Rows(requirements).Executor().Exec()
+		_, err := tx.
+			Insert(goqu.T("resources_requirements")).
+			Rows(reqs).
+			Executor().
+			Exec()
+
 		if err != nil {
-			tx.Rollback()
-			return nil, err
+			return err
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	return r.GetById(uint64(id))
-}
-
-func (r *goquRepository) UpdateResource(resource *Resource) (*Resource, error) {
-	record := goqu.Record{
-		"name":        resource.Name,
-		"image":       resource.Image,
-		"category_id": resource.CategoryId,
-	}
-
-	_, err := r.builder.Update(goqu.T("resources")).
-		Set(record).
-		Where(goqu.I("id").Eq(resource.Id)).
-		Executor().Exec()
-
-	if err != nil {
-		return nil, err
-	}
-
-	return resource, nil
+	return nil
 }

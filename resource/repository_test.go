@@ -3,7 +3,9 @@ package resource_test
 import (
 	"api/database"
 	"api/resource"
+	"context"
 	"testing"
+	"time"
 )
 
 func TestRepository(t *testing.T) {
@@ -27,7 +29,11 @@ func TestRepository(t *testing.T) {
 
 	repository := resource.NewRepository(conn)
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+
 	t.Cleanup(func() {
+		cancel()
+
 		if _, err := conn.DB.Exec(`
             DELETE FROM resources_requirements;
             DELETE FROM resources;
@@ -40,7 +46,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should list with requirements", func(t *testing.T) {
 		t.Parallel()
 
-		resources, err := repository.FetchResources()
+		resources, err := repository.FetchResources(ctx)
 		if err != nil {
 			t.Fatalf("could not fetch resources: %s", err)
 		}
@@ -61,7 +67,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should return nil when not found", func(t *testing.T) {
 		t.Parallel()
 
-		resource, err := repository.GetById(5153)
+		resource, err := repository.GetById(ctx, 5153)
 		if err != nil {
 			t.Fatalf("could not get by id: %s", err)
 		}
@@ -73,7 +79,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should return instance if found", func(t *testing.T) {
 		t.Parallel()
 
-		resource, err := repository.GetById(3)
+		resource, err := repository.GetById(ctx, 3)
 		if err != nil {
 			t.Fatalf("could not get by id: %s", err)
 		}
@@ -92,7 +98,7 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should return resource with ID", func(t *testing.T) {
-		resource, err := repository.SaveResource(&resource.Resource{Name: "water", CategoryId: 1})
+		resource, err := repository.SaveResource(ctx, &resource.Resource{Name: "water", CategoryId: 1})
 		if err != nil {
 			t.Fatalf("could not save resource: %s", err)
 		}
@@ -109,7 +115,7 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should save requirements", func(t *testing.T) {
-		resource, err := repository.SaveResource(&resource.Resource{
+		resource, err := repository.SaveResource(ctx, &resource.Resource{
 			Name:       "water",
 			CategoryId: 1,
 			Requirements: []*resource.Item{
@@ -122,7 +128,7 @@ func TestRepository(t *testing.T) {
 			t.Fatalf("could not save resource: %s", err)
 		}
 
-		resource, err = repository.GetById(resource.Id)
+		resource, err = repository.GetById(ctx, resource.Id)
 		if err != nil {
 			t.Fatalf("could not save resource: %s", err)
 		}

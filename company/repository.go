@@ -5,6 +5,7 @@ import (
 	"api/database"
 	"api/resource"
 	"api/warehouse"
+	"context"
 	"fmt"
 	"time"
 
@@ -286,7 +287,7 @@ func (r *goquRepository) GetResources(buildingId uint64) ([]*building.BuildingRe
 		ScanStructs(&resources)
 
 	for _, resource := range resources {
-		requirements, err := r.resources.GetRequirements(resource.Resource.Id)
+		requirements, err := r.resources.GetRequirements(context.Background(), resource.Resource.Id)
 		if err != nil {
 			return nil, err
 		}
@@ -305,6 +306,7 @@ func (r *goquRepository) AddBuilding(companyId uint64, inventory *warehouse.Inve
 	defer tx.Rollback()
 
 	if err := r.warehouse.ReduceStock(
+		context.Background(),
 		&database.DB{TxDatabase: tx},
 		companyId,
 		inventory,
@@ -358,6 +360,7 @@ func (r *goquRepository) Produce(companyId uint64, inventory *warehouse.Inventor
 
 	dbTx := &database.DB{TxDatabase: tx}
 	if err := r.warehouse.ReduceStock(
+		context.Background(),
 		dbTx,
 		companyId,
 		inventory,

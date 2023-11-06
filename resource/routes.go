@@ -11,7 +11,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 	group := e.Group("/resources")
 
 	group.GET("/", func(c echo.Context) error {
-		resources, err := service.GetAll()
+		resources, err := service.GetAll(c.Request().Context())
 		if err != nil {
 			return err
 		}
@@ -23,7 +23,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 		if err != nil {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
-		resource, err := service.GetById(id)
+		resource, err := service.GetById(c.Request().Context(), id)
 		if err != nil {
 			return err
 		}
@@ -41,7 +41,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 		if err := c.Validate(resource); err != nil {
 			return err
 		}
-		_, err := service.CreateResource(resource)
+		_, err := service.CreateResource(c.Request().Context(), resource)
 		if err != nil {
 			return err
 		}
@@ -54,7 +54,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return echo.NewHTTPError(http.StatusBadRequest, err)
 		}
 
-		resource, err := service.GetById(id)
+		resource, err := service.GetById(c.Request().Context(), id)
 		if err != nil {
 			return err
 		}
@@ -69,7 +69,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return err
 		}
 
-		resource, err = service.UpdateResource(resource)
+		resource, err = service.UpdateResource(c.Request().Context(), resource)
 		if err != nil {
 			return err
 		}

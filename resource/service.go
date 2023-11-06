@@ -1,11 +1,13 @@
 package resource
 
+import "context"
+
 type (
 	Service interface {
-		GetAll() ([]*Resource, error)
-		GetById(id uint64) (*Resource, error)
-		CreateResource(resource *Resource) (*Resource, error)
-		UpdateResource(resource *Resource) (*Resource, error)
+		GetAll(ctx context.Context) ([]*Resource, error)
+		GetById(ctx context.Context, id uint64) (*Resource, error)
+		CreateResource(ctx context.Context, resource *Resource) (*Resource, error)
+		UpdateResource(ctx context.Context, resource *Resource) (*Resource, error)
 	}
 
 	Category struct {
@@ -38,18 +40,18 @@ func NewService(repository Repository) Service {
 	return &service{repository}
 }
 
-func (s *service) GetAll() ([]*Resource, error) {
-	return s.repository.FetchResources()
+func (s *service) GetAll(ctx context.Context) ([]*Resource, error) {
+	return s.repository.FetchResources(ctx)
 }
 
-func (s *service) GetById(id uint64) (*Resource, error) {
-	return s.repository.GetById(id)
+func (s *service) GetById(ctx context.Context, id uint64) (*Resource, error) {
+	return s.repository.GetById(ctx, id)
 }
 
-func (s *service) CreateResource(resource *Resource) (*Resource, error) {
-	return s.repository.SaveResource(resource)
+func (s *service) CreateResource(ctx context.Context, resource *Resource) (*Resource, error) {
+	return s.repository.SaveResource(ctx, resource)
 }
 
-func (s *service) UpdateResource(resource *Resource) (*Resource, error) {
-	return s.repository.UpdateResource(resource)
+func (s *service) UpdateResource(ctx context.Context, resource *Resource) (*Resource, error) {
+	return s.repository.UpdateResource(ctx, resource)
 }

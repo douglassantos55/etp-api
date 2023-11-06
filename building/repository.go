@@ -124,7 +124,7 @@ func (r *goquRepository) GetResources(ctx context.Context, buildingId uint64) ([
 		ScanStructsContext(ctx, &resources)
 
 	for _, resource := range resources {
-		requirements, err := r.resources.GetRequirements(resource.Resource.Id)
+		requirements, err := r.resources.GetRequirements(ctx, resource.Resource.Id)
 		if err != nil {
 			return nil, err
 		}
