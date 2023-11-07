@@ -86,7 +86,7 @@ func (b *CompanyBuilding) GetResource(resourceId uint64) (*building.BuildingReso
 			return resource, nil
 		}
 	}
-	return nil, errors.New("resource not found")
+	return nil, server.NewBusinessRuleError("resource not found")
 }
 
 func NewService(repository Repository, building building.Service, warehouse warehouse.Service) Service {
@@ -146,7 +146,7 @@ func (s *service) AddBuilding(ctx context.Context, companyId, buildingId uint64,
 	}
 
 	if !inventory.HasResources(build.Requirements) {
-		return nil, errors.New("not enough resources")
+		return nil, server.NewBusinessRuleError("not enough resources")
 	}
 
 	return s.repository.AddBuilding(ctx, companyId, inventory, build, position)
@@ -159,11 +159,11 @@ func (s *service) Produce(ctx context.Context, companyId, buildingId uint64, ite
 	}
 
 	if building == nil {
-		return nil, errors.New("building not found")
+		return nil, server.NewBusinessRuleError("building not found")
 	}
 
 	if building.BusyUntil != nil {
-		return nil, errors.New("building is busy")
+		return nil, server.NewBusinessRuleError("building is busy")
 	}
 
 	resourceToProduce, err := building.GetResource(item.ResourceId)
@@ -182,7 +182,7 @@ func (s *service) Produce(ctx context.Context, companyId, buildingId uint64, ite
 	}
 
 	if !inventory.HasResources(resourceToProduce.Requirements) {
-		return nil, errors.New("not enough resources")
+		return nil, server.NewBusinessRuleError("not enough resources")
 	}
 
 	timeToProduce := float64(item.Qty) / (float64(resourceToProduce.QtyPerHours) / 60.0)
@@ -196,7 +196,7 @@ func (s *service) Produce(ctx context.Context, companyId, buildingId uint64, ite
 	}
 
 	if company.AvailableCash < totalCost {
-		return nil, errors.New("not enough cash")
+		return nil, server.NewBusinessRuleError("not enough cash")
 	}
 
 	return s.repository.Produce(ctx, companyId, inventory, building, item, totalCost)

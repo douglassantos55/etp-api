@@ -32,6 +32,10 @@ type (
 		Errors map[string]string `json:"errors"`
 	}
 
+	BusinessRuleError struct {
+		Message string
+	}
+
 	Message struct {
 		Token   string
 		Message string
@@ -51,8 +55,24 @@ func GetJwtSecret() string {
 	return os.Getenv(JWT_SECRET_KEY)
 }
 
+func NewBusinessRuleError(message string) BusinessRuleError {
+	return BusinessRuleError{message}
+}
+
+func (e BusinessRuleError) Error() string {
+	return e.Message
+}
+
 func NewServer() *echo.Echo {
 	e := echo.New()
+
+	e.HTTPErrorHandler = func(err error, c echo.Context) {
+		he := err
+		if be, ok := err.(BusinessRuleError); ok {
+			he = echo.NewHTTPError(http.StatusUnprocessableEntity, be.Message)
+		}
+		e.DefaultHTTPErrorHandler(he, c)
+	}
 
 	e.Use(middleware.Logger())
 

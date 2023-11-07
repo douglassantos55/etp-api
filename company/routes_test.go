@@ -27,6 +27,7 @@ func NewFakeRepository() company.Repository {
 		1: {Id: 1, Name: "Test", Email: "admin@test.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy", AvailableCash: 720},
 	}
 
+	busyUntil := time.Now().Add(time.Minute)
 	buildings := map[uint64]map[uint64]*company.CompanyBuilding{
 		1: {
 			1: {
@@ -43,6 +44,45 @@ func NewFakeRepository() company.Repository {
 							Name: "Seeds",
 							Requirements: []*resource.Item{
 								{Qty: 15, Quality: 0, Resource: &resource.Resource{Id: 2}},
+							},
+						},
+					},
+				},
+			},
+			3: {
+				Id:        3,
+				Name:      "Laboratory",
+				Level:     1,
+				WagesHour: 1000000,
+				AdminHour: 5000000,
+				Resources: []*building.BuildingResource{
+					{
+						QtyPerHours: 100,
+						Resource: &resource.Resource{
+							Id:   5,
+							Name: "Vaccine",
+							Requirements: []*resource.Item{
+								{Qty: 15, Quality: 0, Resource: &resource.Resource{Id: 2}},
+							},
+						},
+					},
+				},
+			},
+			4: {
+				Id:        4,
+				Name:      "Factory",
+				Level:     1,
+				WagesHour: 10,
+				AdminHour: 50,
+				BusyUntil: &busyUntil,
+				Resources: []*building.BuildingResource{
+					{
+						QtyPerHours: 1000,
+						Resource: &resource.Resource{
+							Id:   6,
+							Name: "Iron bar",
+							Requirements: []*resource.Item{
+								{Qty: 1500, Quality: 0, Resource: &resource.Resource{Id: 3}},
 							},
 						},
 					},
@@ -193,7 +233,9 @@ func TestCompanyRoutes(t *testing.T) {
 	}
 
 	svr := server.NewServer()
-	svc := company.NewService(NewFakeRepository(), nil, nil)
+	buildingSvc := building.NewService(building.NewFakeRepository())
+	warehouseSvc := warehouse.NewService(warehouse.NewFakeRepository())
+	svc := company.NewService(NewFakeRepository(), buildingSvc, warehouseSvc)
 	company.CreateEndpoints(svr, svc)
 
 	t.Run("should validate registration", func(t *testing.T) {
@@ -428,6 +470,101 @@ func TestCompanyRoutes(t *testing.T) {
 
 		if rec.Code != http.StatusUnauthorized {
 			t.Errorf("expected status %d, got %d: %s", http.StatusUnauthorized, rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("should return 422 not enough resources", func(t *testing.T) {
+		body := strings.NewReader(`{"building_id":2,"position":1}`)
+
+		req := httptest.NewRequest("POST", "/companies/1/buildings", body)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+		}
+		if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"not enough resources\"}" {
+			t.Errorf("expected not enough resources, got %s", rec.Body.String())
+		}
+	})
+
+	t.Run("should return 422 producing on building that does not exist", func(t *testing.T) {
+		body := strings.NewReader(`{"resource_id":1,"quantity":100,"quality":0}`)
+
+		req := httptest.NewRequest("POST", "/companies/1/buildings/5/produce", body)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+		}
+		if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"building not found\"}" {
+			t.Errorf("expected building not found, got %s", rec.Body.String())
+		}
+	})
+
+	t.Run("should return 422 producing on busy building", func(t *testing.T) {
+		body := strings.NewReader(`{"resource_id":6,"quantity":100,"quality":0}`)
+
+		req := httptest.NewRequest("POST", "/companies/1/buildings/4/produce", body)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+		}
+		if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"building is busy\"}" {
+			t.Errorf("expected building is busy, got %s", rec.Body.String())
+		}
+	})
+
+	t.Run("should return 422 producing resource not available for building", func(t *testing.T) {
+		body := strings.NewReader(`{"resource_id":5,"quantity":100,"quality":0}`)
+
+		req := httptest.NewRequest("POST", "/companies/1/buildings/1/produce", body)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+		}
+		if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"resource not found\"}" {
+			t.Errorf("expected resource not found, got %s", rec.Body.String())
+		}
+	})
+
+	t.Run("should return 422 if not enough cash", func(t *testing.T) {
+		body := strings.NewReader(`{"resource_id":5,"quantity":1,"quality":0}`)
+
+		req := httptest.NewRequest("POST", "/companies/1/buildings/3/produce", body)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnprocessableEntity {
+			t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+		}
+		if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"not enough cash\"}" {
+			t.Errorf("expected not enough cash, got %s", rec.Body.String())
 		}
 	})
 }
