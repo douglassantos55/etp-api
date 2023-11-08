@@ -14,7 +14,7 @@ type Repository interface {
 	FetchInventory(ctx context.Context, companyId uint64) (*Inventory, error)
 
 	// Reduces the stock for the given resources
-	ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error
+	ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) (uint64, error)
 
 	// Increments stock for the given resources
 	IncrementStock(db *database.DB, companyId uint64, resources []*resource.Item) error
@@ -65,8 +65,16 @@ func (r *goquRepository) FetchInventory(ctx context.Context, companyId uint64) (
 	return &Inventory{items}, nil
 }
 
-func (r *goquRepository) ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error {
+func (r *goquRepository) ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) (uint64, error) {
+	var totalQty uint64
+	var sourcingCost uint64
+
+	if len(resources) == 0 {
+		return 0, nil
+	}
+
 	for _, resource := range resources {
+		totalQty += resource.Qty
 		remaining := resource.Qty
 
 		for _, item := range inventory.Items {
@@ -76,19 +84,24 @@ func (r *goquRepository) ReduceStock(db *database.DB, companyId uint64, inventor
 			if remaining > 0 && isResource && hasSufficientQuality {
 				if item.Qty > remaining {
 					item.Qty -= remaining
+					sourcingCost += item.Cost * remaining
+
 					if err := r.updateStock(db, companyId, item); err != nil {
-						return err
+						return 0, err
 					}
 				} else {
 					remaining -= item.Qty
+					sourcingCost += item.Cost * item.Qty
+
 					if err := r.removeStock(db, companyId, item); err != nil {
-						return err
+						return 0, err
 					}
 				}
 			}
 		}
 	}
-	return nil
+
+	return sourcingCost / totalQty, nil
 }
 
 func (r *goquRepository) removeStock(tx *database.DB, companyId uint64, item *StockItem) error {

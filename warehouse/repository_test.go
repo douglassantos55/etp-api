@@ -42,7 +42,7 @@ func TestWarehouseRepository(t *testing.T) {
 		_, err = td.Insert("inventories").Rows(
 			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 1300, "quality": 0, "sourcing_cost": 857},
 			goqu.Record{"company_id": 1, "resource_id": 2, "quantity": 130, "quality": 0, "sourcing_cost": 10830},
-			goqu.Record{"company_id": 1, "resource_id": 2, "quantity": 130, "quality": 2, "sourcing_cost": 10830},
+			goqu.Record{"company_id": 1, "resource_id": 2, "quantity": 130, "quality": 2, "sourcing_cost": 15830},
 			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 150, "quality": 1, "sourcing_cost": 905},
 			goqu.Record{"company_id": 1, "resource_id": 3, "quantity": 150, "quality": 5, "sourcing_cost": 1905},
 		).Executor().Exec()
@@ -131,11 +131,21 @@ func TestWarehouseRepository(t *testing.T) {
 				}
 
 				if item.Resource.Id == 2 {
-					if item.Qty != 130 {
-						t.Errorf("expected qty %d, got %d", 130, item.Qty)
+					if item.Quality == 0 {
+						if item.Qty != 130 {
+							t.Errorf("expected qty %d, got %d", 130, item.Qty)
+						}
+						if item.Cost != 10830 {
+							t.Errorf("expected cost %d, got %d", 10830, item.Cost)
+						}
 					}
-					if item.Cost != 10830 {
-						t.Errorf("expected cost %d, got %d", 10830, item.Cost)
+					if item.Quality == 2 {
+						if item.Qty != 130 {
+							t.Errorf("expected qty %d, got %d", 130, item.Qty)
+						}
+						if item.Cost != 15830 {
+							t.Errorf("expected cost %d, got %d", 15830, item.Cost)
+						}
 					}
 				}
 			}
@@ -178,11 +188,16 @@ func TestWarehouseRepository(t *testing.T) {
 
 			defer tx.Rollback()
 
-			err = repository.ReduceStock(&database.DB{TxDatabase: tx}, 1, inventory, []*resource.Item{
+			sourcingCost, err := repository.ReduceStock(&database.DB{TxDatabase: tx}, 1, inventory, []*resource.Item{
 				{Qty: 1300, Quality: 0, Resource: &resource.Resource{Id: 1}},
 			})
+
 			if err != nil {
 				t.Fatalf("could not reduce stocks: %s", err)
+			}
+
+			if sourcingCost != 857 {
+				t.Errorf("expected sourcing cost %d, got %d", 857, sourcingCost/100)
 			}
 
 			if err := tx.Commit(); err != nil {
@@ -208,11 +223,16 @@ func TestWarehouseRepository(t *testing.T) {
 
 			defer tx.Rollback()
 
-			err = repository.ReduceStock(&database.DB{TxDatabase: tx}, 1, inventory, []*resource.Item{
+			sourcingCost, err := repository.ReduceStock(&database.DB{TxDatabase: tx}, 1, inventory, []*resource.Item{
 				{Qty: 250, Quality: 0, Resource: &resource.Resource{Id: 2}},
 			})
+
 			if err != nil {
 				t.Fatalf("could not reduce stocks: %s", err)
+			}
+
+			if sourcingCost != 13230 {
+				t.Errorf("expected sourcing cost %d, got %d", 13230, sourcingCost/100)
 			}
 
 			if err := tx.Commit(); err != nil {
@@ -243,11 +263,16 @@ func TestWarehouseRepository(t *testing.T) {
 
 			defer tx.Rollback()
 
-			err = repository.ReduceStock(&database.DB{TxDatabase: tx}, 1, inventory, []*resource.Item{
+			sourcingCost, err := repository.ReduceStock(&database.DB{TxDatabase: tx}, 1, inventory, []*resource.Item{
 				{Qty: 100, Quality: 2, Resource: &resource.Resource{Id: 3}},
 			})
+
 			if err != nil {
 				t.Fatalf("could not reduce stocks: %s", err)
+			}
+
+			if sourcingCost != 1905 {
+				t.Errorf("expected sourcing cost %d, got %d", 1905, sourcingCost/100)
 			}
 
 			if err := tx.Commit(); err != nil {

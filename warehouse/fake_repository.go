@@ -33,18 +33,28 @@ func (r *fakeRepository) FetchInventory(ctx context.Context, companyId uint64) (
 	return inventory, nil
 }
 
-func (r *fakeRepository) ReduceStock(tx *database.DB, companyId uint64, inventory *Inventory, items []*resource.Item) error {
+func (r *fakeRepository) ReduceStock(tx *database.DB, companyId uint64, inventory *Inventory, items []*resource.Item) (uint64, error) {
+	var totalQty uint64
+	var sourcingCost uint64
+
 	for _, item := range items {
+		totalQty += item.Qty
+		remaining := item.Qty
+
 		for _, inv := range inventory.Items {
 			isResource := item.Resource.Id == inv.Resource.Id
-			isQuality := item.Quality == inv.Quality
+			isSufficientQuality := item.Quality >= inv.Quality
 
-			if isResource && isQuality {
-				inv.Qty -= item.Qty
+			if remaining > 0 && isResource && isSufficientQuality {
+				if item.Qty > remaining {
+					inv.Qty -= item.Qty
+					sourcingCost += inv.Cost * remaining
+				}
 			}
 		}
 	}
-	return nil
+
+	return sourcingCost / totalQty, nil
 }
 
 func (r *fakeRepository) IncrementStock(tx *database.DB, companyId uint64, resources []*resource.Item) error {
