@@ -115,6 +115,39 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 		return c.JSON(http.StatusCreated, production)
 	})
 
+	group.DELETE("/:id/buildings/:building/production/:production", func(c echo.Context) error {
+		companyId, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+
+		buildingId, err := strconv.ParseUint(c.Param("building"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+
+		productionId, err := strconv.ParseUint(c.Param("production"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+
+		authenticated, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		if companyId != authenticated {
+			return echo.NewHTTPError(http.StatusUnauthorized)
+		}
+
+		err = service.CancelProduction(c.Request().Context(), companyId, buildingId, productionId)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusNoContent, nil)
+	})
+
 	group.POST("/register", func(c echo.Context) error {
 		registration := new(Registration)
 		if err := c.Bind(registration); err != nil {

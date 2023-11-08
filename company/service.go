@@ -53,8 +53,12 @@ type (
 
 	Production struct {
 		*resource.Item
-		Id         uint64    `db:"id" json:"id"`
-		FinishesAt time.Time `db:"finishes_at" json:"finishes_at"`
+		Id             uint64           `db:"id" json:"id"`
+		Building       *CompanyBuilding `db:"-" json:"building"`
+		StartedAt      time.Time        `db:"created_at" json:"started_at"`
+		FinishesAt     time.Time        `db:"finishes_at" json:"finishes_at"`
+		CanceledAt     *time.Time       `db:"canceled_at" json:"canceled_at"`
+		LastCollection *time.Time       `db:"collected_at" json:"last_collection"`
 	}
 
 	Service interface {
@@ -71,6 +75,8 @@ type (
 		AddBuilding(ctx context.Context, companyId, buildingId uint64, position uint8) (*CompanyBuilding, error)
 
 		Produce(ctx context.Context, companyId, companyBuildingId uint64, item *resource.Item) (*Production, error)
+
+		CancelProduction(ctx context.Context, companyId, buildingId, productionId uint64) error
 	}
 
 	service struct {
@@ -87,6 +93,30 @@ func (b *CompanyBuilding) GetResource(resourceId uint64) (*building.BuildingReso
 		}
 	}
 	return nil, server.NewBusinessRuleError("resource not found")
+}
+
+func (p *Production) ProducedUntil(t time.Time) (*resource.Item, error) {
+	producedResource, err := p.Building.GetResource(p.Resource.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	var lastCollection time.Time
+	if p.LastCollection == nil {
+		lastCollection = p.StartedAt
+	} else {
+		lastCollection = *p.LastCollection
+	}
+
+	qtyPerMinute := (float64(producedResource.QtyPerHours) / 60.0)
+	qtyProduced := t.Sub(lastCollection).Minutes() * qtyPerMinute
+
+	return &resource.Item{
+		Qty:        uint64(qtyProduced),
+		Quality:    p.Quality,
+		ResourceId: producedResource.Id,
+		Resource:   producedResource.Resource,
+	}, nil
 }
 
 func NewService(repository Repository, building building.Service, warehouse warehouse.Service) Service {
@@ -200,4 +230,21 @@ func (s *service) Produce(ctx context.Context, companyId, buildingId uint64, ite
 	}
 
 	return s.repository.Produce(ctx, companyId, inventory, building, item, totalCost)
+}
+
+func (s *service) CancelProduction(ctx context.Context, companyId, buildingId, productionId uint64) error {
+	companyBuilding, err := s.repository.GetBuilding(ctx, buildingId, companyId)
+	if err != nil {
+		return err
+	}
+
+	if companyBuilding == nil {
+		return server.NewBusinessRuleError("building not found")
+	}
+
+	if companyBuilding.BusyUntil == nil {
+		return server.NewBusinessRuleError("no production in process")
+	}
+
+	return s.repository.CancelProduction(ctx, productionId, buildingId, companyId)
 }

@@ -18,6 +18,9 @@ func TestRepository(t *testing.T) {
 		t.Fatalf("could not connect to database: %s", err)
 	}
 
+	productionEnd := time.Now().Add(1 * time.Hour).UTC().Format("2006-01-02 15:04:05")
+	productionStart := time.Now().Add(-1 * time.Hour).UTC().Format("2006-01-02 15:04:05")
+
 	_, err = conn.DB.Exec(`
         INSERT INTO companies (id, name, email, password, created_at, blocked_at, deleted_at) VALUES
         (1, "Coca-Cola", "coke@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, NULL),
@@ -44,8 +47,8 @@ func TestRepository(t *testing.T) {
         INSERT INTO transactions (company_id, value)
         VALUES (1, 1000000);
 
-        INSERT INTO productions (resource_id, building_id, qty, quality, finishes_at)
-        VALUES (3, 2, 250, 0, '2034-12-31 15:59:59');
+        INSERT INTO productions (id, resource_id, building_id, qty, quality, finishes_at, created_at)
+        VALUES (1, 3, 2, 250, 1, '` + productionEnd + `', '` + productionStart + `');
 
         INSERT INTO inventories (company_id, resource_id, quantity, quality, sourcing_cost)
         VALUES (1, 1, 100, 0, 137), (1, 3, 1000, 1, 470), (1, 2, 700, 0, 1553);
@@ -281,8 +284,6 @@ func TestRepository(t *testing.T) {
 	})
 
 	t.Run("should get building with busy until", func(t *testing.T) {
-		t.Parallel()
-
 		building, err := repository.GetBuilding(ctx, 2, 1)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
@@ -399,6 +400,32 @@ func TestRepository(t *testing.T) {
 		expectedCash := 500_000
 		if company.AvailableCash != expectedCash {
 			t.Errorf("expected %d cash, got %d", expectedCash, company.AvailableCash)
+		}
+	})
+
+	t.Run("should cancel production and increment stocks", func(t *testing.T) {
+		err = repository.CancelProduction(ctx, 1, 2, 1)
+		if err != nil {
+			t.Fatalf("could not cancel production: %s", err)
+		}
+
+		inventory, err := warehouseRepository.FetchInventory(ctx, 1)
+		if err != nil {
+			t.Fatalf("could not fetch inventory: %s", err)
+		}
+
+		stock := inventory.GetStock(3, 1)
+		if stock != 1750 {
+			t.Errorf("should have more than before: %d, %d", 1750, stock)
+		}
+
+		companyBuilding, err := repository.GetBuilding(ctx, 2, 1)
+		if err != nil {
+			t.Fatalf("could not get building: %s", err)
+		}
+
+		if companyBuilding.BusyUntil != nil {
+			t.Errorf("should cancel production, got busy until: %+v", *companyBuilding.BusyUntil)
 		}
 	})
 }

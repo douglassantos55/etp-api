@@ -46,3 +46,7 @@ func (r *fakeRepository) ReduceStock(tx *database.DB, companyId uint64, inventor
 	}
 	return nil
 }
+
+func (r *fakeRepository) IncrementStock(tx *database.DB, companyId uint64, resources []*resource.Item) error {
+	return nil
+}

@@ -24,6 +24,15 @@ type (
 	}
 )
 
+func (i *Inventory) GetStock(resourceId uint64, quality uint8) uint64 {
+	for _, item := range i.Items {
+		if item.Quality == quality && item.Resource.Id == resourceId {
+			return item.Qty
+		}
+	}
+	return 0
+}
+
 func (i *Inventory) HasResources(resources []*resource.Item) bool {
 	if len(resources) == 0 {
 		return true

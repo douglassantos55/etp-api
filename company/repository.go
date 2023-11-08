@@ -32,6 +32,8 @@ type (
 		AddBuilding(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error)
 
 		Produce(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *CompanyBuilding, item *resource.Item, totalCost int) (*Production, error)
+
+		CancelProduction(ctx context.Context, productionId, buildingId, companyId uint64) error
 	}
 
 	goquRepository struct {
@@ -180,6 +182,7 @@ func (r *goquRepository) GetBuildings(ctx context.Context, companyId uint64) ([]
 			goqu.T("productions").As("bp"),
 			goqu.On(
 				goqu.And(
+					goqu.I("bp.canceled_at").IsNull(),
 					goqu.I("bp.building_id").Eq(goqu.I("cb.id")),
 					goqu.I("bp.finishes_at").Gt(goqu.L("CURRENT_TIMESTAMP")),
 				),
@@ -234,6 +237,7 @@ func (r *goquRepository) GetBuilding(ctx context.Context, id, companyId uint64) 
 			goqu.T("productions").As("bp"),
 			goqu.On(
 				goqu.And(
+					goqu.I("bp.canceled_at").IsNull(),
 					goqu.I("bp.building_id").Eq(goqu.I("cb.id")),
 					goqu.I("bp.finishes_at").Gt(goqu.L("CURRENT_TIMESTAMP")),
 				),
@@ -398,10 +402,10 @@ func (r *goquRepository) Produce(ctx context.Context, companyId uint64, inventor
 		return nil, err
 	}
 
-	return r.getProduction(ctx, uint64(id))
+	return r.getProduction(ctx, uint64(id), building.Id, companyId)
 }
 
-func (r *goquRepository) getProduction(ctx context.Context, id uint64) (*Production, error) {
+func (r *goquRepository) getProduction(ctx context.Context, id, buildingId, companyId uint64) (*Production, error) {
 	production := new(Production)
 
 	found, err := r.builder.
@@ -409,6 +413,9 @@ func (r *goquRepository) getProduction(ctx context.Context, id uint64) (*Product
 			goqu.I("p.id"),
 			goqu.I("p.quality"),
 			goqu.I("p.finishes_at"),
+			goqu.I("p.created_at"),
+			goqu.I("p.collected_at"),
+			goqu.I("p.canceled_at"),
 			goqu.I("p.qty").As("quantity"),
 			goqu.I("r.id").As(goqu.C("resource.id")),
 			goqu.I("r.name").As(goqu.C("resource.name")),
@@ -420,13 +427,22 @@ func (r *goquRepository) getProduction(ctx context.Context, id uint64) (*Product
 			goqu.T("resources").As("r"),
 			goqu.On(goqu.I("p.resource_id").Eq(goqu.I("r.id"))),
 		).
-		Where(goqu.I("p.id").Eq(id)).
+		Where(goqu.And(
+			goqu.I("p.id").Eq(id)),
+			goqu.I("p.building_id").Eq(buildingId),
+		).
 		ScanStructContext(ctx, production)
 
 	if err != nil || !found {
 		return nil, err
 	}
 
+	building, err := r.GetBuilding(ctx, buildingId, companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	production.Building = building
 	return production, nil
 }
 
@@ -443,4 +459,46 @@ func (r *goquRepository) registerTransaction(tx *database.DB, companyId, classif
 		Exec()
 
 	return err
+}
+
+func (r *goquRepository) CancelProduction(ctx context.Context, productionId, buildingId, companyId uint64) error {
+	production, err := r.getProduction(ctx, productionId, buildingId, companyId)
+	if err != nil {
+		return err
+	}
+
+	tx, err := r.builder.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	resourceProduced, err := production.ProducedUntil(time.Now())
+	if err != nil {
+		return err
+	}
+
+	if err := r.warehouse.IncrementStock(
+		&database.DB{TxDatabase: tx},
+		companyId,
+		[]*resource.Item{resourceProduced},
+	); err != nil {
+		return err
+	}
+
+	_, err = tx.Update(goqu.T("productions")).
+		Set(goqu.Record{
+			"canceled_at":  time.Now(),
+			"collected_at": time.Now(),
+		}).
+		Where(goqu.I("id").Eq(productionId)).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

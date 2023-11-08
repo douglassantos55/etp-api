@@ -15,6 +15,9 @@ type Repository interface {
 
 	// Reduces the stock for the given resources
 	ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error
+
+	// Increments stock for the given resources
+	IncrementStock(db *database.DB, companyId uint64, resources []*resource.Item) error
 }
 
 type goquRepository struct {
@@ -109,7 +112,26 @@ func (r *goquRepository) updateStock(tx *database.DB, companyId uint64, item *St
 	return err
 }
 
-// Get the stock of a company's resource, grouping by quality
-func (r *goquRepository) FetchStock(companyId, resourceId uint64) ([]any, error) {
-	return nil, nil
+func (r *goquRepository) IncrementStock(tx *database.DB, companyId uint64, resources []*resource.Item) error {
+	for _, item := range resources {
+		_, err := tx.Insert(goqu.T("inventories")).
+			Rows(goqu.Record{
+				"quantity":      item.Qty,
+				"quality":       item.Quality,
+				"company_id":    companyId,
+				"sourcing_cost": 0, //
+				"resource_id":   item.Resource.Id,
+			}).
+			OnConflict(goqu.DoUpdate("", goqu.Record{
+				"quantity": goqu.L("? + ?", goqu.I("quantity"), item.Qty),
+			})).
+			Executor().
+			Exec()
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

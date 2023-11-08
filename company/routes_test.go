@@ -224,6 +224,10 @@ func (r *fakeRepository) RegisterTransaction(tx *database.DB, companyId, classif
 	return nil
 }
 
+func (r *fakeRepository) CancelProduction(ctx context.Context, productionId, buildingId, companyId uint64) error {
+	return nil
+}
+
 func TestCompanyRoutes(t *testing.T) {
 	t.Setenv(server.JWT_SECRET_KEY, "secret")
 
@@ -566,5 +570,111 @@ func TestCompanyRoutes(t *testing.T) {
 		if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"not enough cash\"}" {
 			t.Errorf("expected not enough cash, got %s", rec.Body.String())
 		}
+	})
+
+	t.Run("cancel production", func(t *testing.T) {
+		t.Run("should return 400 when invalid company id", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/a/buildings/1/production/1", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should return 400 when invalid building id", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/a/production/1", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should return 400 when invalid production id", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/2/production/a", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should return 401 when other company", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/2/buildings/2/production/1", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("expected status %d, got %d: %s", http.StatusUnauthorized, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should return 422 building not found", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/2/production/1", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+			}
+			if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"building not found\"}" {
+				t.Errorf("expected building not found, got %s", rec.Body.String())
+			}
+		})
+
+		t.Run("should return 422 building not producing", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/3/production/1", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+			}
+			if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"no production in process\"}" {
+				t.Errorf("expected no production in process, got %s", rec.Body.String())
+			}
+		})
+
+		t.Run("should return 204 when canceled", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/4/production/1", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNoContent {
+				t.Errorf("expected status %d, got %d: %s", http.StatusNoContent, rec.Code, rec.Body.String())
+			}
+		})
 	})
 }
