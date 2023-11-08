@@ -33,7 +33,9 @@ type (
 
 		Produce(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *CompanyBuilding, item *resource.Item, totalCost int) (*Production, error)
 
-		CancelProduction(ctx context.Context, productionId, buildingId, companyId uint64) error
+		CancelProduction(ctx context.Context, timestamp time.Time, productionId, buildingId, companyId uint64) error
+
+		CollectResource(ctx context.Context, timestamp time.Time, productionId, buildingId, companyId uint64) (*warehouse.StockItem, error)
 	}
 
 	goquRepository struct {
@@ -433,6 +435,13 @@ func (r *goquRepository) getProduction(ctx context.Context, id, buildingId, comp
 			goqu.T("resources").As("r"),
 			goqu.On(goqu.I("p.resource_id").Eq(goqu.I("r.id"))),
 		).
+		InnerJoin(
+			goqu.T("companies_buildings").As("cb"),
+			goqu.On(goqu.And(
+				goqu.I("p.building_id").Eq(goqu.I("cb.id")),
+				goqu.I("cb.company_id").Eq(companyId),
+			)),
+		).
 		Where(goqu.And(
 			goqu.I("p.id").Eq(id)),
 			goqu.I("p.building_id").Eq(buildingId),
@@ -467,7 +476,7 @@ func (r *goquRepository) registerTransaction(tx *database.DB, companyId, classif
 	return err
 }
 
-func (r *goquRepository) CancelProduction(ctx context.Context, productionId, buildingId, companyId uint64) error {
+func (r *goquRepository) CancelProduction(ctx context.Context, timestamp time.Time, productionId, buildingId, companyId uint64) error {
 	production, err := r.getProduction(ctx, productionId, buildingId, companyId)
 	if err != nil {
 		return err
@@ -480,7 +489,7 @@ func (r *goquRepository) CancelProduction(ctx context.Context, productionId, bui
 
 	defer tx.Rollback()
 
-	resourceProduced, err := production.ProducedUntil(time.Now())
+	resourceProduced, err := production.ProducedUntil(timestamp)
 	if err != nil {
 		return err
 	}
@@ -498,7 +507,10 @@ func (r *goquRepository) CancelProduction(ctx context.Context, productionId, bui
 			"canceled_at":  time.Now(),
 			"collected_at": time.Now(),
 		}).
-		Where(goqu.I("id").Eq(productionId)).
+		Where(goqu.And(
+			goqu.I("id").Eq(productionId),
+			goqu.I("building_id").Eq(buildingId),
+		)).
 		Executor().
 		Exec()
 
@@ -507,4 +519,50 @@ func (r *goquRepository) CancelProduction(ctx context.Context, productionId, bui
 	}
 
 	return tx.Commit()
+}
+
+func (r *goquRepository) CollectResource(ctx context.Context, timestamp time.Time, productionId, buildingId, companyId uint64) (*warehouse.StockItem, error) {
+	production, err := r.getProduction(ctx, productionId, buildingId, companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := r.builder.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	resourceProduced, err := production.ProducedUntil(timestamp)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := r.warehouse.IncrementStock(
+		&database.DB{TxDatabase: tx},
+		companyId,
+		[]*warehouse.StockItem{resourceProduced},
+	); err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Update(goqu.T("productions")).
+		Set(goqu.Record{"collected_at": time.Now()}).
+		Where(goqu.And(
+			goqu.I("id").Eq(productionId),
+			goqu.I("building_id").Eq(buildingId),
+		)).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return resourceProduced, nil
 }

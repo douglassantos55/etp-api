@@ -78,6 +78,8 @@ type (
 		Produce(ctx context.Context, companyId, companyBuildingId uint64, item *resource.Item) (*Production, error)
 
 		CancelProduction(ctx context.Context, companyId, buildingId, productionId uint64) error
+
+		CollectResource(ctx context.Context, companyId, buildingId, productionId uint64) (*warehouse.StockItem, error)
 	}
 
 	service struct {
@@ -250,5 +252,22 @@ func (s *service) CancelProduction(ctx context.Context, companyId, buildingId, p
 		return server.NewBusinessRuleError("no production in process")
 	}
 
-	return s.repository.CancelProduction(ctx, productionId, buildingId, companyId)
+	return s.repository.CancelProduction(ctx, time.Now(), productionId, buildingId, companyId)
+}
+
+func (s *service) CollectResource(ctx context.Context, companyId, buildingId, productionId uint64) (*warehouse.StockItem, error) {
+	companyBuilding, err := s.repository.GetBuilding(ctx, buildingId, companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	if companyBuilding == nil {
+		return nil, server.NewBusinessRuleError("building not found")
+	}
+
+	if companyBuilding.BusyUntil == nil {
+		return nil, server.NewBusinessRuleError("no production in process")
+	}
+
+	return s.repository.CollectResource(ctx, time.Now(), productionId, buildingId, companyId)
 }

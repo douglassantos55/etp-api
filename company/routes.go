@@ -199,6 +199,41 @@ func BuildingProductions(g *echo.Group, service Service) {
 	})
 
 	group.POST("/:production/collect", func(c echo.Context) error {
-		return nil
+		companyId, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+
+		buildingId, err := strconv.ParseUint(c.Param("building"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+
+		productionId, err := strconv.ParseUint(c.Param("production"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+
+		authenticated, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		if companyId != authenticated {
+			return echo.NewHTTPError(http.StatusUnauthorized)
+		}
+
+		collected, err := service.CollectResource(
+			c.Request().Context(),
+			productionId,
+			buildingId,
+			companyId,
+		)
+
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, collected)
 	})
 }

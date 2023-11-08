@@ -401,16 +401,23 @@ func TestRepository(t *testing.T) {
 			t.Fatalf("could not get company: %s", err)
 		}
 
-		expectedCash := 500_000
+		expectedCash := 5000 * 100
 		if company.AvailableCash != expectedCash {
 			t.Errorf("expected %d cash, got %d", expectedCash, company.AvailableCash)
 		}
 	})
 
-	t.Run("should cancel production and increment stocks", func(t *testing.T) {
-		err = repository.CancelProduction(ctx, 1, 2, 1)
+	t.Run("collect resource", func(t *testing.T) {
+		produced, err := repository.CollectResource(ctx, time.Now(), 1, 2, 1)
 		if err != nil {
-			t.Fatalf("could not cancel production: %s", err)
+			t.Fatalf("could not collect resource: %s", err)
+		}
+
+		if produced.Qty != 750 {
+			t.Errorf("expected qty %d, got %d", 750, produced.Qty)
+		}
+		if produced.Cost != 1352 {
+			t.Errorf("expected sourcing cost of %d, got %d", 1352, produced.Cost)
 		}
 
 		inventory, err := warehouseRepository.FetchInventory(ctx, 1)
@@ -434,8 +441,42 @@ func TestRepository(t *testing.T) {
 			t.Fatalf("could not get building: %s", err)
 		}
 
-		if companyBuilding.BusyUntil != nil {
-			t.Errorf("should cancel production, got busy until: %+v", *companyBuilding.BusyUntil)
+		if companyBuilding.BusyUntil == nil {
+			t.Error("should not cancel production")
 		}
+	})
+
+	t.Run("cancel production", func(t *testing.T) {
+		t.Run("should cancel production and increment stocks", func(t *testing.T) {
+			err = repository.CancelProduction(ctx, time.Now().Add(time.Hour), 1, 2, 1)
+			if err != nil {
+				t.Fatalf("could not cancel production: %s", err)
+			}
+
+			inventory, err := warehouseRepository.FetchInventory(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not fetch inventory: %s", err)
+			}
+
+			for _, item := range inventory.Items {
+				if item.Resource.Id == 3 {
+					if item.Qty != 2500 {
+						t.Errorf("should have more than before: %d, %d", 2500, item.Qty)
+					}
+					if item.Cost != 999 {
+						t.Errorf("expected sourcing cost %d, got %d", 999, item.Cost)
+					}
+				}
+			}
+
+			companyBuilding, err := repository.GetBuilding(ctx, 2, 1)
+			if err != nil {
+				t.Fatalf("could not get building: %s", err)
+			}
+
+			if companyBuilding.BusyUntil != nil {
+				t.Errorf("should cancel production, got busy until: %+v", *companyBuilding.BusyUntil)
+			}
+		})
 	})
 }

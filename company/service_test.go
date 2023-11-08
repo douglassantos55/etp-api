@@ -128,7 +128,9 @@ func TestCompanyService(t *testing.T) {
 				t.Errorf("expected building is busy, got %s", err)
 			}
 		})
+	})
 
+	t.Run("cancel production", func(t *testing.T) {
 		t.Run("should not cancel production of non existent building", func(t *testing.T) {
 			err := service.CancelProduction(ctx, 1, 2, 1)
 			expectedError := "building not found"
@@ -139,6 +141,26 @@ func TestCompanyService(t *testing.T) {
 		})
 
 		t.Run("should not cancel production of non busy building", func(t *testing.T) {
+			err := service.CancelProduction(ctx, 1, 3, 1)
+			expectedError := "no production in process"
+
+			if err.Error() != expectedError {
+				t.Errorf("expected %s, got %s", expectedError, err)
+			}
+		})
+	})
+
+	t.Run("collect resource", func(t *testing.T) {
+		t.Run("should not collect from non existent building", func(t *testing.T) {
+			_, err := service.CollectResource(ctx, 1, 2, 1)
+			expectedError := "building not found"
+
+			if err.Error() != expectedError {
+				t.Errorf("expected %s, got %s", expectedError, err)
+			}
+		})
+
+		t.Run("should not collect from non busy building", func(t *testing.T) {
 			err := service.CancelProduction(ctx, 1, 3, 1)
 			expectedError := "no production in process"
 

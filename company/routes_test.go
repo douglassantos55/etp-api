@@ -224,8 +224,12 @@ func (r *fakeRepository) RegisterTransaction(tx *database.DB, companyId, classif
 	return nil
 }
 
-func (r *fakeRepository) CancelProduction(ctx context.Context, productionId, buildingId, companyId uint64) error {
+func (r *fakeRepository) CancelProduction(ctx context.Context, timestamp time.Time, productionId, buildingId, companyId uint64) error {
 	return nil
+}
+
+func (r *fakeRepository) CollectResource(ctx context.Context, timestamp time.Time, productionId, buildingId, companyId uint64) (*warehouse.StockItem, error) {
+	return nil, nil
 }
 
 func TestCompanyRoutes(t *testing.T) {
