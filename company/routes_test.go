@@ -499,7 +499,7 @@ func TestCompanyRoutes(t *testing.T) {
 	t.Run("should return 422 producing on building that does not exist", func(t *testing.T) {
 		body := strings.NewReader(`{"resource_id":1,"quantity":100,"quality":0}`)
 
-		req := httptest.NewRequest("POST", "/companies/1/buildings/5/produce", body)
+		req := httptest.NewRequest("POST", "/companies/1/buildings/5/productions", body)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -518,7 +518,7 @@ func TestCompanyRoutes(t *testing.T) {
 	t.Run("should return 422 producing on busy building", func(t *testing.T) {
 		body := strings.NewReader(`{"resource_id":6,"quantity":100,"quality":0}`)
 
-		req := httptest.NewRequest("POST", "/companies/1/buildings/4/produce", body)
+		req := httptest.NewRequest("POST", "/companies/1/buildings/4/productions", body)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -537,7 +537,7 @@ func TestCompanyRoutes(t *testing.T) {
 	t.Run("should return 422 producing resource not available for building", func(t *testing.T) {
 		body := strings.NewReader(`{"resource_id":5,"quantity":100,"quality":0}`)
 
-		req := httptest.NewRequest("POST", "/companies/1/buildings/1/produce", body)
+		req := httptest.NewRequest("POST", "/companies/1/buildings/1/productions", body)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -556,7 +556,7 @@ func TestCompanyRoutes(t *testing.T) {
 	t.Run("should return 422 if not enough cash", func(t *testing.T) {
 		body := strings.NewReader(`{"resource_id":5,"quantity":1,"quality":0}`)
 
-		req := httptest.NewRequest("POST", "/companies/1/buildings/3/produce", body)
+		req := httptest.NewRequest("POST", "/companies/1/buildings/3/productions", body)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -574,7 +574,7 @@ func TestCompanyRoutes(t *testing.T) {
 
 	t.Run("cancel production", func(t *testing.T) {
 		t.Run("should return 400 when invalid company id", func(t *testing.T) {
-			req := httptest.NewRequest("DELETE", "/companies/a/buildings/1/production/1", nil)
+			req := httptest.NewRequest("DELETE", "/companies/a/buildings/1/productions/1", nil)
 			req.Header.Set("Accept", "application/json")
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -588,7 +588,7 @@ func TestCompanyRoutes(t *testing.T) {
 		})
 
 		t.Run("should return 400 when invalid building id", func(t *testing.T) {
-			req := httptest.NewRequest("DELETE", "/companies/1/buildings/a/production/1", nil)
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/a/productions/1", nil)
 			req.Header.Set("Accept", "application/json")
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -602,7 +602,7 @@ func TestCompanyRoutes(t *testing.T) {
 		})
 
 		t.Run("should return 400 when invalid production id", func(t *testing.T) {
-			req := httptest.NewRequest("DELETE", "/companies/1/buildings/2/production/a", nil)
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/2/productions/a", nil)
 			req.Header.Set("Accept", "application/json")
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -616,7 +616,7 @@ func TestCompanyRoutes(t *testing.T) {
 		})
 
 		t.Run("should return 401 when other company", func(t *testing.T) {
-			req := httptest.NewRequest("DELETE", "/companies/2/buildings/2/production/1", nil)
+			req := httptest.NewRequest("DELETE", "/companies/2/buildings/2/productions/1", nil)
 			req.Header.Set("Accept", "application/json")
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -630,7 +630,7 @@ func TestCompanyRoutes(t *testing.T) {
 		})
 
 		t.Run("should return 422 building not found", func(t *testing.T) {
-			req := httptest.NewRequest("DELETE", "/companies/1/buildings/2/production/1", nil)
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/2/productions/1", nil)
 			req.Header.Set("Accept", "application/json")
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -647,7 +647,7 @@ func TestCompanyRoutes(t *testing.T) {
 		})
 
 		t.Run("should return 422 building not producing", func(t *testing.T) {
-			req := httptest.NewRequest("DELETE", "/companies/1/buildings/3/production/1", nil)
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/3/productions/1", nil)
 			req.Header.Set("Accept", "application/json")
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+token)
@@ -664,7 +664,7 @@ func TestCompanyRoutes(t *testing.T) {
 		})
 
 		t.Run("should return 204 when canceled", func(t *testing.T) {
-			req := httptest.NewRequest("DELETE", "/companies/1/buildings/4/production/1", nil)
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/4/productions/1", nil)
 			req.Header.Set("Accept", "application/json")
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+token)
