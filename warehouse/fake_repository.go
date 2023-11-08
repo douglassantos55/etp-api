@@ -57,6 +57,6 @@ func (r *fakeRepository) ReduceStock(tx *database.DB, companyId uint64, inventor
 	return sourcingCost / totalQty, nil
 }
 
-func (r *fakeRepository) IncrementStock(tx *database.DB, companyId uint64, resources []*resource.Item) error {
+func (r *fakeRepository) IncrementStock(tx *database.DB, companyId uint64, resources []*StockItem) error {
 	return nil
 }

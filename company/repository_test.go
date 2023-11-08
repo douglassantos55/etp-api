@@ -47,8 +47,8 @@ func TestRepository(t *testing.T) {
         INSERT INTO transactions (company_id, value)
         VALUES (1, 1000000);
 
-        INSERT INTO productions (id, resource_id, building_id, qty, quality, finishes_at, created_at)
-        VALUES (1, 3, 2, 250, 1, '` + productionEnd + `', '` + productionStart + `');
+        INSERT INTO productions (id, resource_id, building_id, qty, quality, finishes_at, created_at, sourcing_cost)
+        VALUES (1, 3, 2, 1500, 1, '` + productionEnd + `', '` + productionStart + `', 1352);
 
         INSERT INTO inventories (company_id, resource_id, quantity, quality, sourcing_cost)
         VALUES (1, 1, 100, 0, 137), (1, 3, 1000, 1, 470), (1, 2, 700, 0, 1553);
@@ -378,13 +378,17 @@ func TestRepository(t *testing.T) {
 		}
 
 		item := &resource.Item{Qty: 2000, Quality: 0, ResourceId: 4}
-		production, err := repository.Produce(ctx, 1, inventory, building, item, 500_000)
+		production, err := repository.Produce(ctx, 1, inventory, building, item, 5000*100)
 		if err != nil {
 			t.Fatalf("could not produce: %s", err)
 		}
 
 		if production == nil {
 			t.Fatal("production not found")
+		}
+
+		if production.SourcingCost != 250 {
+			t.Errorf("expected sourcing cost %d, got %d", 250, production.SourcingCost)
 		}
 
 		diff := production.FinishesAt.Sub(time.Now())
@@ -414,9 +418,15 @@ func TestRepository(t *testing.T) {
 			t.Fatalf("could not fetch inventory: %s", err)
 		}
 
-		stock := inventory.GetStock(3, 1)
-		if stock != 1750 {
-			t.Errorf("should have more than before: %d, %d", 1750, stock)
+		for _, item := range inventory.Items {
+			if item.Resource.Id == 3 {
+				if item.Qty != 1750 {
+					t.Errorf("should have more than before: %d, %d", 1750, item.Qty)
+				}
+				if item.Cost != 848 {
+					t.Errorf("expected sourcing cost %d, got %d", 848, item.Cost)
+				}
+			}
 		}
 
 		companyBuilding, err := repository.GetBuilding(ctx, 2, 1)

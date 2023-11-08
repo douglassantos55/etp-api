@@ -305,7 +305,7 @@ func (r *goquRepository) AddBuilding(ctx context.Context, companyId uint64, inve
 
 	defer tx.Rollback()
 
-	if err := r.warehouse.ReduceStock(
+	if _, err := r.warehouse.ReduceStock(
 		&database.DB{TxDatabase: tx},
 		companyId,
 		inventory,
@@ -358,12 +358,14 @@ func (r *goquRepository) Produce(ctx context.Context, companyId uint64, inventor
 	defer tx.Rollback()
 
 	dbTx := &database.DB{TxDatabase: tx}
-	if err := r.warehouse.ReduceStock(
+	sourcingCost, err := r.warehouse.ReduceStock(
 		dbTx,
 		companyId,
 		inventory,
 		resourceToProduce.Requirements,
-	); err != nil {
+	)
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -377,14 +379,17 @@ func (r *goquRepository) Produce(ctx context.Context, companyId uint64, inventor
 		return nil, err
 	}
 
+	sourcingCost += uint64(totalCost / int(item.Qty))
+
 	result, err := tx.
 		Insert(goqu.T("productions")).
 		Rows(goqu.Record{
-			"qty":         item.Qty,
-			"quality":     item.Quality,
-			"building_id": building.Id,
-			"resource_id": item.ResourceId,
-			"finishes_at": finishesAt,
+			"qty":           item.Qty,
+			"sourcing_cost": sourcingCost,
+			"quality":       item.Quality,
+			"building_id":   building.Id,
+			"resource_id":   item.ResourceId,
+			"finishes_at":   finishesAt,
 		}).
 		Executor().
 		Exec()
@@ -416,6 +421,7 @@ func (r *goquRepository) getProduction(ctx context.Context, id, buildingId, comp
 			goqu.I("p.created_at"),
 			goqu.I("p.collected_at"),
 			goqu.I("p.canceled_at"),
+			goqu.I("p.sourcing_cost"),
 			goqu.I("p.qty").As("quantity"),
 			goqu.I("r.id").As(goqu.C("resource.id")),
 			goqu.I("r.name").As(goqu.C("resource.name")),
@@ -482,7 +488,7 @@ func (r *goquRepository) CancelProduction(ctx context.Context, productionId, bui
 	if err := r.warehouse.IncrementStock(
 		&database.DB{TxDatabase: tx},
 		companyId,
-		[]*resource.Item{resourceProduced},
+		[]*warehouse.StockItem{resourceProduced},
 	); err != nil {
 		return err
 	}

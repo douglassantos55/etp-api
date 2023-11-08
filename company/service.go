@@ -54,11 +54,12 @@ type (
 	Production struct {
 		*resource.Item
 		Id             uint64           `db:"id" json:"id"`
-		Building       *CompanyBuilding `db:"-" json:"building"`
+		Building       *CompanyBuilding `db:"-" json:"-"`
 		StartedAt      time.Time        `db:"created_at" json:"started_at"`
 		FinishesAt     time.Time        `db:"finishes_at" json:"finishes_at"`
 		CanceledAt     *time.Time       `db:"canceled_at" json:"canceled_at"`
 		LastCollection *time.Time       `db:"collected_at" json:"last_collection"`
+		SourcingCost   uint64           `db:"sourcing_cost" json:"sourcing_cost"`
 	}
 
 	Service interface {
@@ -95,7 +96,7 @@ func (b *CompanyBuilding) GetResource(resourceId uint64) (*building.BuildingReso
 	return nil, server.NewBusinessRuleError("resource not found")
 }
 
-func (p *Production) ProducedUntil(t time.Time) (*resource.Item, error) {
+func (p *Production) ProducedUntil(t time.Time) (*warehouse.StockItem, error) {
 	producedResource, err := p.Building.GetResource(p.Resource.Id)
 	if err != nil {
 		return nil, err
@@ -111,11 +112,14 @@ func (p *Production) ProducedUntil(t time.Time) (*resource.Item, error) {
 	qtyPerMinute := (float64(producedResource.QtyPerHours) / 60.0)
 	qtyProduced := t.Sub(lastCollection).Minutes() * qtyPerMinute
 
-	return &resource.Item{
-		Qty:        uint64(qtyProduced),
-		Quality:    p.Quality,
-		ResourceId: producedResource.Id,
-		Resource:   producedResource.Resource,
+	return &warehouse.StockItem{
+		Cost: p.SourcingCost,
+		Item: &resource.Item{
+			Qty:        uint64(qtyProduced),
+			Quality:    p.Quality,
+			ResourceId: producedResource.Id,
+			Resource:   producedResource.Resource,
+		},
 	}, nil
 }
 
