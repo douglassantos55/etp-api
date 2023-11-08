@@ -38,13 +38,16 @@ func (i *Inventory) HasResources(resources []*resource.Item) bool {
 		return true
 	}
 	for _, resource := range resources {
+		var count uint64
 		for _, item := range i.Items {
 			isResource := item.Resource.Id == resource.Resource.Id
-			isSameQuality := item.Quality == resource.Quality
-			hasEnoughQty := item.Qty >= resource.Qty
+			hasSufficientQuality := item.Quality >= resource.Quality
 
-			if isResource && isSameQuality && hasEnoughQty {
-				return true
+			if isResource && hasSufficientQuality {
+				count += item.Qty
+				if count >= resource.Qty {
+					return true
+				}
 			}
 		}
 	}

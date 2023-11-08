@@ -54,6 +54,8 @@ func (r *goquRepository) FetchInventory(ctx context.Context, companyId uint64) (
 		)).
 		Where(goqu.I("i.company_id").Eq(companyId)).
 		GroupBy(goqu.I("r.id"), goqu.I("i.quality")).
+		// make sure q0 comes before q1 so that it's consumed first
+		Order(goqu.I("i.quality").Asc()).
 		ScanStructsContext(ctx, &items)
 
 	if err != nil {
@@ -65,15 +67,21 @@ func (r *goquRepository) FetchInventory(ctx context.Context, companyId uint64) (
 
 func (r *goquRepository) ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) error {
 	for _, resource := range resources {
+		remaining := resource.Qty
+
 		for _, item := range inventory.Items {
-			if item.Resource.Id == resource.Resource.Id && item.Quality == resource.Quality {
-				item.Qty -= resource.Qty
-				if item.Qty == 0 {
-					if err := r.removeStock(db, companyId, item); err != nil {
+			isResource := item.Resource.Id == resource.Resource.Id
+			hasSufficientQuality := item.Quality >= resource.Quality
+
+			if remaining > 0 && isResource && hasSufficientQuality {
+				if item.Qty > remaining {
+					item.Qty -= remaining
+					if err := r.updateStock(db, companyId, item); err != nil {
 						return err
 					}
 				} else {
-					if err := r.updateStock(db, companyId, item); err != nil {
+					remaining -= item.Qty
+					if err := r.removeStock(db, companyId, item); err != nil {
 						return err
 					}
 				}
