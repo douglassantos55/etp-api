@@ -1,6 +1,8 @@
-package company
+package production
 
 import (
+	"api/company"
+	"api/company/building"
 	"api/database"
 	"api/warehouse"
 	"context"
@@ -19,13 +21,13 @@ type (
 
 	productionRepository struct {
 		builder   *goqu.Database
-		company   Repository
-		building  BuildingRepository
+		company   company.Repository
+		building  building.BuildingRepository
 		warehouse warehouse.Repository
 	}
 )
 
-func NewProductionRepository(conn *database.Connection, company Repository, building BuildingRepository, warehouse warehouse.Repository) ProductionRepository {
+func NewProductionRepository(conn *database.Connection, company company.Repository, building building.BuildingRepository, warehouse warehouse.Repository) ProductionRepository {
 	builder := goqu.New(conn.Driver, conn.DB)
 	return &productionRepository{builder, company, building, warehouse}
 }
@@ -46,7 +48,7 @@ func (r *productionRepository) SaveProduction(ctx context.Context, production *P
 	if err := r.company.RegisterTransaction(
 		dbTx,
 		companyId,
-		WAGES,
+		company.WAGES,
 		int(-production.ProductionCost),
 		fmt.Sprintf("Production of %s", production.Resource.Name),
 	); err != nil {

@@ -1,8 +1,8 @@
-package company_test
+package building_test
 
 import (
 	"api/building"
-	"api/company"
+	companyBuilding "api/company/building"
 	"api/database"
 	"api/resource"
 	"api/warehouse"
@@ -12,7 +12,9 @@ import (
 )
 
 func TestBuildingRepository(t *testing.T) {
-	conn, err := database.GetConnection(database.SQLITE, "../test.db")
+	println("Testing Buliding Repository")
+
+	conn, err := database.GetConnection(database.SQLITE, "../../test.db")
 	if err != nil {
 		t.Fatalf("could not connect to database: %s", err)
 	}
@@ -52,27 +54,9 @@ func TestBuildingRepository(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 
-	t.Cleanup(func() {
-		cancel()
-
-		if _, err := conn.DB.Exec(`
-            DELETE FROM inventories;
-            DELETE FROM productions;
-            DELETE FROM buildings_requirements;
-            DELETE FROM buildings_resources;
-            DELETE FROM companies_buildings;
-            DELETE FROM buildings;
-            DELETE FROM resources;
-            DELETE FROM categories;
-            DELETE FROM companies;
-        `); err != nil {
-			t.Fatalf("could not cleanup: %s", err)
-		}
-	})
-
 	resourceRepo := resource.NewRepository(conn)
 	warehouseRepo := warehouse.NewRepository(conn)
-	repository := company.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
+	repository := companyBuilding.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
 
 	t.Run("GetAll", func(t *testing.T) {
 		t.Run("should return empty list when no buildings are found", func(t *testing.T) {
@@ -289,4 +273,22 @@ func TestBuildingRepository(t *testing.T) {
 			}
 		})
 	})
+
+	cancel()
+
+	if _, err := conn.DB.Exec(`
+            DELETE FROM inventories;
+            DELETE FROM productions;
+            DELETE FROM buildings_requirements;
+            DELETE FROM buildings_resources;
+            DELETE FROM companies_buildings;
+            DELETE FROM buildings;
+            DELETE FROM resources;
+            DELETE FROM categories;
+            DELETE FROM companies;
+        `); err != nil {
+		t.Fatalf("could not cleanup: %s", err)
+	}
+
+	println("DONE Testing Buliding Repository")
 }

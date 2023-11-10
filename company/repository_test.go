@@ -55,25 +55,6 @@ func TestRepository(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 
-	t.Cleanup(func() {
-		cancel()
-
-		if _, err := conn.DB.Exec(`
-            DELETE FROM inventories;
-            DELETE FROM productions;
-            DELETE FROM transactions;
-            DELETE FROM buildings_requirements;
-            DELETE FROM buildings_resources;
-            DELETE FROM companies_buildings;
-            DELETE FROM buildings;
-            DELETE FROM resources;
-            DELETE FROM categories;
-            DELETE FROM companies;
-        `); err != nil {
-			t.Fatalf("could not cleanup: %s", err)
-		}
-	})
-
 	repository := company.NewRepository(conn)
 
 	t.Run("should return with cash", func(t *testing.T) {
@@ -108,7 +89,7 @@ func TestRepository(t *testing.T) {
 	t.Run("should return nil when not found by id", func(t *testing.T) {
 		t.Parallel()
 
-		company, err := repository.GetById(ctx, 5)
+		company, err := repository.GetById(ctx, 51245)
 		if err != nil {
 			t.Fatalf("could not get company: %s", err)
 		}
@@ -176,4 +157,21 @@ func TestRepository(t *testing.T) {
 			t.Errorf("should not find deleted company, got %+v", company)
 		}
 	})
+
+	cancel()
+
+	if _, err := conn.DB.Exec(`
+            DELETE FROM inventories;
+            DELETE FROM productions;
+            DELETE FROM transactions;
+            DELETE FROM buildings_requirements;
+            DELETE FROM buildings_resources;
+            DELETE FROM companies_buildings;
+            DELETE FROM buildings;
+            DELETE FROM resources;
+            DELETE FROM categories;
+            DELETE FROM companies;
+        `); err != nil {
+		t.Fatalf("could not cleanup: %s", err)
+	}
 }

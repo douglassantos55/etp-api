@@ -3,6 +3,8 @@ package main
 import (
 	"api/building"
 	"api/company"
+	companyBuilding "api/company/building"
+	"api/company/building/production"
 	"api/database"
 	"api/resource"
 	"api/server"
@@ -38,12 +40,14 @@ func main() {
 	companyRepo := company.NewRepository(conn)
 	companySvc := company.NewService(companyRepo)
 
-	companyBuildingRepo := company.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
-	companyBuildingSvc := company.NewBuildingService(companyBuildingRepo, warehouseSvc, buildingSvc)
+	companyBuildingRepo := companyBuilding.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
+	companyBuildingSvc := companyBuilding.NewBuildingService(companyBuildingRepo, warehouseSvc, buildingSvc)
 
-	productionRepo := company.NewProductionRepository(conn, companyRepo, companyBuildingRepo, warehouseRepo)
-	productionSvc := company.NewProductionService(productionRepo, companySvc, companyBuildingSvc, warehouseSvc)
-	company.CreateEndpoints(svr, companySvc, companyBuildingSvc, productionSvc)
+	productionRepo := production.NewProductionRepository(conn, companyRepo, companyBuildingRepo, warehouseRepo)
+	productionSvc := production.NewProductionService(productionRepo, companySvc, companyBuildingSvc, warehouseSvc)
+
+	company.CreateEndpoints(svr, companySvc)
+	production.CreateEndpoints(svr, productionSvc, companyBuildingSvc, companySvc)
 
 	svr.GET("/", server.Greeting(events))
 	svr.GET("/private", server.Private(events))

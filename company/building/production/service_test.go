@@ -1,8 +1,10 @@
-package company_test
+package production_test
 
 import (
 	"api/building"
 	"api/company"
+	companyBuilding "api/company/building"
+	"api/company/building/production"
 	"api/resource"
 	"api/warehouse"
 	"context"
@@ -14,10 +16,10 @@ func TestProductionService(t *testing.T) {
 	warehouseSvc := warehouse.NewService(warehouse.NewFakeRepository())
 
 	buildingSvc := building.NewService(building.NewFakeRepository())
-	companyBuildingSvc := company.NewBuildingService(company.NewFakeBuildingRepository(), warehouseSvc, buildingSvc)
+	companyBuildingSvc := companyBuilding.NewBuildingService(companyBuilding.NewFakeBuildingRepository(), warehouseSvc, buildingSvc)
 
-	repository := company.NewFakeProductionRepository()
-	service := company.NewProductionService(repository, companySvc, companyBuildingSvc, warehouseSvc)
+	repository := production.NewFakeProductionRepository()
+	service := production.NewProductionService(repository, companySvc, companyBuildingSvc, warehouseSvc)
 
 	ctx := context.Background()
 

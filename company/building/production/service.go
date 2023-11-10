@@ -1,6 +1,8 @@
-package company
+package production
 
 import (
+	"api/company"
+	"api/company/building"
 	"api/resource"
 	"api/server"
 	"api/warehouse"
@@ -17,21 +19,21 @@ type (
 
 	Production struct {
 		*resource.Item
-		Id             uint64           `db:"id" json:"id"`
-		Building       *CompanyBuilding `db:"-" json:"-"`
-		StartedAt      time.Time        `db:"created_at" json:"started_at"`
-		FinishesAt     time.Time        `db:"finishes_at" json:"finishes_at"`
-		CanceledAt     *time.Time       `db:"canceled_at" json:"canceled_at"`
-		LastCollection *time.Time       `db:"collected_at" json:"last_collection"`
-		SourcingCost   uint64           `db:"sourcing_cost" json:"sourcing_cost"`
-		ProductionCost uint64           `db:"-" json:"-"`
-		ResourcesCost  uint64           `db:"-" json:"-"`
+		Id             uint64                    `db:"id" json:"id"`
+		Building       *building.CompanyBuilding `db:"-" json:"-"`
+		StartedAt      time.Time                 `db:"created_at" json:"started_at"`
+		FinishesAt     time.Time                 `db:"finishes_at" json:"finishes_at"`
+		CanceledAt     *time.Time                `db:"canceled_at" json:"canceled_at"`
+		LastCollection *time.Time                `db:"collected_at" json:"last_collection"`
+		SourcingCost   uint64                    `db:"sourcing_cost" json:"sourcing_cost"`
+		ProductionCost uint64                    `db:"-" json:"-"`
+		ResourcesCost  uint64                    `db:"-" json:"-"`
 	}
 
 	productionService struct {
 		repository   ProductionRepository
-		companySvc   Service
-		buildingSvc  BuildingService
+		companySvc   company.Service
+		buildingSvc  building.BuildingService
 		warehouseSvc warehouse.Service
 	}
 )
@@ -67,7 +69,7 @@ func (p *Production) ProducedUntil(t time.Time) (*warehouse.StockItem, error) {
 	}, nil
 }
 
-func NewProductionService(repository ProductionRepository, companySvc Service, buildingSvc BuildingService, warehouseSvc warehouse.Service) ProductionService {
+func NewProductionService(repository ProductionRepository, companySvc company.Service, buildingSvc building.BuildingService, warehouseSvc warehouse.Service) ProductionService {
 	return &productionService{repository, companySvc, buildingSvc, warehouseSvc}
 }
 

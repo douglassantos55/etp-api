@@ -1,7 +1,9 @@
-package company_test
+package production_test
 
 import (
 	"api/company"
+	companyBuilding "api/company/building"
+	"api/company/building/production"
 	"api/database"
 	"api/resource"
 	"api/warehouse"
@@ -12,7 +14,9 @@ import (
 )
 
 func TestProductionRepository(t *testing.T) {
-	conn, err := database.GetConnection(database.SQLITE, "../test.db")
+	println("Testing Production Repository")
+
+	conn, err := database.GetConnection(database.SQLITE, "../../../test.db")
 	if err != nil {
 		t.Fatalf("could not connect to database: %s", err)
 	}
@@ -58,31 +62,12 @@ func TestProductionRepository(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 
-	t.Cleanup(func() {
-		cancel()
-
-		if _, err := conn.DB.Exec(`
-            DELETE FROM inventories;
-            DELETE FROM productions;
-            DELETE FROM transactions;
-            DELETE FROM buildings_requirements;
-            DELETE FROM buildings_resources;
-            DELETE FROM companies_buildings;
-            DELETE FROM buildings;
-            DELETE FROM resources;
-            DELETE FROM categories;
-            DELETE FROM companies;
-        `); err != nil {
-			t.Fatalf("could not cleanup: %s", err)
-		}
-	})
-
 	companyRepo := company.NewRepository(conn)
 	warehouseRepo := warehouse.NewRepository(conn)
 	resourceRepo := resource.NewRepository(conn)
-	buildingRepo := company.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
+	buildingRepo := companyBuilding.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
 
-	repository := company.NewProductionRepository(conn, companyRepo, buildingRepo, warehouseRepo)
+	repository := production.NewProductionRepository(conn, companyRepo, buildingRepo, warehouseRepo)
 
 	t.Run("Produce", func(t *testing.T) {
 		t.Run("should set sourcing cost and register transaction", func(t *testing.T) {
@@ -96,7 +81,7 @@ func TestProductionRepository(t *testing.T) {
 				t.Fatalf("could not fetch inventory: %s", err)
 			}
 
-			production := &company.Production{
+			production := &production.Production{
 				Item:           &resource.Item{Qty: 2000, Quality: 0, Resource: &resource.Resource{Id: 4, Name: "Test"}},
 				Building:       companyBuilding,
 				ProductionCost: 5000 * 100,
@@ -217,4 +202,23 @@ func TestProductionRepository(t *testing.T) {
 			}
 		})
 	})
+
+	cancel()
+
+	if _, err := conn.DB.Exec(`
+            DELETE FROM inventories;
+            DELETE FROM productions;
+            DELETE FROM transactions;
+            DELETE FROM buildings_requirements;
+            DELETE FROM buildings_resources;
+            DELETE FROM companies_buildings;
+            DELETE FROM buildings;
+            DELETE FROM resources;
+            DELETE FROM categories;
+            DELETE FROM companies;
+        `); err != nil {
+		t.Fatalf("could not cleanup: %s", err)
+	}
+
+	println("Done Testing Production Repository")
 }

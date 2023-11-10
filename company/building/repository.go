@@ -1,4 +1,4 @@
-package company
+package building
 
 import (
 	"api/building"

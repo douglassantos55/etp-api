@@ -1,8 +1,8 @@
-package company_test
+package building_test
 
 import (
 	"api/building"
-	"api/company"
+	companyBuilding "api/company/building"
 	"api/resource"
 	"api/warehouse"
 	"context"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestCompanyBuilding(t *testing.T) {
-	companyBuilding := &company.CompanyBuilding{
+	companyBuilding := &companyBuilding.CompanyBuilding{
 		WagesHour: 225000,
 		AdminHour: 413500,
 		Resources: []*building.BuildingResource{
@@ -164,10 +164,10 @@ func TestCompanyBuilding(t *testing.T) {
 }
 
 func TestBuildingService(t *testing.T) {
-	repository := company.NewFakeBuildingRepository()
+	repository := companyBuilding.NewFakeBuildingRepository()
 	warehouseSvc := warehouse.NewService(warehouse.NewFakeRepository())
 	buildingSvc := building.NewService(building.NewFakeRepository())
-	service := company.NewBuildingService(repository, warehouseSvc, buildingSvc)
+	service := companyBuilding.NewBuildingService(repository, warehouseSvc, buildingSvc)
 
 	ctx := context.Background()
 

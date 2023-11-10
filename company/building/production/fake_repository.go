@@ -1,7 +1,8 @@
-package company
+package production
 
 import (
 	"api/building"
+	companyBuilding "api/company/building"
 	"api/resource"
 	"api/warehouse"
 	"context"
@@ -28,7 +29,7 @@ func NewFakeProductionRepository() ProductionRepository {
 				StartedAt:      time.Now().Add(-time.Hour),
 				ProductionCost: 60,
 				SourcingCost:   4704,
-				Building: &CompanyBuilding{
+				Building: &companyBuilding.CompanyBuilding{
 					Id:        4,
 					Name:      "Factory",
 					Level:     1,
@@ -60,7 +61,7 @@ func NewFakeProductionRepository() ProductionRepository {
 				StartedAt:      time.Now().Add(-time.Hour),
 				ProductionCost: 60,
 				SourcingCost:   4704,
-				Building: &CompanyBuilding{
+				Building: &companyBuilding.CompanyBuilding{
 					Id:        4,
 					Name:      "Factory",
 					Level:     1,

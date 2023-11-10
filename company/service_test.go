@@ -2,7 +2,8 @@ package company_test
 
 import (
 	"api/building"
-	"api/company"
+	companyBuilding "api/company/building"
+	"api/company/building/production"
 	"api/resource"
 	"testing"
 	"time"
@@ -12,12 +13,12 @@ func TestProduction(t *testing.T) {
 	now := time.Now()
 	seed := &resource.Resource{Id: 1, Name: "Test"}
 
-	production := &company.Production{
+	production := &production.Production{
 		Id:             1,
 		FinishesAt:     now,
 		LastCollection: nil,
 		StartedAt:      now.Add(-3 * time.Hour),
-		Building: &company.CompanyBuilding{
+		Building: &companyBuilding.CompanyBuilding{
 			Id:        1,
 			Name:      "Plantation",
 			BusyUntil: &now,
