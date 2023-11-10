@@ -2,7 +2,6 @@ package warehouse
 
 import (
 	"api/database"
-	"api/resource"
 	"context"
 
 	"github.com/doug-martin/goqu/v9"
@@ -13,11 +12,8 @@ type Repository interface {
 	// Fetches the inventory of a company
 	FetchInventory(ctx context.Context, companyId uint64) (*Inventory, error)
 
-	// Reduces the stock for the given resources
-	ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) (uint64, error)
-
-	// Increments stock for the given resources
-	IncrementStock(db *database.DB, companyId uint64, resources []*StockItem) error
+	// Updates the inventory
+	UpdateInventory(db *database.DB, inventory *Inventory) error
 }
 
 type goquRepository struct {
@@ -62,46 +58,22 @@ func (r *goquRepository) FetchInventory(ctx context.Context, companyId uint64) (
 		return nil, err
 	}
 
-	return &Inventory{items}, nil
+	return &Inventory{companyId, items}, nil
 }
 
-func (r *goquRepository) ReduceStock(db *database.DB, companyId uint64, inventory *Inventory, resources []*resource.Item) (uint64, error) {
-	var totalQty uint64
-	var sourcingCost uint64
-
-	if len(resources) == 0 {
-		return 0, nil
-	}
-
-	for _, resource := range resources {
-		totalQty += resource.Qty
-		remaining := resource.Qty
-
-		for _, item := range inventory.Items {
-			isResource := item.Resource.Id == resource.Resource.Id
-			hasSufficientQuality := item.Quality >= resource.Quality
-
-			if remaining > 0 && isResource && hasSufficientQuality {
-				if item.Qty > remaining {
-					item.Qty -= remaining
-					sourcingCost += item.Cost * remaining
-
-					if err := r.updateStock(db, companyId, item); err != nil {
-						return 0, err
-					}
-				} else {
-					remaining -= item.Qty
-					sourcingCost += item.Cost * item.Qty
-
-					if err := r.removeStock(db, companyId, item); err != nil {
-						return 0, err
-					}
-				}
+func (r *goquRepository) UpdateInventory(db *database.DB, inventory *Inventory) error {
+	for _, item := range inventory.Items {
+		if item.Qty == 0 {
+			if err := r.removeStock(db, inventory.CompanyId, item); err != nil {
+				return err
+			}
+		} else {
+			if err := r.updateStock(db, inventory.CompanyId, item); err != nil {
+				return err
 			}
 		}
 	}
-
-	return sourcingCost / totalQty, nil
+	return nil
 }
 
 func (r *goquRepository) removeStock(tx *database.DB, companyId uint64, item *StockItem) error {
@@ -131,29 +103,4 @@ func (r *goquRepository) updateStock(tx *database.DB, companyId uint64, item *St
 		Exec()
 
 	return err
-}
-
-func (r *goquRepository) IncrementStock(tx *database.DB, companyId uint64, resources []*StockItem) error {
-	for _, item := range resources {
-		_, err := tx.Insert(goqu.T("inventories")).
-			Rows(goqu.Record{
-				"quantity":      item.Qty,
-				"quality":       item.Quality,
-				"company_id":    companyId,
-				"sourcing_cost": item.Cost,
-				"resource_id":   item.Resource.Id,
-			}).
-			OnConflict(goqu.DoUpdate("", goqu.Record{
-				"sourcing_cost": goqu.L("((sourcing_cost * quantity) + (? * ?)) / (quantity + ?)", item.Cost, item.Qty, item.Qty),
-				"quantity":      goqu.L("? + ?", goqu.I("quantity"), item.Qty),
-			})).
-			Executor().
-			Exec()
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

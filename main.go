@@ -35,8 +35,15 @@ func main() {
 	buildingSvc := building.NewService(building.NewRepository(conn, resourceRepo))
 	building.CreateEndpoints(svr, buildingSvc)
 
-	companySvc := company.NewService(company.NewRepository(conn, resourceRepo, warehouseRepo), buildingSvc, warehouseSvc)
-	company.CreateEndpoints(svr, companySvc)
+	companyRepo := company.NewRepository(conn)
+	companySvc := company.NewService(companyRepo)
+
+	companyBuildingRepo := company.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
+	companyBuildingSvc := company.NewBuildingService(companyBuildingRepo, warehouseSvc, buildingSvc)
+
+	productionRepo := company.NewProductionRepository(conn, companyRepo, companyBuildingRepo, warehouseRepo)
+	productionSvc := company.NewProductionService(productionRepo, companySvc, companyBuildingSvc, warehouseSvc)
+	company.CreateEndpoints(svr, companySvc, companyBuildingSvc, productionSvc)
 
 	svr.GET("/", server.Greeting(events))
 	svr.GET("/private", server.Private(events))

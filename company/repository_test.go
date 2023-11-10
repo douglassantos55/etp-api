@@ -1,13 +1,9 @@
 package company_test
 
 import (
-	"api/building"
 	"api/company"
 	"api/database"
-	"api/resource"
-	"api/warehouse"
 	"context"
-	"math"
 	"testing"
 	"time"
 )
@@ -78,9 +74,7 @@ func TestRepository(t *testing.T) {
 		}
 	})
 
-	resourcesRepository := resource.NewRepository(conn)
-	warehouseRepository := warehouse.NewRepository(conn)
-	repository := company.NewRepository(conn, resourcesRepository, warehouseRepository)
+	repository := company.NewRepository(conn)
 
 	t.Run("should return with cash", func(t *testing.T) {
 		company, err := repository.GetById(ctx, 1)
@@ -108,6 +102,30 @@ func TestRepository(t *testing.T) {
 
 		if company.Id == 0 {
 			t.Errorf("expected an id, got %d", company.Id)
+		}
+	})
+
+	t.Run("should return nil when not found by id", func(t *testing.T) {
+		t.Parallel()
+
+		company, err := repository.GetById(ctx, 5)
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+		if company != nil {
+			t.Errorf("should not find company, got %+v", company)
+		}
+	})
+
+	t.Run("should ignore deleted", func(t *testing.T) {
+		t.Parallel()
+
+		company, err := repository.GetById(ctx, 3)
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+		if company != nil {
+			t.Errorf("should not find company, got %+v", company)
 		}
 	})
 
@@ -157,326 +175,5 @@ func TestRepository(t *testing.T) {
 		if company != nil {
 			t.Errorf("should not find deleted company, got %+v", company)
 		}
-	})
-
-	t.Run("should return empty list when no buildings are found", func(t *testing.T) {
-		t.Parallel()
-
-		buildings, err := repository.GetBuildings(ctx, 100)
-		if err != nil {
-			t.Fatalf("could not fetch buildings: %s", err)
-		}
-
-		if buildings == nil {
-			t.Fatal("expected a list, got nil")
-		}
-
-		if len(buildings) != 0 {
-			t.Errorf("expected empty list, got %d items", len(buildings))
-		}
-	})
-
-	t.Run("should ignore demolished buildings", func(t *testing.T) {
-		t.Parallel()
-
-		buildings, err := repository.GetBuildings(ctx, 1)
-		if err != nil {
-			t.Fatalf("could not fetch buildings: %s", err)
-		}
-
-		if len(buildings) != 3 {
-			t.Errorf("expected %d buildings, got %d", 3, len(buildings))
-		}
-
-		for _, building := range buildings {
-			if building.Id == 0 {
-				t.Error("expected an id, got 0")
-			}
-			if building.Name == "" {
-				t.Error("expected a name")
-			}
-		}
-	})
-
-	t.Run("should list buildings with resources", func(t *testing.T) {
-		t.Parallel()
-
-		buildings, err := repository.GetBuildings(ctx, 1)
-		if err != nil {
-			t.Fatalf("could not get buildings: %s", err)
-		}
-
-		if len(buildings) == 0 {
-			t.Fatal("expected buildings")
-		}
-
-		for _, building := range buildings {
-			if building.Id == 1 {
-				if len(building.Resources) != 1 {
-					t.Errorf("expected %d resources, got %d", 1, len(building.Resources))
-				}
-
-				for _, resource := range building.Resources {
-					if resource.Resource.Id == 4 && resource.QtyPerHours != 2000 {
-						t.Errorf("expected qty per hour %d, got %d", 2000, resource.QtyPerHours)
-					}
-				}
-			}
-
-			if building.Id == 2 {
-				if len(building.Resources) != 2 {
-					t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
-				}
-
-				for _, resource := range building.Resources {
-					if resource.Resource.Id == 1 && resource.QtyPerHours != 1500 {
-						t.Errorf("expected qty per hour %d, got %d", 1500, resource.QtyPerHours)
-					}
-					if resource.Resource.Id == 3 && resource.QtyPerHours != 750 {
-						t.Errorf("expected qty per hour %d, got %d", 750, resource.QtyPerHours)
-					}
-				}
-			}
-		}
-	})
-
-	t.Run("should list buildings with busy until", func(t *testing.T) {
-		buildings, err := repository.GetBuildings(ctx, 1)
-		if err != nil {
-			t.Fatalf("could not get buildings: %s", err)
-		}
-
-		for _, building := range buildings {
-			if building.Id == 1 && building.BusyUntil != nil {
-				t.Errorf("should not be busy, got %+v", *building.BusyUntil)
-			}
-
-			if building.Id == 2 && building.BusyUntil == nil {
-				t.Error("should be busy")
-			}
-		}
-	})
-
-	t.Run("should get building with resources", func(t *testing.T) {
-		t.Parallel()
-
-		building, err := repository.GetBuilding(ctx, 2, 1)
-		if err != nil {
-			t.Fatalf("could not get building: %s", err)
-		}
-
-		if building == nil {
-			t.Fatal("could not get building")
-		}
-
-		if len(building.Resources) != 2 {
-			t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
-		}
-
-		for _, resource := range building.Resources {
-			if resource.Resource.Id == 1 && resource.QtyPerHours != 1500 {
-				t.Errorf("expected qty per hour %d, got %d", 1500, resource.QtyPerHours)
-			}
-			if resource.Resource.Id == 3 && resource.QtyPerHours != 750 {
-				t.Errorf("expected qty per hour %d, got %d", 750, resource.QtyPerHours)
-			}
-		}
-	})
-
-	t.Run("should get building with busy until", func(t *testing.T) {
-		building, err := repository.GetBuilding(ctx, 2, 1)
-		if err != nil {
-			t.Fatalf("could not get building: %s", err)
-		}
-
-		if building == nil {
-			t.Fatal("could not get building")
-		}
-
-		if building.BusyUntil == nil {
-			t.Error("should be busy")
-		}
-	})
-
-	t.Run("should return nil if not found", func(t *testing.T) {
-		t.Parallel()
-
-		building, err := repository.GetBuilding(ctx, 3, 1)
-		if err != nil {
-			t.Fatalf("could not get building: %s", err)
-		}
-
-		if building != nil {
-			t.Errorf("should not find building: %+v", building)
-		}
-	})
-
-	t.Run("should insert building", func(t *testing.T) {
-		plantation := &building.Building{
-			Id:   1,
-			Name: "Plantation",
-			Requirements: []*resource.Item{
-				{ResourceId: 1, Qty: 50, Quality: 0, Resource: &resource.Resource{Id: 1}},
-			},
-		}
-
-		inventory, err := warehouseRepository.FetchInventory(ctx, 1)
-		if err != nil {
-			t.Fatalf("could not fetch inventory: %s", err)
-		}
-
-		if inventory == nil {
-			t.Fatal("could not fetch inventory")
-		}
-
-		building, err := repository.AddBuilding(ctx, 1, inventory, plantation, 1)
-		if err != nil {
-			t.Fatalf("could not insert building: %s", err)
-		}
-
-		if building == nil {
-			t.Fatal("expected building, got nil")
-		}
-		if *building.Position != 1 {
-			t.Errorf("expected position %d, got %d", 1, building.Position)
-		}
-		if building.Level != 1 {
-			t.Errorf("expected level %d, got %d", 1, building.Level)
-		}
-		if building.Name != "Plantation" {
-			t.Errorf("expected name %s, got %s", "Plantation", building.Name)
-		}
-
-		if inventory == nil {
-			t.Fatal("could not fetch inventory")
-		}
-
-		for _, item := range inventory.Items {
-			if item.Resource.Id == 1 && item.Qty != 50 {
-				t.Errorf("expected stock %d, got %d", 50, item.Qty)
-			}
-
-			if item.Resource.Id == 2 && item.Qty != 700 {
-				t.Errorf("expected stock %d, got %d", 700, item.Qty)
-			}
-
-			if item.Resource.Id == 3 && item.Qty != 1000 {
-				t.Errorf("expected stock %d, got %d", 1000, item.Qty)
-			}
-		}
-	})
-
-	t.Run("should set finishes at", func(t *testing.T) {
-		building, err := repository.GetBuilding(ctx, 1, 1)
-		if err != nil {
-			t.Fatalf("could not get building: %s", err)
-		}
-
-		inventory, err := warehouseRepository.FetchInventory(ctx, 1)
-		if err != nil {
-			t.Fatalf("could not fetch inventory: %s", err)
-		}
-
-		item := &resource.Item{Qty: 2000, Quality: 0, ResourceId: 4}
-		production, err := repository.Produce(ctx, 1, inventory, building, item, 5000*100)
-		if err != nil {
-			t.Fatalf("could not produce: %s", err)
-		}
-
-		if production == nil {
-			t.Fatal("production not found")
-		}
-
-		if production.SourcingCost != 250 {
-			t.Errorf("expected sourcing cost %d, got %d", 250, production.SourcingCost)
-		}
-
-		diff := production.FinishesAt.Sub(time.Now())
-		if math.Round(diff.Minutes()) != 60 {
-			t.Errorf("expected 60, got %f", math.Round(diff.Minutes()))
-		}
-
-		company, err := repository.GetById(ctx, 1)
-		if err != nil {
-			t.Fatalf("could not get company: %s", err)
-		}
-
-		expectedCash := 5000 * 100
-		if company.AvailableCash != expectedCash {
-			t.Errorf("expected %d cash, got %d", expectedCash, company.AvailableCash)
-		}
-	})
-
-	t.Run("collect resource", func(t *testing.T) {
-		produced, err := repository.CollectResource(ctx, time.Now(), 1, 2, 1)
-		if err != nil {
-			t.Fatalf("could not collect resource: %s", err)
-		}
-
-		if produced.Qty != 750 {
-			t.Errorf("expected qty %d, got %d", 750, produced.Qty)
-		}
-		if produced.Cost != 1352 {
-			t.Errorf("expected sourcing cost of %d, got %d", 1352, produced.Cost)
-		}
-
-		inventory, err := warehouseRepository.FetchInventory(ctx, 1)
-		if err != nil {
-			t.Fatalf("could not fetch inventory: %s", err)
-		}
-
-		for _, item := range inventory.Items {
-			if item.Resource.Id == 3 {
-				if item.Qty != 1750 {
-					t.Errorf("should have more than before: %d, %d", 1750, item.Qty)
-				}
-				if item.Cost != 848 {
-					t.Errorf("expected sourcing cost %d, got %d", 848, item.Cost)
-				}
-			}
-		}
-
-		companyBuilding, err := repository.GetBuilding(ctx, 2, 1)
-		if err != nil {
-			t.Fatalf("could not get building: %s", err)
-		}
-
-		if companyBuilding.BusyUntil == nil {
-			t.Error("should not cancel production")
-		}
-	})
-
-	t.Run("cancel production", func(t *testing.T) {
-		t.Run("should cancel production and increment stocks", func(t *testing.T) {
-			err = repository.CancelProduction(ctx, time.Now().Add(time.Hour), 1, 2, 1)
-			if err != nil {
-				t.Fatalf("could not cancel production: %s", err)
-			}
-
-			inventory, err := warehouseRepository.FetchInventory(ctx, 1)
-			if err != nil {
-				t.Fatalf("could not fetch inventory: %s", err)
-			}
-
-			for _, item := range inventory.Items {
-				if item.Resource.Id == 3 {
-					if item.Qty != 2500 {
-						t.Errorf("should have more than before: %d, %d", 2500, item.Qty)
-					}
-					if item.Cost != 999 {
-						t.Errorf("expected sourcing cost %d, got %d", 999, item.Cost)
-					}
-				}
-			}
-
-			companyBuilding, err := repository.GetBuilding(ctx, 2, 1)
-			if err != nil {
-				t.Fatalf("could not get building: %s", err)
-			}
-
-			if companyBuilding.BusyUntil != nil {
-				t.Errorf("should cancel production, got busy until: %+v", *companyBuilding.BusyUntil)
-			}
-		})
 	})
 }

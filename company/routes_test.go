@@ -4,233 +4,14 @@ import (
 	"api/auth"
 	"api/building"
 	"api/company"
-	"api/database"
-	"api/resource"
 	"api/server"
 	"api/warehouse"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 )
-
-type fakeRepository struct {
-	data      map[uint64]*company.Company
-	buildings map[uint64]map[uint64]*company.CompanyBuilding
-}
-
-func NewFakeRepository() company.Repository {
-	data := map[uint64]*company.Company{
-		1: {Id: 1, Name: "Test", Email: "admin@test.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy", AvailableCash: 720},
-	}
-
-	busyUntil := time.Now().Add(time.Minute)
-	buildings := map[uint64]map[uint64]*company.CompanyBuilding{
-		1: {
-			1: {
-				Id:        1,
-				Name:      "Plantation",
-				Level:     1,
-				WagesHour: 100,
-				AdminHour: 500,
-				Resources: []*building.BuildingResource{
-					{
-						QtyPerHours: 1000,
-						Resource: &resource.Resource{
-							Id:   1,
-							Name: "Seeds",
-							Requirements: []*resource.Item{
-								{Qty: 15, Quality: 0, Resource: &resource.Resource{Id: 2}},
-							},
-						},
-					},
-				},
-			},
-			3: {
-				Id:        3,
-				Name:      "Laboratory",
-				Level:     1,
-				WagesHour: 1000000,
-				AdminHour: 5000000,
-				Resources: []*building.BuildingResource{
-					{
-						QtyPerHours: 100,
-						Resource: &resource.Resource{
-							Id:   5,
-							Name: "Vaccine",
-							Requirements: []*resource.Item{
-								{Qty: 15, Quality: 0, Resource: &resource.Resource{Id: 2}},
-							},
-						},
-					},
-				},
-			},
-			4: {
-				Id:        4,
-				Name:      "Factory",
-				Level:     1,
-				WagesHour: 10,
-				AdminHour: 50,
-				BusyUntil: &busyUntil,
-				Resources: []*building.BuildingResource{
-					{
-						QtyPerHours: 1000,
-						Resource: &resource.Resource{
-							Id:   6,
-							Name: "Iron bar",
-							Requirements: []*resource.Item{
-								{Qty: 1500, Quality: 0, Resource: &resource.Resource{Id: 3}},
-							},
-						},
-					},
-				},
-			},
-		},
-		2: {
-			2: {
-				Id:        2,
-				Name:      "Plantation",
-				Level:     1,
-				WagesHour: 100,
-				AdminHour: 500,
-				Resources: []*building.BuildingResource{
-					{
-						QtyPerHours: 1000,
-						Resource: &resource.Resource{
-							Id:   1,
-							Name: "Seeds",
-							Requirements: []*resource.Item{
-								{Qty: 15, Quality: 0, Resource: &resource.Resource{Id: 2}},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-	return &fakeRepository{data, buildings}
-}
-
-func (r *fakeRepository) Register(ctx context.Context, registration *company.Registration) (*company.Company, error) {
-	id := uint64(len(r.data) + 1)
-	company := &company.Company{
-		Id:    id,
-		Name:  registration.Name,
-		Email: registration.Email,
-		Pass:  registration.Password,
-	}
-	r.data[id] = company
-	return r.GetById(ctx, id)
-}
-
-func (r *fakeRepository) GetById(ctx context.Context, id uint64) (*company.Company, error) {
-	return r.data[id], nil
-}
-
-func (r *fakeRepository) GetByEmail(ctx context.Context, email string) (*company.Company, error) {
-	for _, company := range r.data {
-		if company.Email == email {
-			return company, nil
-		}
-	}
-	return nil, nil
-}
-
-func (r *fakeRepository) GetBuildings(ctx context.Context, companyId uint64) ([]*company.CompanyBuilding, error) {
-	buildings := make([]*company.CompanyBuilding, 0)
-	for _, building := range r.buildings[companyId] {
-		buildings = append(buildings, building)
-	}
-	return buildings, nil
-}
-
-func (r *fakeRepository) GetBuilding(ctx context.Context, buildingId, companyId uint64) (*company.CompanyBuilding, error) {
-	buildings, ok := r.buildings[companyId]
-	if !ok {
-		return nil, nil
-	}
-
-	companyBuilding, ok := buildings[buildingId]
-	if !ok {
-		return nil, nil
-	}
-
-	resources := make([]*building.BuildingResource, 0)
-	for _, buildingResource := range companyBuilding.Resources {
-		requirements := make([]*resource.Item, 0)
-		for _, req := range buildingResource.Requirements {
-			requirements = append(requirements, &resource.Item{
-				Qty:        req.Qty,
-				Quality:    req.Quality,
-				ResourceId: req.ResourceId,
-				Resource:   req.Resource,
-			})
-		}
-
-		resources = append(resources, &building.BuildingResource{
-			Resource: &resource.Resource{
-				Id:           buildingResource.Id,
-				Name:         buildingResource.Name,
-				Requirements: requirements,
-			},
-			QtyPerHours: buildingResource.QtyPerHours,
-		})
-	}
-
-	return &company.CompanyBuilding{
-		Id:              companyBuilding.Id,
-		Name:            companyBuilding.Name,
-		WagesHour:       companyBuilding.WagesHour,
-		AdminHour:       companyBuilding.AdminHour,
-		MaintenanceHour: companyBuilding.MaintenanceHour,
-		Level:           companyBuilding.Level,
-		Position:        companyBuilding.Position,
-		BusyUntil:       companyBuilding.BusyUntil,
-		Resources:       resources,
-	}, nil
-}
-
-func (r *fakeRepository) AddBuilding(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*company.CompanyBuilding, error) {
-	id := uint64(len(r.buildings) + 1)
-	companyBuilding := &company.CompanyBuilding{
-		Id:              id,
-		Name:            building.Name,
-		Position:        &position,
-		Level:           1,
-		WagesHour:       building.WagesHour,
-		AdminHour:       building.AdminHour,
-		MaintenanceHour: building.MaintenanceHour,
-	}
-	r.buildings[companyId][id] = companyBuilding
-	return companyBuilding, nil
-}
-
-func (r *fakeRepository) Produce(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *company.CompanyBuilding, item *resource.Item, totalCost int) (*company.Production, error) {
-	finishesAt := time.Now().Add(time.Hour)
-	r.buildings[companyId][building.Id].BusyUntil = &finishesAt
-
-	return &company.Production{
-		Item:       item,
-		Id:         1,
-		FinishesAt: finishesAt,
-	}, nil
-}
-
-func (r *fakeRepository) RegisterTransaction(tx *database.DB, companyId, classificationId uint64, amount int, description string) error {
-	r.data[companyId].AvailableCash += amount
-	return nil
-}
-
-func (r *fakeRepository) CancelProduction(ctx context.Context, timestamp time.Time, productionId, buildingId, companyId uint64) error {
-	return nil
-}
-
-func (r *fakeRepository) CollectResource(ctx context.Context, timestamp time.Time, productionId, buildingId, companyId uint64) (*warehouse.StockItem, error) {
-	return nil, nil
-}
 
 func TestCompanyRoutes(t *testing.T) {
 	t.Setenv(server.JWT_SECRET_KEY, "secret")
@@ -241,10 +22,15 @@ func TestCompanyRoutes(t *testing.T) {
 	}
 
 	svr := server.NewServer()
+	svc := company.NewService(company.NewFakeRepository())
+
 	buildingSvc := building.NewService(building.NewFakeRepository())
 	warehouseSvc := warehouse.NewService(warehouse.NewFakeRepository())
-	svc := company.NewService(NewFakeRepository(), buildingSvc, warehouseSvc)
-	company.CreateEndpoints(svr, svc)
+
+	companyBuildingSvc := company.NewBuildingService(company.NewFakeBuildingRepository(), warehouseSvc, buildingSvc)
+	productionSvc := company.NewProductionService(company.NewFakeProductionRepository(), svc, companyBuildingSvc, warehouseSvc)
+
+	company.CreateEndpoints(svr, svc, companyBuildingSvc, productionSvc)
 
 	t.Run("should validate registration", func(t *testing.T) {
 		t.Parallel()
@@ -533,6 +319,7 @@ func TestCompanyRoutes(t *testing.T) {
 		if rec.Code != http.StatusUnprocessableEntity {
 			t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
 		}
+
 		if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"building is busy\"}" {
 			t.Errorf("expected building is busy, got %s", rec.Body.String())
 		}

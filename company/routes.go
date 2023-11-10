@@ -11,10 +11,10 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func CreateEndpoints(e *echo.Echo, service Service) {
+func CreateEndpoints(e *echo.Echo, service Service, building BuildingService, production ProductionService) {
 	group := e.Group("/companies")
 
-	CompanyBuildings(group, service)
+	CompanyBuildings(group, building, production)
 
 	group.GET("/:id", func(c echo.Context) error {
 		companyId, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -73,10 +73,10 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 	})
 }
 
-func CompanyBuildings(g *echo.Group, service Service) {
+func CompanyBuildings(g *echo.Group, service BuildingService, production ProductionService) {
 	group := g.Group("/:id/buildings")
 
-	BuildingProductions(group, service)
+	BuildingProductions(group, production)
 
 	group.GET("", func(c echo.Context) error {
 		companyId, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -125,7 +125,7 @@ func CompanyBuildings(g *echo.Group, service Service) {
 	})
 }
 
-func BuildingProductions(g *echo.Group, service Service) {
+func BuildingProductions(g *echo.Group, service ProductionService) {
 	group := g.Group("/:building/productions")
 
 	group.POST("", func(c echo.Context) error {

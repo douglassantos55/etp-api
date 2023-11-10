@@ -2,7 +2,6 @@ package warehouse_test
 
 import (
 	"api/database"
-	"api/resource"
 	"api/warehouse"
 	"context"
 	"testing"
@@ -170,123 +169,6 @@ func TestWarehouseRepository(t *testing.T) {
 				if item.Resource.Category.Name == "" {
 					t.Error("expected name, got empty")
 				}
-			}
-		})
-	})
-
-	t.Run("ReduceStock", func(t *testing.T) {
-		inventory, err := repository.FetchInventory(ctx, 1)
-		if err != nil {
-			t.Fatalf("could not fetch inventory: %s", err)
-		}
-
-		t.Run("same quality", func(t *testing.T) {
-			tx, err := builder.BeginTx(ctx, nil)
-			if err != nil {
-				t.Fatalf("could not begin transaction: %s", err)
-			}
-
-			defer tx.Rollback()
-
-			sourcingCost, err := repository.ReduceStock(&database.DB{TxDatabase: tx}, 1, inventory, []*resource.Item{
-				{Qty: 1300, Quality: 0, Resource: &resource.Resource{Id: 1}},
-			})
-
-			if err != nil {
-				t.Fatalf("could not reduce stocks: %s", err)
-			}
-
-			if sourcingCost != 857 {
-				t.Errorf("expected sourcing cost %d, got %d", 857, sourcingCost/100)
-			}
-
-			if err := tx.Commit(); err != nil {
-				t.Fatalf("could not commit transaction: %s", err)
-			}
-
-			inventory, err = repository.FetchInventory(ctx, 1)
-			if err != nil {
-				t.Fatalf("could not fetch inventory: %s", err)
-			}
-
-			stockLeft := inventory.GetStock(1, 0)
-			if stockLeft != 0 {
-				t.Errorf("expected %d left, got %d", 0, stockLeft)
-			}
-		})
-
-		t.Run("different qualities", func(t *testing.T) {
-			tx, err := builder.BeginTx(ctx, nil)
-			if err != nil {
-				t.Fatalf("could not begin transaction: %s", err)
-			}
-
-			defer tx.Rollback()
-
-			sourcingCost, err := repository.ReduceStock(&database.DB{TxDatabase: tx}, 1, inventory, []*resource.Item{
-				{Qty: 250, Quality: 0, Resource: &resource.Resource{Id: 2}},
-			})
-
-			if err != nil {
-				t.Fatalf("could not reduce stocks: %s", err)
-			}
-
-			if sourcingCost != 13230 {
-				t.Errorf("expected sourcing cost %d, got %d", 13230, sourcingCost/100)
-			}
-
-			if err := tx.Commit(); err != nil {
-				t.Fatalf("could not commit transaction: %s", err)
-			}
-
-			inventory, err = repository.FetchInventory(ctx, 1)
-			if err != nil {
-				t.Fatalf("could not fetch inventory: %s", err)
-			}
-
-			stockLeft := inventory.GetStock(2, 0)
-			if stockLeft != 0 {
-				t.Errorf("should have consumed everything, got %d left", stockLeft)
-			}
-
-			stockLeft = inventory.GetStock(2, 2)
-			if stockLeft != 10 {
-				t.Errorf("expected %d left, got %d", 10, stockLeft)
-			}
-		})
-
-		t.Run("higher quality", func(t *testing.T) {
-			tx, err := builder.BeginTx(ctx, nil)
-			if err != nil {
-				t.Fatalf("could not begin transaction: %s", err)
-			}
-
-			defer tx.Rollback()
-
-			sourcingCost, err := repository.ReduceStock(&database.DB{TxDatabase: tx}, 1, inventory, []*resource.Item{
-				{Qty: 100, Quality: 2, Resource: &resource.Resource{Id: 3}},
-			})
-
-			if err != nil {
-				t.Fatalf("could not reduce stocks: %s", err)
-			}
-
-			if sourcingCost != 1905 {
-				t.Errorf("expected sourcing cost %d, got %d", 1905, sourcingCost/100)
-			}
-
-			if err := tx.Commit(); err != nil {
-				t.Fatalf("could not commit transaction: %s", err)
-			}
-
-			inventory, err = repository.FetchInventory(ctx, 1)
-			if err != nil {
-				t.Fatalf("could not fetch inventory: %s", err)
-			}
-
-			stockLeft := inventory.GetStock(3, 5)
-			if stockLeft != 50 {
-				t.Errorf("expected %d left, got %d", 50, stockLeft)
 			}
 		})
 	})
