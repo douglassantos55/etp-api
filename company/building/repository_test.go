@@ -7,52 +7,158 @@ import (
 	"api/resource"
 	"api/warehouse"
 	"context"
+	"log"
+	"os"
 	"testing"
 	"time"
 )
 
-func TestBuildingRepository(t *testing.T) {
-	println("Testing Buliding Repository")
+func TestMain(t *testing.M) {
+	conn, err := database.GetConnection(database.SQLITE, "../../test.db")
+	if err != nil {
+		log.Fatalf("could not connect to database: %s", err)
+	}
 
+	tx, err := conn.DB.Begin()
+	if err != nil {
+		log.Fatalf("could not start transaction: %s", err)
+	}
+
+	defer tx.Rollback()
+
+	rows, err := tx.Query("SELECT id, name FROM companies")
+	if err != nil {
+		log.Fatalf("could not fetch companies: %s", err)
+	}
+
+	defer rows.Close()
+
+	var id uint64
+	var name string
+	for rows.Next() {
+		if err := rows.Scan(&id, &name); err != nil {
+			log.Fatalf("could not scan row: %s", err)
+		}
+		log.Printf("id: %d, name: %s", id, name)
+	}
+	if rows.Err() != nil {
+		log.Fatalf("oops: %s", rows.Err())
+	}
+
+	log.Println("STARTING SEED OF COMPANY BUILDING TEST")
+
+	if _, err := tx.Exec(`
+        INSERT INTO companies (id, name, email, password, created_at, blocked_at, deleted_at) VALUES
+        (1, "Coca-Cola", "coke@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, NULL),
+        (2, "Blocked", "blocked@email.com", "aoeu", "2023-10-22T01:11:53Z", "2023-10-22T01:11:53Z", NULL),
+        (3, "Deleted", "deleted@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, "2023-10-22T01:11:53Z")
+    `); err != nil {
+		log.Fatalf("could not seed database 1: %s", err)
+	}
+
+	if _, err := tx.Exec(`INSERT INTO categories (id, name) VALUES (1, "Construction"), (2, "Food")`); err != nil {
+		log.Fatalf("could not seed database 2: %s", err)
+	}
+
+	if _, err := tx.Exec(`
+        INSERT INTO resources (id, name, category_id)
+        VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1), (4, "Seeds", 2)
+    `); err != nil {
+		log.Fatalf("could not seed database 3: %s", err)
+	}
+
+	if _, err := tx.Exec(`
+        INSERT INTO buildings (id, name, wages_per_hour, admin_per_hour, maintenance_per_hour)
+        VALUES (1, "Plantation", 500, 1000, 200), (2, "Factory", 1500, 5000, 500)
+    `); err != nil {
+		log.Fatalf("could not seed database 4: %s", err)
+	}
+
+	if _, err := tx.Exec(`
+        INSERT INTO companies_buildings (id, name, company_id, building_id, level, demolished_at)
+        VALUES (1, "Plantation", 1, 1, 2, NULL), (2, "Factory", 1, 2, 3, NULL), (3, "Plantation", 1, 1, 1, "2023-10-25 22:36:21")
+    `); err != nil {
+		log.Fatalf("could not seed database 5: %s", err)
+	}
+
+	if _, err := tx.Exec(`
+        INSERT INTO buildings_resources (building_id, resource_id, qty_per_hour)
+        VALUES (1, 4, 1000), (2, 1, 500), (2, 3, 250)
+    `); err != nil {
+		log.Fatalf("could not seed database 6: %s", err)
+	}
+
+	if _, err := tx.Exec(`
+        INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
+        VALUES (1, 1, 50, 0), (2, 1, 150, 0)
+    `); err != nil {
+		log.Fatalf("could not seed database 7: %s", err)
+	}
+
+	if _, err := tx.Exec(`
+        INSERT INTO productions (id, resource_id, building_id, qty, quality, finishes_at, created_at, sourcing_cost)
+        VALUES (1, 3, 2, 1500, 1, '2050-11-11 11:11:11', '2023-11-09 11:11:11', 1352);
+    `); err != nil {
+		log.Fatalf("could not seed database 8: %s", err)
+	}
+
+	if _, err := tx.Exec(`
+        INSERT INTO inventories (company_id, resource_id, quantity, quality, sourcing_cost)
+        VALUES (1, 1, 100, 0, 137), (1, 3, 1000, 1, 470), (1, 2, 700, 0, 1553)
+    `); err != nil {
+		log.Fatalf("could not seed database 9: %s", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Fatalf("could not commit transaction: %s", err)
+	}
+
+	exitCode := t.Run()
+
+	os.Exit(exitCode)
+}
+
+func TestBuildingRepository(t *testing.T) {
 	conn, err := database.GetConnection(database.SQLITE, "../../test.db")
 	if err != nil {
 		t.Fatalf("could not connect to database: %s", err)
 	}
 
-	_, err = conn.DB.Exec(`
-        INSERT INTO companies (id, name, email, password, created_at, blocked_at, deleted_at) VALUES
-        (1, "Coca-Cola", "coke@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, NULL),
-        (2, "Blocked", "blocked@email.com", "aoeu", "2023-10-22T01:11:53Z", "2023-10-22T01:11:53Z", NULL),
-        (3, "Deleted", "deleted@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, "2023-10-22T01:11:53Z");
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
-        INSERT INTO categories (id, name) VALUES (1, "Construction"), (2, "Food");
+	t.Cleanup(func() {
+		cancel()
 
-        INSERT INTO resources (id, name, category_id)
-        VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1), (4, "Seeds", 2);
+		log.Println("CLEARING UP SEED OF COMPANY BUILDING TEST")
 
-        INSERT INTO buildings (id, name, wages_per_hour, admin_per_hour, maintenance_per_hour)
-        VALUES (1, "Plantation", 500, 1000, 200), (2, "Factory", 1500, 5000, 500);
-
-        INSERT INTO companies_buildings (id, name, company_id, building_id, level, demolished_at)
-        VALUES (1, "Plantation", 1, 1, 2, NULL), (2, "Factory", 1, 2, 3, NULL), (3, "Plantation", 1, 1, 1, "2023-10-25 22:36:21");
-
-        INSERT INTO buildings_resources (building_id, resource_id, qty_per_hour)
-        VALUES (1, 4, 1000), (2, 1, 500), (2, 3, 250);
-
-        INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
-        VALUES (1, 1, 50, 0), (2, 1, 150, 0);
-
-        INSERT INTO productions (id, resource_id, building_id, qty, quality, finishes_at, created_at, sourcing_cost)
-        VALUES (1, 3, 2, 1500, 1, '2050-11-11 11:11:11', '2023-11-09 11:11:11', 1352);
-
-        INSERT INTO inventories (company_id, resource_id, quantity, quality, sourcing_cost)
-        VALUES (1, 1, 100, 0, 137), (1, 3, 1000, 1, 470), (1, 2, 700, 0, 1553);
-    `)
-	if err != nil {
-		t.Fatalf("could not seed database: %s", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		if _, err := conn.DB.Exec("DELETE FROM inventories"); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec("DELETE FROM productions"); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec("DELETE FROM buildings_requirements"); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec("DELETE FROM buildings_resources"); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec("DELETE FROM companies_buildings"); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec("DELETE FROM buildings"); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec("DELETE FROM resources"); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec("DELETE FROM categories"); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec("DELETE FROM companies"); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+	})
 
 	resourceRepo := resource.NewRepository(conn)
 	warehouseRepo := warehouse.NewRepository(conn)
@@ -60,8 +166,6 @@ func TestBuildingRepository(t *testing.T) {
 
 	t.Run("GetAll", func(t *testing.T) {
 		t.Run("should return empty list when no buildings are found", func(t *testing.T) {
-			t.Parallel()
-
 			buildings, err := repository.GetAll(ctx, 100)
 			if err != nil {
 				t.Fatalf("could not fetch buildings: %s", err)
@@ -77,8 +181,6 @@ func TestBuildingRepository(t *testing.T) {
 		})
 
 		t.Run("should ignore demolished buildings", func(t *testing.T) {
-			t.Parallel()
-
 			buildings, err := repository.GetAll(ctx, 1)
 			if err != nil {
 				t.Fatalf("could not fetch buildings: %s", err)
@@ -99,8 +201,6 @@ func TestBuildingRepository(t *testing.T) {
 		})
 
 		t.Run("should list buildings with resources", func(t *testing.T) {
-			t.Parallel()
-
 			buildings, err := repository.GetAll(ctx, 1)
 			if err != nil {
 				t.Fatalf("could not get buildings: %s", err)
@@ -174,8 +274,6 @@ func TestBuildingRepository(t *testing.T) {
 
 	t.Run("GetById", func(t *testing.T) {
 		t.Run("should get building with resources", func(t *testing.T) {
-			t.Parallel()
-
 			building, err := repository.GetById(ctx, 2, 1)
 			if err != nil {
 				t.Fatalf("could not get building: %s", err)
@@ -222,8 +320,6 @@ func TestBuildingRepository(t *testing.T) {
 		})
 
 		t.Run("should ignore demolished", func(t *testing.T) {
-			t.Parallel()
-
 			building, err := repository.GetById(ctx, 3, 1)
 			if err != nil {
 				t.Fatalf("could not get building: %s", err)
@@ -273,22 +369,4 @@ func TestBuildingRepository(t *testing.T) {
 			}
 		})
 	})
-
-	cancel()
-
-	if _, err := conn.DB.Exec(`
-            DELETE FROM inventories;
-            DELETE FROM productions;
-            DELETE FROM buildings_requirements;
-            DELETE FROM buildings_resources;
-            DELETE FROM companies_buildings;
-            DELETE FROM buildings;
-            DELETE FROM resources;
-            DELETE FROM categories;
-            DELETE FROM companies;
-        `); err != nil {
-		t.Fatalf("could not cleanup: %s", err)
-	}
-
-	println("DONE Testing Buliding Repository")
 }

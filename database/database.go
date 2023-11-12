@@ -22,12 +22,17 @@ type DB struct {
 	*goqu.TxDatabase
 }
 
+var connection *Connection
+
 // Establishes and returns a connection to the database. If a connection
 // is already established, it is reused.
 func GetConnection(driver, connectionUrl string) (*Connection, error) {
-	conn, err := sql.Open(driver, connectionUrl)
-	if err != nil {
-		return nil, err
+	if connection == nil {
+		conn, err := sql.Open(driver, connectionUrl)
+		if err != nil {
+			return nil, err
+		}
+		connection = &Connection{driver, conn}
 	}
-	return &Connection{driver, conn}, nil
+	return connection, nil
 }

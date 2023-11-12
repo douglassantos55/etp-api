@@ -5,63 +5,81 @@ import (
 	"api/database"
 	"api/resource"
 	"context"
+	"log"
+	"os"
 	"testing"
 	"time"
 )
 
-func TestBuildingRepository(t *testing.T) {
+func TestMain(t *testing.M) {
 	conn, err := database.GetConnection(database.SQLITE, "../test.db")
 	if err != nil {
-		t.Fatalf("could not connect to database: %s", err)
+		log.Fatalf("could not connect to database: %s", err)
 	}
 
 	tx, err := conn.DB.Begin()
 	if err != nil {
-		t.Fatalf("could not start transaction: %s", err)
+		log.Fatalf("could not start transaction: %s", err)
 	}
 
+	defer tx.Rollback()
+
+	tx.Exec(`INSERT INTO categories (id, name) VALUES (1, "Construction"), (2, "Food")`)
+
 	tx.Exec(`
-        INSERT INTO categories (id, name) VALUES (1, "Construction"), (2, "Food");
-
         INSERT INTO resources (id, name, category_id)
-        VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1), (4, "Seeds", 2);
+        VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1), (4, "Seeds", 2)
+    `)
 
-        INSERT INTO buildings (id, name) VALUES (1, "Plantation"), (2, "Factory");
+	tx.Exec(`INSERT INTO buildings (id, name) VALUES (1, "Plantation"), (2, "Factory")`)
 
+	tx.Exec(`
         INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
-        VALUES (1, 1, 500, 0), (1, 2, 1000, 0), (1, 3, 100, 1), (2, 1, 1000, 1), (2, 2, 5000, 1);
+        VALUES (1, 1, 500, 0), (1, 2, 1000, 0), (1, 3, 100, 1), (2, 1, 1000, 1), (2, 2, 5000, 1)
+    `)
 
+	tx.Exec(`
         INSERT INTO buildings_resources (building_id, resource_id, qty_per_hour)
-        VALUES (1, 4, 1000), (2, 1, 250), (2, 3, 100);
+        VALUES (1, 4, 1000), (2, 1, 250), (2, 3, 100)
     `)
 
 	if err := tx.Commit(); err != nil {
-		t.Fatalf("could not commit transaction: %s", err)
+		log.Fatalf("could not commit transaction: %s", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	exitCode := t.Run()
 
-	t.Cleanup(func() {
-		cancel()
+	tx, err = conn.DB.Begin()
+	if err != nil {
+		log.Fatalf("could not start transaction: %s", err)
+	}
 
-		_, err := conn.DB.Exec(`
-            DELETE FROM buildings_resources;
-            DELETE FROM buildings_requirements;
-            DELETE FROM resources;
-            DELETE FROM buildings;
-            DELETE FROM categories;
-        `)
+	tx.Exec("DELETE FROM buildings_resources")
+	tx.Exec("DELETE FROM buildings_requirements")
+	tx.Exec("DELETE FROM resources")
+	tx.Exec("DELETE FROM buildings")
+	tx.Exec("DELETE FROM categories")
 
-		if err != nil {
-			t.Fatalf("could not cleanup database: %s", err)
-		}
-	})
+	if err := tx.Commit(); err != nil {
+		log.Fatalf("could not commit transaction: %s", err)
+	}
+
+	os.Exit(exitCode)
+}
+
+func TestBuildingRepository(t *testing.T) {
+	conn, err := database.GetConnection(database.SQLITE, "../test.db")
+	if err != nil {
+		log.Fatalf("could not connect to database: %s", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	t.Cleanup(cancel)
 
 	repository := building.NewRepository(conn, resource.NewRepository(conn))
 
 	t.Run("should list all", func(t *testing.T) {
-		t.Parallel()
-
 		buildings, err := repository.GetAll(ctx)
 		if err != nil {
 			t.Fatalf("could not fetch buildings: %s", err)
@@ -102,8 +120,6 @@ func TestBuildingRepository(t *testing.T) {
 	})
 
 	t.Run("should return nil if not found", func(t *testing.T) {
-		t.Parallel()
-
 		building, err := repository.GetById(ctx, 999)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
@@ -115,15 +131,13 @@ func TestBuildingRepository(t *testing.T) {
 	})
 
 	t.Run("should return with requirements", func(t *testing.T) {
-		t.Parallel()
-
 		building, err := repository.GetById(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not get building: %s", err)
 		}
 
 		if building == nil {
-			t.Error("could not get building")
+			t.Fatal("could not get building")
 		}
 
 		if len(building.Requirements) != 3 {

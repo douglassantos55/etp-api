@@ -4,9 +4,60 @@ import (
 	"api/database"
 	"api/resource"
 	"context"
+	"log"
+	"os"
 	"testing"
 	"time"
 )
+
+func TestMain(t *testing.M) {
+	conn, err := database.GetConnection(database.SQLITE, "../test.db")
+	if err != nil {
+		log.Fatalf("could not connect to database: %s", err)
+	}
+
+	tx, err := conn.DB.Begin()
+	if err != nil {
+		log.Fatalf("could not start transaction: %s", err)
+	}
+
+	defer tx.Rollback()
+
+	tx.Exec(`INSERT INTO categories (id, name) VALUES (1, "Food")`)
+
+	tx.Exec(`
+        INSERT INTO resources (id, name, category_id)
+        VALUES (1, "Water", 1), (2, "Seeds", 1), (3, "Apple", 1)
+    `)
+
+	tx.Exec(`
+        INSERT INTO resources_requirements (resource_id, requirement_id, qty, quality)
+        VALUES (2, 1, 5, 0), (3, 1, 10, 0), (3, 2, 2, 0)
+    `)
+
+	if err := tx.Commit(); err != nil {
+		log.Fatalf("could not commit transaction: %s", err)
+	}
+
+	exitCode := t.Run()
+
+	tx, err = conn.DB.Begin()
+	if err != nil {
+		log.Fatalf("could not start transaction: %s", err)
+	}
+
+	defer tx.Rollback()
+
+	tx.Exec("DELETE FROM resources_requirements")
+	tx.Exec("DELETE FROM resources")
+	tx.Exec("DELETE FROM categories")
+
+	if err := tx.Commit(); err != nil {
+		log.Fatalf("could not commit transaction: %s", err)
+	}
+
+	os.Exit(exitCode)
+}
 
 func TestResourceRepository(t *testing.T) {
 	conn, err := database.GetConnection(database.SQLITE, "../test.db")
@@ -14,38 +65,15 @@ func TestResourceRepository(t *testing.T) {
 		t.Fatalf("could not connect to database: %s", err)
 	}
 
-	_, err = conn.DB.Exec(`
-        INSERT INTO categories (id, name) VALUES (1, "Food");
-
-        INSERT INTO resources (id, name, category_id)
-        VALUES (1, "Water", 1), (2, "Seeds", 1), (3, "Apple", 1);
-
-        INSERT INTO resources_requirements (resource_id, requirement_id, qty, quality)
-        VALUES (2, 1, 5, 0), (3, 1, 10, 0), (3, 2, 2, 0);
-    `)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	repository := resource.NewRepository(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	t.Cleanup(func() {
 		cancel()
-
-		if _, err := conn.DB.Exec(`
-            DELETE FROM resources_requirements;
-            DELETE FROM resources;
-            DELETE FROM categories;
-        `); err != nil {
-			t.Fatalf("could not truncate table: %s", err)
-		}
 	})
 
 	t.Run("should list with requirements", func(t *testing.T) {
-		t.Parallel()
-
 		resources, err := repository.FetchResources(ctx)
 		if err != nil {
 			t.Fatalf("could not fetch resources: %s", err)
@@ -65,8 +93,6 @@ func TestResourceRepository(t *testing.T) {
 	})
 
 	t.Run("should return nil when not found", func(t *testing.T) {
-		t.Parallel()
-
 		resource, err := repository.GetById(ctx, 5153)
 		if err != nil {
 			t.Fatalf("could not get by id: %s", err)
@@ -77,8 +103,6 @@ func TestResourceRepository(t *testing.T) {
 	})
 
 	t.Run("should return instance if found", func(t *testing.T) {
-		t.Parallel()
-
 		resource, err := repository.GetById(ctx, 3)
 		if err != nil {
 			t.Fatalf("could not get by id: %s", err)

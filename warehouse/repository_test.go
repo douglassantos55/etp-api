@@ -4,11 +4,58 @@ import (
 	"api/database"
 	"api/warehouse"
 	"context"
+	"log"
+	"os"
 	"testing"
 	"time"
-
-	"github.com/doug-martin/goqu/v9"
 )
+
+func TestMain(t *testing.M) {
+	conn, err := database.GetConnection(database.SQLITE, "../test.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tx, err := conn.DB.Begin()
+	if err != nil {
+		log.Fatalf("could not start transaction: %s", err)
+	}
+
+	tx.Exec(`INSERT INTO categories (id, name) VALUES (1, "Food"), (2, "Infrastructure")`)
+
+	tx.Exec(`
+        INSERT INTO resources (id, name, category_id)
+        VALUES (1, "Wood", 2), (2, "Window", 2), (3, "Tools", 2)
+    `)
+
+	tx.Exec(`
+        INSERT INTO inventories (company_id, resource_id, quantity, quality, sourcing_cost)
+        VALUES (1, 1, 1300, 0, 857), (1, 2, 130, 0, 10830), (1, 2, 130, 2, 15830), (1, 1, 150, 1, 905), (1, 3, 150, 5, 1905)
+    `)
+
+	if err := tx.Commit(); err != nil {
+		log.Fatalf("could not commit transaction: %s", err)
+	}
+
+	exitCode := t.Run()
+
+	tx, err = conn.DB.Begin()
+	if err != nil {
+		log.Fatalf("could not start transaction: %s", err)
+	}
+
+	defer tx.Rollback()
+
+	tx.Exec("DELETE FROM inventories")
+	tx.Exec("DELETE FROM resources")
+	tx.Exec("DELETE FROM categories")
+
+	if err := tx.Commit(); err != nil {
+		log.Fatalf("could not commit transaction: %s", err)
+	}
+
+	os.Exit(exitCode)
+}
 
 func TestWarehouseRepository(t *testing.T) {
 	conn, err := database.GetConnection(database.SQLITE, "../test.db")
@@ -16,72 +63,17 @@ func TestWarehouseRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	builder := goqu.New(conn.Driver, conn.DB)
-
-	err = builder.WithTx(func(td *goqu.TxDatabase) error {
-		_, err := td.Insert("categories").Rows(
-			goqu.Record{"id": 1, "name": "Food"},
-			goqu.Record{"id": 2, "name": "Infrastructure"},
-		).Executor().Exec()
-
-		if err != nil {
-			return err
-		}
-
-		_, err = td.Insert("resources").Rows(
-			goqu.Record{"id": 1, "name": "Wood", "category_id": 2},
-			goqu.Record{"id": 2, "name": "Window", "category_id": 2},
-			goqu.Record{"id": 3, "name": "Tools", "category_id": 2},
-		).Executor().Exec()
-
-		if err != nil {
-			return err
-		}
-
-		_, err = td.Insert("inventories").Rows(
-			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 1300, "quality": 0, "sourcing_cost": 857},
-			goqu.Record{"company_id": 1, "resource_id": 2, "quantity": 130, "quality": 0, "sourcing_cost": 10830},
-			goqu.Record{"company_id": 1, "resource_id": 2, "quantity": 130, "quality": 2, "sourcing_cost": 15830},
-			goqu.Record{"company_id": 1, "resource_id": 1, "quantity": 150, "quality": 1, "sourcing_cost": 905},
-			goqu.Record{"company_id": 1, "resource_id": 3, "quantity": 150, "quality": 5, "sourcing_cost": 1905},
-		).Executor().Exec()
-
-		return err
-	})
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	t.Cleanup(func() {
 		cancel()
 
-		err := builder.WithTx(func(td *goqu.TxDatabase) error {
-			if _, err := td.Delete("inventories").Executor().Exec(); err != nil {
-				return err
-			}
-
-			if _, err := td.Delete("resources").Executor().Exec(); err != nil {
-				return err
-			}
-
-			_, err := td.Delete("categories").Executor().Exec()
-			return err
-		})
-
-		if err != nil {
-			t.Fatal(err)
-		}
 	})
 
 	repository := warehouse.NewRepository(conn)
 
 	t.Run("FetchInventory", func(t *testing.T) {
 		t.Run("should return empty list", func(t *testing.T) {
-			t.Parallel()
-
 			resources, err := repository.FetchInventory(ctx, 2)
 			if err != nil {
 				t.Fatal(err)
@@ -95,8 +87,6 @@ func TestWarehouseRepository(t *testing.T) {
 		})
 
 		t.Run("should list inventory grouped by resource/quality", func(t *testing.T) {
-			t.Parallel()
-
 			items, err := repository.FetchInventory(ctx, 1)
 			if err != nil {
 				t.Fatal(err)
@@ -151,8 +141,6 @@ func TestWarehouseRepository(t *testing.T) {
 		})
 
 		t.Run("should include resource category", func(t *testing.T) {
-			t.Parallel()
-
 			items, err := repository.FetchInventory(ctx, 1)
 			if err != nil {
 				t.Fatal(err)
