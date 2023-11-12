@@ -31,8 +31,6 @@ func TestMain(t *testing.M) {
 	productionEnd := time.Now().Add(1 * time.Hour).UTC().Format("2006-01-02 15:04:05")
 	productionStart := time.Now().Add(-1 * time.Hour).UTC().Format("2006-01-02 15:04:05")
 
-	log.Println("STARTING SEED OF PRODUCTION TEST")
-
 	if _, err := tx.Exec(`
         INSERT INTO companies (id, name, email, password, created_at, blocked_at, deleted_at) VALUES
         (1, "Coca-Cola", "coke@email.com", "aoeu", "2023-10-22T01:11:53Z", NULL, NULL),
@@ -118,8 +116,6 @@ func TestProductionRepository(t *testing.T) {
 
 	t.Cleanup(func() {
 		cancel()
-
-		log.Println("CLEARING UP SEED OF PRODUCTION TEST")
 
 		if _, err := conn.DB.Exec("DELETE FROM inventories"); err != nil {
 			log.Fatalf("could not cleanup database: %s", err)

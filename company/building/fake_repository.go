@@ -73,11 +73,12 @@ func NewFakeBuildingRepository() BuildingRepository {
 		},
 		2: {
 			2: {
-				Id:        2,
-				Name:      "Plantation",
-				Level:     1,
-				WagesHour: 100,
-				AdminHour: 500,
+				Id:          2,
+				Name:        "Plantation",
+				Level:       1,
+				WagesHour:   100,
+				AdminHour:   500,
+				CompletesAt: &busyUntil,
 				Resources: []*building.BuildingResource{
 					{
 						QtyPerHours: 1000,

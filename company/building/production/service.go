@@ -87,6 +87,10 @@ func (s *productionService) Produce(ctx context.Context, companyId, buildingId u
 		return nil, server.NewBusinessRuleError("building is busy")
 	}
 
+	if buildingToProduce.CompletesAt != nil {
+		return nil, server.NewBusinessRuleError("building is not ready")
+	}
+
 	inventory, err := s.warehouseSvc.GetInventory(ctx, companyId)
 	if err != nil {
 		return nil, err

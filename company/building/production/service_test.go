@@ -62,6 +62,18 @@ func TestProductionService(t *testing.T) {
 			}
 		})
 
+		t.Run("should not produce on downtime building", func(t *testing.T) {
+			_, err := service.Produce(ctx, 2, 2, &resource.Item{
+				Qty:      1,
+				Quality:  0,
+				Resource: &resource.Resource{Id: 1},
+			})
+
+			if err.Error() != "building is not ready" {
+				t.Errorf("expected building is not ready, got %s", err)
+			}
+		})
+
 		t.Run("should set finishes at and reduce stock", func(t *testing.T) {
 			production, err := service.Produce(ctx, 1, 1, &resource.Item{
 				Qty:      1,
