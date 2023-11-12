@@ -31,7 +31,7 @@ func TestMain(t *testing.M) {
         VALUES (1, "Metal", 1), (2, "Concrete", 1), (3, "Glass", 1), (4, "Seeds", 2)
     `)
 
-	tx.Exec(`INSERT INTO buildings (id, name) VALUES (1, "Plantation"), (2, "Factory")`)
+	tx.Exec(`INSERT INTO buildings (id, name, downtime) VALUES (1, "Plantation", 60), (2, "Factory", 120)`)
 
 	tx.Exec(`
         INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
@@ -101,6 +101,14 @@ func TestBuildingRepository(t *testing.T) {
 				if len(building.Resources) != 1 {
 					t.Errorf("expected %d resources, got %d", 1, len(building.Resources))
 				}
+
+				if building.Downtime == nil {
+					t.Error("expected downtime")
+				} else {
+					if *building.Downtime != 60 {
+						t.Errorf("expected downtime of %d minutes, got %+v", 60, building.Downtime)
+					}
+				}
 			}
 			if building.Id == 2 {
 				if len(building.Requirements) != 2 {
@@ -109,6 +117,15 @@ func TestBuildingRepository(t *testing.T) {
 				if len(building.Resources) != 2 {
 					t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
 				}
+
+				if building.Downtime == nil {
+					t.Error("expected downtime")
+				} else {
+					if *building.Downtime != 120 {
+						t.Errorf("expected downtime of %d minutes, got %+v", 120, building.Downtime)
+					}
+				}
+
 				for _, resource := range building.Resources {
 					if resource.Name == "" {
 						t.Error("should have a name")

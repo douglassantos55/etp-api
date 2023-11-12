@@ -1,6 +1,7 @@
 CREATE TABLE IF NOT EXISTS `buildings` (
     `id` INTEGER PRIMARY KEY AUTOINCREMENT,
     `name` VARCHAR(255) NOT NULL,
+    `downtime` INTEGER DEFAULT NULL,
     `wages_per_hour` INTEGER UNSIGNED DEFAULT 0,
     `admin_per_hour` INTEGER UNSIGNED DEFAULT 0,
     `maintenance_per_hour` INTEGER UNSIGNED DEFAULT 0,

@@ -35,6 +35,7 @@ func (r *goquRepository) GetAll(ctx context.Context) ([]*Building, error) {
 		Select(
 			goqu.I("id"),
 			goqu.I("name"),
+			goqu.I("downtime"),
 			goqu.I("wages_per_hour"),
 			goqu.I("admin_per_hour"),
 			goqu.I("maintenance_per_hour"),
@@ -72,6 +73,7 @@ func (r *goquRepository) GetById(ctx context.Context, id uint64) (*Building, err
 		Select(
 			goqu.I("id"),
 			goqu.I("name"),
+			goqu.I("downtime"),
 			goqu.I("wages_per_hour"),
 			goqu.I("admin_per_hour"),
 			goqu.I("maintenance_per_hour"),
