@@ -8,6 +8,7 @@ import (
 	"api/warehouse"
 	"context"
 	"log"
+	"math"
 	"os"
 	"testing"
 	"time"
@@ -25,27 +26,6 @@ func TestMain(t *testing.M) {
 	}
 
 	defer tx.Rollback()
-
-	rows, err := tx.Query("SELECT id, name FROM companies")
-	if err != nil {
-		log.Fatalf("could not fetch companies: %s", err)
-	}
-
-	defer rows.Close()
-
-	var id uint64
-	var name string
-	for rows.Next() {
-		if err := rows.Scan(&id, &name); err != nil {
-			log.Fatalf("could not scan row: %s", err)
-		}
-		log.Printf("id: %d, name: %s", id, name)
-	}
-	if rows.Err() != nil {
-		log.Fatalf("oops: %s", rows.Err())
-	}
-
-	log.Println("STARTING SEED OF COMPANY BUILDING TEST")
 
 	if _, err := tx.Exec(`
         INSERT INTO companies (id, name, email, password, created_at, blocked_at, deleted_at) VALUES
@@ -128,8 +108,6 @@ func TestBuildingRepository(t *testing.T) {
 
 	t.Cleanup(func() {
 		cancel()
-
-		log.Println("CLEARING UP SEED OF COMPANY BUILDING TEST")
 
 		if _, err := conn.DB.Exec("DELETE FROM inventories"); err != nil {
 			t.Fatalf("could not cleanup database: %s", err)
@@ -333,9 +311,12 @@ func TestBuildingRepository(t *testing.T) {
 
 	t.Run("AddBuilding", func(t *testing.T) {
 		t.Run("should insert building", func(t *testing.T) {
+			downtime := uint8(90)
+
 			plantation := &building.Building{
-				Id:   1,
-				Name: "Plantation",
+				Id:       1,
+				Name:     "Plantation",
+				Downtime: &downtime,
 				Requirements: []*resource.Item{
 					{ResourceId: 1, Qty: 50, Quality: 0, Resource: &resource.Resource{Id: 1}},
 				},
@@ -350,22 +331,35 @@ func TestBuildingRepository(t *testing.T) {
 				t.Fatal("could not fetch inventory")
 			}
 
-			building, err := repository.AddBuilding(ctx, 1, inventory, plantation, 1)
+			buildingConstructed, err := repository.AddBuilding(ctx, 1, inventory, plantation, 1)
 			if err != nil {
 				t.Fatalf("could not insert building: %s", err)
 			}
 
-			if building == nil {
-				t.Fatal("expected building, got nil")
+			if buildingConstructed == nil {
+				t.Fatal("could not find building")
 			}
-			if *building.Position != 1 {
-				t.Errorf("expected position %d, got %d", 1, building.Position)
+
+			if buildingConstructed.CompletesAt == nil {
+				t.Fatalf("should have set downtime")
 			}
-			if building.Level != 1 {
-				t.Errorf("expected level %d, got %d", 1, building.Level)
+			if buildingConstructed.CompletesAt.IsZero() {
+				t.Error("should have set a proper downtime")
 			}
-			if building.Name != "Plantation" {
-				t.Errorf("expected name %s, got %s", "Plantation", building.Name)
+
+			diff := math.Round(buildingConstructed.CompletesAt.Sub(time.Now()).Minutes())
+			if diff != float64(downtime) {
+				t.Errorf("expected downtime to be %d, got %f", downtime, diff)
+			}
+
+			if *buildingConstructed.Position != 1 {
+				t.Errorf("expected position %d, got %d", 1, buildingConstructed.Position)
+			}
+			if buildingConstructed.Level != 1 {
+				t.Errorf("expected level %d, got %d", 1, buildingConstructed.Level)
+			}
+			if buildingConstructed.Name != "Plantation" {
+				t.Errorf("expected name %s, got %s", "Plantation", buildingConstructed.Name)
 			}
 		})
 	})

@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS `companies_buildings` (
     `level` TINYINT UNSIGNED DEFAULT 1,
     `position` TINYINT UNSIGNED DEFAULT NULL,
     `built_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `completes_at` TIMESTAMP DEFAULT NULL,
     `demolished_at` TIMESTAMP DEFAULT NULL,
     FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`),
     FOREIGN KEY (`building_id`) REFERENCES `buildings`(`id`)

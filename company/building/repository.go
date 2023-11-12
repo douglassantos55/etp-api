@@ -6,6 +6,7 @@ import (
 	"api/resource"
 	"api/warehouse"
 	"context"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 )
@@ -94,10 +95,11 @@ func (r *buildingRepository) AddBuilding(ctx context.Context, companyId uint64, 
 	result, err := tx.
 		Insert(goqu.T("companies_buildings")).
 		Rows(goqu.Record{
-			"position":    position,
-			"company_id":  companyId,
-			"building_id": buildingToConstruct.Id,
-			"name":        buildingToConstruct.Name,
+			"position":     position,
+			"company_id":   companyId,
+			"building_id":  buildingToConstruct.Id,
+			"name":         buildingToConstruct.Name,
+			"completes_at": time.Now().Add(time.Minute * time.Duration(*buildingToConstruct.Downtime)),
 		}).
 		Executor().
 		Exec()
@@ -157,6 +159,7 @@ func (r *buildingRepository) getSelectDataset() *goqu.SelectDataset {
 		Select(
 			goqu.I("cb.id"),
 			goqu.I("cb.name"),
+			goqu.I("cb.completes_at"),
 			goqu.I("bp.finishes_at").As("busy_until"),
 			goqu.L("? * ?", goqu.I("b.wages_per_hour"), goqu.I("cb.level")).As("wages_per_hour"),
 			goqu.L("? * ?", goqu.I("b.admin_per_hour"), goqu.I("cb.level")).As("admin_per_hour"),

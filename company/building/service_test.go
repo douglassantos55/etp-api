@@ -193,7 +193,7 @@ func TestBuildingService(t *testing.T) {
 			}
 		})
 
-		t.Run("should reduce stocks", func(t *testing.T) {
+		t.Run("should reduce stocks and set construction downtime", func(t *testing.T) {
 			_, err := service.AddBuilding(ctx, 1, 1, 1)
 			if err != nil {
 				t.Fatalf("could not add building: %s", err)

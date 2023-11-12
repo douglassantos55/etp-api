@@ -31,6 +31,7 @@ type (
 		Position        *uint8 `db:"position" json:"position"`
 		Resources       []*building.BuildingResource
 		BusyUntil       *time.Time `db:"busy_until" json:"busy_until"`
+		CompletesAt     *time.Time `db:"completes_at" json:"completes_at"`
 	}
 
 	buildingService struct {
