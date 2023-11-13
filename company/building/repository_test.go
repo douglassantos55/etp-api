@@ -363,4 +363,22 @@ func TestBuildingRepository(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("Demolish", func(t *testing.T) {
+		t.Run("demolish", func(t *testing.T) {
+			err := repository.Demolish(ctx, 1, 2)
+			if err != nil {
+				t.Fatalf("could not demolish building: %s", err)
+			}
+
+			buildingFound, err := repository.GetById(ctx, 2, 1)
+			if err != nil {
+				t.Fatalf("could get building: %s", err)
+			}
+
+			if buildingFound != nil {
+				t.Error("should not find demolished building")
+			}
+		})
+	})
 }

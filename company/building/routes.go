@@ -60,5 +60,33 @@ func CreateEndpoints(e *echo.Echo, service BuildingService, companySvc company.S
 		return c.JSON(http.StatusCreated, companyBuilding)
 	})
 
+	group.DELETE("/:buildingId", func(c echo.Context) error {
+		companyId, err := strconv.ParseUint(c.Param("id"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+
+		buildingId, err := strconv.ParseUint(c.Param("buildingId"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err)
+		}
+
+		authenticated, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		if companyId != authenticated {
+			return echo.NewHTTPError(http.StatusUnauthorized)
+		}
+
+		err = service.Demolish(c.Request().Context(), companyId, buildingId)
+		if err != nil {
+			return err
+		}
+
+		return c.NoContent(http.StatusOK)
+	})
+
 	return group
 }

@@ -219,4 +219,22 @@ func TestBuildingService(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("demolish", func(t *testing.T) {
+		t.Run("cannot demolish non existing building", func(t *testing.T) {
+			err := service.Demolish(ctx, 1, 452)
+			expectedError := "building not found"
+			if err.Error() != expectedError {
+				t.Errorf("expected error %s, got %s", expectedError, err)
+			}
+        })
+
+		t.Run("cannot demolish busy building", func(t *testing.T) {
+			err := service.Demolish(ctx, 1, 4)
+			expectedError := "cannot demolish busy building"
+			if err.Error() != expectedError {
+				t.Errorf("expected error %s, got %s", expectedError, err)
+			}
+		})
+	})
 }

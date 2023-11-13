@@ -146,3 +146,9 @@ func (r *fakeBuildingRepository) AddBuilding(ctx context.Context, companyId uint
 	r.data[companyId][id] = companyBuilding
 	return companyBuilding, nil
 }
+
+func (r *fakeBuildingRepository) Demolish(ctx context.Context, companyId, buildingId uint64) error {
+	companyBuildings := r.data[companyId]
+	delete(companyBuildings, buildingId)
+	return nil
+}

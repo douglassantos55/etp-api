@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/doug-martin/goqu/v9"
+	"github.com/doug-martin/goqu/v9/exp"
 )
 
 type (
@@ -16,6 +17,7 @@ type (
 		GetAll(ctx context.Context, companyId uint64) ([]*CompanyBuilding, error)
 		GetById(ctx context.Context, buildingId, companyId uint64) (*CompanyBuilding, error)
 		AddBuilding(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error)
+		Demolish(ctx context.Context, companyId, building uint64) error
 	}
 
 	buildingRepository struct {
@@ -34,10 +36,7 @@ func (r *buildingRepository) GetAll(ctx context.Context, companyId uint64) ([]*C
 	buildings := make([]*CompanyBuilding, 0)
 
 	err := r.getSelectDataset().
-		Where(goqu.And(
-			goqu.I("cb.company_id").Eq(companyId),
-			goqu.I("cb.demolished_at").IsNull(),
-		)).
+		Where(r.getSelectConditions(companyId)).
 		ScanStructsContext(ctx, &buildings)
 
 	if err != nil {
@@ -60,9 +59,9 @@ func (r *buildingRepository) GetById(ctx context.Context, id, companyId uint64) 
 
 	found, err := r.getSelectDataset().
 		Where(goqu.And(
-			goqu.I("cb.id").Eq(id),
-			goqu.I("cb.company_id").Eq(companyId),
-			goqu.I("cb.demolished_at").IsNull(),
+			r.getSelectConditions(companyId).Append(
+				goqu.I("cb.id").Eq(id),
+			),
 		)).
 		ScanStructContext(ctx, building)
 
@@ -118,6 +117,20 @@ func (r *buildingRepository) AddBuilding(ctx context.Context, companyId uint64, 
 	}
 
 	return r.GetById(ctx, uint64(id), companyId)
+}
+
+func (r *buildingRepository) Demolish(ctx context.Context, companyId, buildingId uint64) error {
+	_, err := r.builder.
+		Update(goqu.T("companies_buildings")).
+		Set(goqu.Record{"demolished_at": time.Now()}).
+		Where(goqu.And(
+			goqu.I("id").Eq(buildingId),
+			goqu.I("company_id").Eq(companyId),
+		)).
+		Executor().
+		Exec()
+
+	return err
 }
 
 func (r *buildingRepository) getResources(ctx context.Context, buildingId uint64) ([]*building.BuildingResource, error) {
@@ -187,4 +200,11 @@ func (r *buildingRepository) getSelectDataset() *goqu.SelectDataset {
 				),
 			),
 		)
+}
+
+func (r *buildingRepository) getSelectConditions(companyId uint64) exp.ExpressionList {
+	return goqu.And(
+		goqu.I("cb.company_id").Eq(companyId),
+		goqu.I("cb.demolished_at").IsNull(),
+	)
 }

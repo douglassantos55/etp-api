@@ -14,6 +14,7 @@ type (
 		GetBuilding(ctx context.Context, companyId, buildingId uint64) (*CompanyBuilding, error)
 		GetBuildings(ctx context.Context, companyId uint64) ([]*CompanyBuilding, error)
 		AddBuilding(ctx context.Context, companyId, buildingId uint64, position uint8) (*CompanyBuilding, error)
+		Demolish(ctx context.Context, companyId, buildingId uint64) error
 	}
 
 	Building struct {
@@ -133,4 +134,21 @@ func (s *buildingService) AddBuilding(ctx context.Context, companyId, buildingId
 	inventory.ReduceStock(buildingToConstruct.Requirements)
 
 	return s.repository.AddBuilding(ctx, companyId, inventory, buildingToConstruct, position)
+}
+
+func (s *buildingService) Demolish(ctx context.Context, companyId, buildingId uint64) error {
+	buildingToDemolish, err := s.GetBuilding(ctx, companyId, buildingId)
+	if err != nil {
+		return err
+	}
+
+	if buildingToDemolish == nil {
+		return server.NewBusinessRuleError("building not found")
+	}
+
+	if buildingToDemolish.BusyUntil != nil {
+		return server.NewBusinessRuleError("cannot demolish busy building")
+	}
+
+	return s.repository.Demolish(ctx, companyId, buildingId)
 }

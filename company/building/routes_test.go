@@ -29,71 +29,114 @@ func TestCompanyBuildingRoutes(t *testing.T) {
 	svr := server.NewServer()
 	companyBuilding.CreateEndpoints(svr, svc, companySvc)
 
-	t.Run("should return bad request invalid data", func(t *testing.T) {
-		body := strings.NewReader(`{"building_id":"a","position":"b"}`)
+	t.Run("AddBuilding", func(t *testing.T) {
+		t.Run("should return bad request invalid data", func(t *testing.T) {
+			body := strings.NewReader(`{"building_id":"a","position":"b"}`)
 
-		req := httptest.NewRequest("POST", "/companies/1/buildings", body)
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+token)
+			req := httptest.NewRequest("POST", "/companies/1/buildings", body)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
 
-		rec := httptest.NewRecorder()
-		svr.ServeHTTP(rec, req)
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
-		}
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should validate building", func(t *testing.T) {
+			body := strings.NewReader(`{"building_id":0,"position":0}`)
+
+			req := httptest.NewRequest("POST", "/companies/1/buildings", body)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+
+		})
+
+		t.Run("should return unauthorized", func(t *testing.T) {
+			body := strings.NewReader(`{"building_id":1,"position":1}`)
+
+			req := httptest.NewRequest("POST", "/companies/2/buildings", body)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("expected status %d, got %d: %s", http.StatusUnauthorized, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should return 422 not enough resources", func(t *testing.T) {
+			body := strings.NewReader(`{"building_id":2,"position":1}`)
+
+			req := httptest.NewRequest("POST", "/companies/1/buildings", body)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+			}
+			if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"not enough resources\"}" {
+				t.Errorf("expected not enough resources, got %s", rec.Body.String())
+			}
+		})
 	})
 
-	t.Run("should validate building", func(t *testing.T) {
-		body := strings.NewReader(`{"building_id":0,"position":0}`)
+	t.Run("Demolish", func(t *testing.T) {
+		t.Run("should return unauthorized", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/2/buildings/2", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Accept", "application/json")
 
-		req := httptest.NewRequest("POST", "/companies/1/buildings", body)
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+token)
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
 
-		rec := httptest.NewRecorder()
-		svr.ServeHTTP(rec, req)
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+			}
+		})
 
-		if rec.Code != http.StatusBadRequest {
-			t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
-		}
+		t.Run("should return 422 when building is not found", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/2", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Accept", "application/json")
 
-	})
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
 
-	t.Run("should return unauthorized", func(t *testing.T) {
-		body := strings.NewReader(`{"building_id":1,"position":1}`)
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("expected status %d, got %d", http.StatusUnprocessableEntity, rec.Code)
+			}
+		})
 
-		req := httptest.NewRequest("POST", "/companies/2/buildings", body)
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+token)
+		t.Run("should return 422 when building is busy", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/companies/1/buildings/4", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Accept", "application/json")
 
-		rec := httptest.NewRecorder()
-		svr.ServeHTTP(rec, req)
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("expected status %d, got %d: %s", http.StatusUnauthorized, rec.Code, rec.Body.String())
-		}
-	})
-
-	t.Run("should return 422 not enough resources", func(t *testing.T) {
-		body := strings.NewReader(`{"building_id":2,"position":1}`)
-
-		req := httptest.NewRequest("POST", "/companies/1/buildings", body)
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+token)
-
-		rec := httptest.NewRecorder()
-		svr.ServeHTTP(rec, req)
-
-		if rec.Code != http.StatusUnprocessableEntity {
-			t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
-		}
-		if strings.TrimSpace(rec.Body.String()) != "{\"message\":\"not enough resources\"}" {
-			t.Errorf("expected not enough resources, got %s", rec.Body.String())
-		}
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("expected status %d, got %d", http.StatusUnprocessableEntity, rec.Code)
+			}
+		})
 	})
 }
