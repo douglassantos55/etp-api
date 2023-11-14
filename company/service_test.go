@@ -19,11 +19,13 @@ func TestProduction(t *testing.T) {
 		LastCollection: nil,
 		StartedAt:      now.Add(-3 * time.Hour),
 		Building: &companyBuilding.CompanyBuilding{
-			Id:        1,
-			Name:      "Plantation",
 			BusyUntil: &now,
-			Resources: []*building.BuildingResource{
-				{Resource: seed, QtyPerHours: 50},
+			Building: &building.Building{
+				Id:   1,
+				Name: "Plantation",
+				Resources: []*building.BuildingResource{
+					{Resource: seed, QtyPerHours: 50},
+				},
 			},
 		},
 		Item: &resource.Item{

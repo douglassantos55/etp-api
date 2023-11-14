@@ -30,19 +30,21 @@ func NewFakeProductionRepository() ProductionRepository {
 				ProductionCost: 60,
 				SourcingCost:   4704,
 				Building: &companyBuilding.CompanyBuilding{
-					Id:        4,
-					Name:      "Factory",
-					Level:     1,
-					WagesHour: 10,
-					AdminHour: 50,
-					Resources: []*building.BuildingResource{
-						{
-							QtyPerHours: 1000,
-							Resource: &resource.Resource{
-								Id:   6,
-								Name: "Iron bar",
-								Requirements: []*resource.Item{
-									{Qty: 1500, Quality: 0, Resource: &resource.Resource{Id: 3}},
+					Level: 1,
+					Building: &building.Building{
+						Id:        4,
+						Name:      "Factory",
+						WagesHour: 10,
+						AdminHour: 50,
+						Resources: []*building.BuildingResource{
+							{
+								QtyPerHours: 1000,
+								Resource: &resource.Resource{
+									Id:   6,
+									Name: "Iron bar",
+									Requirements: []*resource.Item{
+										{Qty: 1500, Quality: 0, Resource: &resource.Resource{Id: 3}},
+									},
 								},
 							},
 						},
@@ -62,19 +64,21 @@ func NewFakeProductionRepository() ProductionRepository {
 				ProductionCost: 60,
 				SourcingCost:   4704,
 				Building: &companyBuilding.CompanyBuilding{
-					Id:        4,
-					Name:      "Factory",
-					Level:     1,
-					WagesHour: 10,
-					AdminHour: 50,
-					Resources: []*building.BuildingResource{
-						{
-							QtyPerHours: 1000,
-							Resource: &resource.Resource{
-								Id:   6,
-								Name: "Iron bar",
-								Requirements: []*resource.Item{
-									{Qty: 1500, Quality: 0, Resource: &resource.Resource{Id: 3}},
+					Level: 1,
+					Building: &building.Building{
+						Id:        4,
+						Name:      "Factory",
+						WagesHour: 10,
+						AdminHour: 50,
+						Resources: []*building.BuildingResource{
+							{
+								QtyPerHours: 1000,
+								Resource: &resource.Resource{
+									Id:   6,
+									Name: "Iron bar",
+									Requirements: []*resource.Item{
+										{Qty: 1500, Quality: 0, Resource: &resource.Resource{Id: 3}},
+									},
 								},
 							},
 						},

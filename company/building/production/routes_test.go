@@ -35,7 +35,7 @@ func TestProductionRoutes(t *testing.T) {
 	t.Run("should return 422 producing on building that does not exist", func(t *testing.T) {
 		body := strings.NewReader(`{"resource_id":1,"quantity":100,"quality":0}`)
 
-		req := httptest.NewRequest("POST", "/companies/1/buildings/5/productions", body)
+		req := httptest.NewRequest("POST", "/companies/1/buildings/152/productions", body)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
