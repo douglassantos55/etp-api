@@ -15,6 +15,7 @@ type (
 		GetBuildings(ctx context.Context, companyId uint64) ([]*CompanyBuilding, error)
 		AddBuilding(ctx context.Context, companyId, buildingId uint64, position uint8) (*CompanyBuilding, error)
 		Demolish(ctx context.Context, companyId, buildingId uint64) error
+		Upgrade(ctx context.Context, companyId, buildingId uint64) (*time.Time, error)
 	}
 
 	Building struct {
@@ -23,16 +24,12 @@ type (
 	}
 
 	CompanyBuilding struct {
-		Id              uint64 `db:"id" json:"id"`
-		Name            string `db:"name" json:"name"`
-		WagesHour       uint64 `db:"wages_per_hour" json:"wages_per_hour"`
-		AdminHour       uint64 `db:"admin_per_hour" json:"admin_per_hour"`
-		MaintenanceHour uint64 `db:"maintenance_per_hour" json:"maintenance_per_hour"`
-		Level           uint8  `db:"level" json:"level"`
-		Position        *uint8 `db:"position" json:"position"`
-		Resources       []*building.BuildingResource
-		BusyUntil       *time.Time `db:"busy_until" json:"busy_until"`
-		CompletesAt     *time.Time `db:"completes_at" json:"completes_at"`
+		*building.Building
+
+		Level       uint8      `db:"level" json:"level"`
+		Position    *uint8     `db:"position" json:"position"`
+		BusyUntil   *time.Time `db:"busy_until" json:"busy_until"`
+		CompletesAt *time.Time `db:"completes_at" json:"completes_at"`
 	}
 
 	buildingService struct {
@@ -151,4 +148,46 @@ func (s *buildingService) Demolish(ctx context.Context, companyId, buildingId ui
 	}
 
 	return s.repository.Demolish(ctx, companyId, buildingId)
+}
+
+func (s *buildingService) Upgrade(ctx context.Context, companyId, buildingId uint64) (*time.Time, error) {
+	buildingToUpgrade, err := s.GetBuilding(ctx, companyId, buildingId)
+	if err != nil {
+		return nil, err
+	}
+
+	if buildingToUpgrade == nil {
+		return nil, server.NewBusinessRuleError("building not found")
+	}
+
+	if buildingToUpgrade.CompletesAt != nil {
+		return nil, server.NewBusinessRuleError("building is not ready")
+	}
+
+	if buildingToUpgrade.BusyUntil != nil {
+		return nil, server.NewBusinessRuleError("cannot upgrade busy building")
+	}
+
+	inventory, err := s.warehouseSvc.GetInventory(ctx, companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	if !inventory.HasResources(buildingToUpgrade.Requirements) {
+		return nil, server.NewBusinessRuleError("not enough resources")
+	}
+
+	inventory.ReduceStock(buildingToUpgrade.Requirements)
+
+	completesAt := time.Now().Add(time.Minute * time.Duration(*buildingToUpgrade.Downtime))
+
+	buildingToUpgrade.Level++
+	buildingToUpgrade.CompletesAt = &completesAt
+
+	err = s.repository.Upgrade(ctx, inventory, buildingToUpgrade)
+	if err != nil {
+		return nil, err
+	}
+
+	return &completesAt, nil
 }

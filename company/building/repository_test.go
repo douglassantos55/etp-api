@@ -48,8 +48,8 @@ func TestMain(t *testing.M) {
 	}
 
 	if _, err := tx.Exec(`
-        INSERT INTO buildings (id, name, wages_per_hour, admin_per_hour, maintenance_per_hour)
-        VALUES (1, "Plantation", 500, 1000, 200), (2, "Factory", 1500, 5000, 500)
+        INSERT INTO buildings (id, name, wages_per_hour, admin_per_hour, maintenance_per_hour, downtime)
+        VALUES (1, "Plantation", 500, 1000, 200, 60), (2, "Factory", 1500, 5000, 500, 120)
     `); err != nil {
 		log.Fatalf("could not seed database 4: %s", err)
 	}
@@ -178,7 +178,7 @@ func TestBuildingRepository(t *testing.T) {
 			}
 		})
 
-		t.Run("should list buildings with resources", func(t *testing.T) {
+		t.Run("should list buildings", func(t *testing.T) {
 			buildings, err := repository.GetAll(ctx, 1)
 			if err != nil {
 				t.Fatalf("could not get buildings: %s", err)
@@ -194,11 +194,25 @@ func TestBuildingRepository(t *testing.T) {
 						t.Errorf("expected %d resources, got %d", 1, len(building.Resources))
 					}
 
+					if len(building.Requirements) != 1 {
+						t.Errorf("expected %d requirements, got %d", 1, len(building.Requirements))
+					}
+
 					if building.AdminHour != 2000 {
 						t.Errorf("expected admin/h of %d, got %d", 2000, building.AdminHour)
 					}
 					if building.WagesHour != 1000 {
 						t.Errorf("expected wages/h of %d, got %d", 1000, building.WagesHour)
+					}
+
+					if *building.Downtime != 120 {
+						t.Errorf("expected downtime of %d, got %d", 120, *building.Downtime)
+					}
+
+					for _, req := range building.Requirements {
+						if req.Resource.Id == 1 && req.Qty != 100 {
+							t.Errorf("expected qty %d, got %d", 100, req.Qty)
+						}
 					}
 
 					for _, resource := range building.Resources {
@@ -213,11 +227,25 @@ func TestBuildingRepository(t *testing.T) {
 						t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
 					}
 
+					if len(building.Requirements) != 1 {
+						t.Errorf("expected %d requirements, got %d", 1, len(building.Requirements))
+					}
+
 					if building.AdminHour != 15000 {
 						t.Errorf("expected admin/h of %d, got %d", 15000, building.AdminHour)
 					}
 					if building.WagesHour != 4500 {
 						t.Errorf("expected wages/h of %d, got %d", 4500, building.WagesHour)
+					}
+
+					if *building.Downtime != 360 {
+						t.Errorf("expected downtime of %d, got %d", 360, *building.Downtime)
+					}
+
+					for _, req := range building.Requirements {
+						if req.Resource.Id == 1 && req.Qty != 450 {
+							t.Errorf("expected qty %d, got %d", 450, req.Qty)
+						}
 					}
 
 					for _, resource := range building.Resources {
@@ -251,7 +279,7 @@ func TestBuildingRepository(t *testing.T) {
 	})
 
 	t.Run("GetById", func(t *testing.T) {
-		t.Run("should get building with resources", func(t *testing.T) {
+		t.Run("should get building", func(t *testing.T) {
 			building, err := repository.GetById(ctx, 2, 1)
 			if err != nil {
 				t.Fatalf("could not get building: %s", err)
@@ -265,11 +293,25 @@ func TestBuildingRepository(t *testing.T) {
 				t.Errorf("expected %d resources, got %d", 2, len(building.Resources))
 			}
 
+			if len(building.Requirements) != 1 {
+				t.Errorf("expected %d requirements, got %d", 1, len(building.Requirements))
+			}
+
 			if building.AdminHour != 15000 {
 				t.Errorf("expected admin/h of %d, got %d", 15000, building.AdminHour)
 			}
 			if building.WagesHour != 4500 {
 				t.Errorf("expected wages/h of %d, got %d", 4500, building.WagesHour)
+			}
+
+			if *building.Downtime != 360 {
+				t.Errorf("expected downtime of %d, got %d", 360, *building.Downtime)
+			}
+
+			for _, req := range building.Requirements {
+				if req.Resource.Id == 1 && req.Qty != 450 {
+					t.Errorf("expected qty %d, got %d", 450, req.Qty)
+				}
 			}
 
 			for _, resource := range building.Resources {
@@ -311,7 +353,7 @@ func TestBuildingRepository(t *testing.T) {
 
 	t.Run("AddBuilding", func(t *testing.T) {
 		t.Run("should insert building", func(t *testing.T) {
-			downtime := uint8(90)
+			downtime := uint16(90)
 
 			plantation := &building.Building{
 				Id:       1,
@@ -378,6 +420,73 @@ func TestBuildingRepository(t *testing.T) {
 
 			if buildingFound != nil {
 				t.Error("should not find demolished building")
+			}
+		})
+	})
+
+	t.Run("Upgrade", func(t *testing.T) {
+		t.Run("should reduce inventory", func(t *testing.T) {
+			downtime := uint16(90)
+			completesAt := time.Now().Add(time.Minute)
+
+			plantation := &companyBuilding.CompanyBuilding{
+				Level:       3,
+				CompletesAt: &completesAt,
+				Building: &building.Building{
+					Id:       1,
+					Name:     "Factory",
+					Downtime: &downtime,
+					Requirements: []*resource.Item{
+						{ResourceId: 1, Qty: 50, Quality: 0, Resource: &resource.Resource{Id: 1}},
+					},
+				},
+			}
+
+			inventory, err := warehouseRepo.FetchInventory(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not fetch inventory: %s", err)
+			}
+
+			if inventory == nil {
+				t.Fatal("could not fetch inventory")
+			}
+
+			inventory.ReduceStock(plantation.Requirements)
+
+			err = repository.Upgrade(ctx, inventory, plantation)
+			if err != nil {
+				t.Fatalf("could not insert building: %s", err)
+			}
+
+			inventory, err = warehouseRepo.FetchInventory(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not fetch inventory: %s", err)
+			}
+
+			if inventory == nil {
+				t.Fatal("could not fetch inventory")
+			}
+
+			stock := inventory.GetStock(1, 0)
+			if stock != 50 {
+				t.Errorf("expected stock %d, got %d", 50, stock)
+			}
+
+			upgraded, err := repository.GetById(ctx, 1, 1)
+			if err != nil {
+				t.Fatalf("could not find building: %s", err)
+			}
+
+			if upgraded == nil {
+				t.Fatal("should find building")
+			}
+
+			if upgraded.Level != 3 {
+				t.Errorf("expected level %d, got %d", 3, upgraded.Level)
+			}
+
+			if upgraded.CompletesAt == nil {
+				t.Fatal("should have set completes at")
 			}
 		})
 	})

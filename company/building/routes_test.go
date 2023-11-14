@@ -139,4 +139,58 @@ func TestCompanyBuildingRoutes(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("Upgrade", func(t *testing.T) {
+		t.Run("should return unauthorized", func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/companies/2/buildings/2/upgrade", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Accept", "application/json")
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+			}
+		})
+
+		t.Run("should return 422 when building is not found", func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/companies/1/buildings/2/upgrade", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Accept", "application/json")
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("expected status %d, got %d", http.StatusUnprocessableEntity, rec.Code)
+			}
+		})
+
+		t.Run("should return 422 when building is not ready", func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/companies/1/buildings/5/upgrade", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Accept", "application/json")
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("expected status %d, got %d", http.StatusUnprocessableEntity, rec.Code)
+			}
+		})
+
+		t.Run("should return 422 when building is busy", func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/companies/1/buildings/4/upgrade", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Accept", "application/json")
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("expected status %d, got %d", http.StatusUnprocessableEntity, rec.Code)
+			}
+		})
+	})
 }

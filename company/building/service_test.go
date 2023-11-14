@@ -6,27 +6,31 @@ import (
 	"api/resource"
 	"api/warehouse"
 	"context"
+	"math"
 	"testing"
+	"time"
 )
 
 func TestCompanyBuilding(t *testing.T) {
 	companyBuilding := &companyBuilding.CompanyBuilding{
-		WagesHour: 225000,
-		AdminHour: 413500,
-		Resources: []*building.BuildingResource{
-			{
-				QtyPerHours: 50,
-				Resource: &resource.Resource{
-					Id:           1,
-					Requirements: []*resource.Item{},
+		Building: &building.Building{
+			WagesHour: 225000,
+			AdminHour: 413500,
+			Resources: []*building.BuildingResource{
+				{
+					QtyPerHours: 50,
+					Resource: &resource.Resource{
+						Id:           1,
+						Requirements: []*resource.Item{},
+					},
 				},
-			},
-			{
-				QtyPerHours: 100,
-				Resource: &resource.Resource{
-					Id: 2,
-					Requirements: []*resource.Item{
-						{Qty: 10, Quality: 0, ResourceId: 1},
+				{
+					QtyPerHours: 100,
+					Resource: &resource.Resource{
+						Id: 2,
+						Requirements: []*resource.Item{
+							{Qty: 10, Quality: 0, ResourceId: 1},
+						},
 					},
 				},
 			},
@@ -227,13 +231,94 @@ func TestBuildingService(t *testing.T) {
 			if err.Error() != expectedError {
 				t.Errorf("expected error %s, got %s", expectedError, err)
 			}
-        })
+		})
 
 		t.Run("cannot demolish busy building", func(t *testing.T) {
 			err := service.Demolish(ctx, 1, 4)
 			expectedError := "cannot demolish busy building"
 			if err.Error() != expectedError {
 				t.Errorf("expected error %s, got %s", expectedError, err)
+			}
+		})
+	})
+
+	t.Run("Upgrade", func(t *testing.T) {
+		t.Run("should not upgrade non existing building", func(t *testing.T) {
+			_, err := service.Upgrade(ctx, 1, 5232)
+
+			expectedError := "building not found"
+
+			if err.Error() != expectedError {
+				t.Errorf("expected error %s, got %s", expectedError, err)
+			}
+		})
+
+		t.Run("should not upgrade constructing building", func(t *testing.T) {
+			_, err := service.Upgrade(ctx, 2, 2)
+
+			expectedError := "building is not ready"
+
+			if err.Error() != expectedError {
+				t.Errorf("expected error %s, got %s", expectedError, err)
+			}
+		})
+
+		t.Run("should not upgrade busy building", func(t *testing.T) {
+			_, err := service.Upgrade(ctx, 1, 4)
+
+			expectedError := "cannot upgrade busy building"
+
+			if err.Error() != expectedError {
+				t.Errorf("expected error %s, got %s", expectedError, err)
+			}
+		})
+
+		t.Run("should not upgrade without resources", func(t *testing.T) {
+			_, err := service.Upgrade(ctx, 1, 3)
+
+			expectedError := "not enough resources"
+
+			if err.Error() != expectedError {
+				t.Errorf("expected error %s, got %s", expectedError, err)
+			}
+		})
+
+		t.Run("should start upgrade", func(t *testing.T) {
+			completesAt, err := service.Upgrade(ctx, 1, 1)
+			if err != nil {
+				t.Fatalf("could not upgrade building: %s", err)
+			}
+
+			if completesAt == nil {
+				t.Error("should return time of completion")
+			}
+
+			diff := math.Round(completesAt.Sub(time.Now()).Minutes())
+			if diff != 80.0 {
+				t.Errorf("expected completion in %d minutes, got %f", 80, diff)
+			}
+
+			building, err := service.GetBuilding(ctx, 1, 1)
+			if err != nil {
+				t.Fatalf("could not find building: %s", err)
+			}
+
+			if building.Level != 2 {
+				t.Errorf("expected level %d, got %d", 2, building.Level)
+			}
+
+			if building.CompletesAt != completesAt {
+				t.Errorf("expected completes at %+v, got %+v", completesAt, building.CompletesAt)
+			}
+
+			inventory, err := warehouseSvc.GetInventory(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get inventory: %s", err)
+			}
+
+			stock := inventory.GetStock(3, 1)
+			if stock != 900 {
+				t.Errorf("expected stock of %d, got %d", 900, stock)
 			}
 		})
 	})

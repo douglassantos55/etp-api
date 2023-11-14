@@ -11,9 +11,11 @@ import (
 type fakeBuildingRepository struct {
 	data         map[uint64]map[uint64]*CompanyBuilding
 	requirements map[uint64][]resource.Item
+	lastId       uint64
 }
 
 func NewFakeBuildingRepository() BuildingRepository {
+	downtime := uint16(80)
 	busyUntil := time.Now().Add(time.Minute)
 
 	requirements := map[uint64][]resource.Item{
@@ -31,64 +33,96 @@ func NewFakeBuildingRepository() BuildingRepository {
 	data := map[uint64]map[uint64]*CompanyBuilding{
 		1: {
 			1: {
-				Id:        1,
-				Name:      "Plantation",
-				Level:     1,
-				WagesHour: 100,
-				AdminHour: 500,
-				Resources: []*building.BuildingResource{
-					{
-						QtyPerHours: 100,
-						Resource:    &resource.Resource{Id: 1, Name: "Seeds"},
+				Level: 1,
+				Building: &building.Building{
+					Id:        1,
+					Name:      "Plantation",
+					WagesHour: 100,
+					AdminHour: 500,
+					Downtime:  &downtime,
+					Resources: []*building.BuildingResource{
+						{
+							QtyPerHours: 100,
+							Resource:    &resource.Resource{Id: 1, Name: "Seeds"},
+						},
+					},
+					Requirements: []*resource.Item{
+						{Qty: 100, Quality: 0, Resource: &resource.Resource{Id: 3}},
 					},
 				},
 			},
 			3: {
-				Id:        3,
-				Name:      "Laboratory",
-				Level:     1,
-				WagesHour: 1000000,
-				AdminHour: 5000000,
-				Resources: []*building.BuildingResource{
-					{
-						QtyPerHours: 100,
-						Resource:    &resource.Resource{Id: 5, Name: "Vaccine"},
+				Level: 1,
+				Building: &building.Building{
+					Id:        3,
+					Name:      "Laboratory",
+					WagesHour: 1000000,
+					AdminHour: 5000000,
+					Resources: []*building.BuildingResource{
+						{
+							QtyPerHours: 100,
+							Resource:    &resource.Resource{Id: 5, Name: "Vaccine"},
+						},
+					},
+					Requirements: []*resource.Item{
+						{Qty: 1, Quality: 10, Resource: &resource.Resource{Id: 1}},
+						{Qty: 5, Quality: 9, Resource: &resource.Resource{Id: 2}},
 					},
 				},
 			},
 			4: {
-				Id:        4,
-				Name:      "Factory",
 				Level:     1,
-				WagesHour: 10,
-				AdminHour: 50,
 				BusyUntil: &busyUntil,
-				Resources: []*building.BuildingResource{
-					{
-						QtyPerHours: 1000,
-						Resource:    &resource.Resource{Id: 6, Name: "Iron bar"},
+				Building: &building.Building{
+					Id:        4,
+					Name:      "Factory",
+					WagesHour: 10,
+					AdminHour: 50,
+					Resources: []*building.BuildingResource{
+						{
+							QtyPerHours: 1000,
+							Resource:    &resource.Resource{Id: 6, Name: "Iron bar"},
+						},
+					},
+				},
+			},
+			5: {
+				Level:       1,
+				CompletesAt: &busyUntil,
+				Building: &building.Building{
+					Id:        5,
+					Name:      "Factory",
+					WagesHour: 10,
+					AdminHour: 50,
+					Resources: []*building.BuildingResource{
+						{
+							QtyPerHours: 1000,
+							Resource:    &resource.Resource{Id: 6, Name: "Iron bar"},
+						},
 					},
 				},
 			},
 		},
 		2: {
 			2: {
-				Id:          2,
-				Name:        "Plantation",
 				Level:       1,
-				WagesHour:   100,
-				AdminHour:   500,
 				CompletesAt: &busyUntil,
-				Resources: []*building.BuildingResource{
-					{
-						QtyPerHours: 1000,
-						Resource:    &resource.Resource{Id: 1, Name: "Seeds"},
+				Building: &building.Building{
+					Id:        2,
+					Name:      "Plantation",
+					WagesHour: 100,
+					AdminHour: 500,
+					Resources: []*building.BuildingResource{
+						{
+							QtyPerHours: 1000,
+							Resource:    &resource.Resource{Id: 1, Name: "Seeds"},
+						},
 					},
 				},
 			},
 		},
 	}
-	return &fakeBuildingRepository{data, requirements}
+	return &fakeBuildingRepository{data, requirements, 5}
 }
 
 func (r *fakeBuildingRepository) GetAll(ctx context.Context, companyId uint64) ([]*CompanyBuilding, error) {
@@ -130,25 +164,31 @@ func (r *fakeBuildingRepository) getRequirements(companyBuilding *CompanyBuildin
 	}
 }
 
-func (r *fakeBuildingRepository) AddBuilding(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error) {
-	id := uint64(len(r.data) + 1)
+func (r *fakeBuildingRepository) AddBuilding(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, buildingToConstruct *building.Building, position uint8) (*CompanyBuilding, error) {
+	r.lastId++
 
 	companyBuilding := &CompanyBuilding{
-		Id:              id,
-		Name:            building.Name,
-		Position:        &position,
-		Level:           1,
-		WagesHour:       building.WagesHour,
-		AdminHour:       building.AdminHour,
-		MaintenanceHour: building.MaintenanceHour,
+		Position: &position,
+		Level:    1,
+		Building: &building.Building{
+			Id:              r.lastId,
+			Name:            buildingToConstruct.Name,
+			WagesHour:       buildingToConstruct.WagesHour,
+			AdminHour:       buildingToConstruct.AdminHour,
+			MaintenanceHour: buildingToConstruct.MaintenanceHour,
+		},
 	}
 
-	r.data[companyId][id] = companyBuilding
+	r.data[companyId][r.lastId] = companyBuilding
 	return companyBuilding, nil
 }
 
 func (r *fakeBuildingRepository) Demolish(ctx context.Context, companyId, buildingId uint64) error {
 	companyBuildings := r.data[companyId]
 	delete(companyBuildings, buildingId)
+	return nil
+}
+
+func (r *fakeBuildingRepository) Upgrade(ctx context.Context, inventory *warehouse.Inventory, buildingToUpgrade *CompanyBuilding) error {
 	return nil
 }
