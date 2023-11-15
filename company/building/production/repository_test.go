@@ -73,8 +73,8 @@ func TestMain(t *testing.M) {
 	}
 
 	if _, err := tx.Exec(`
-        INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
-        VALUES (1, 1, 50, 0), (2, 1, 150, 0)
+        INSERT INTO buildings_requirements (building_id, resource_id, qty)
+        VALUES (1, 1, 50), (2, 1, 150)
     `); err != nil {
 		log.Fatalf("could not seed database: %s", err)
 	}

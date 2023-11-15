@@ -34,8 +34,8 @@ func TestMain(t *testing.M) {
 	tx.Exec(`INSERT INTO buildings (id, name, downtime) VALUES (1, "Plantation", 60), (2, "Factory", 120)`)
 
 	tx.Exec(`
-        INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
-        VALUES (1, 1, 500, 0), (1, 2, 1000, 0), (1, 3, 100, 1), (2, 1, 1000, 1), (2, 2, 5000, 1)
+        INSERT INTO buildings_requirements (building_id, resource_id, qty)
+        VALUES (1, 1, 500), (1, 2, 1000), (1, 3, 100), (2, 1, 1000), (2, 2, 5000)
     `)
 
 	tx.Exec(`

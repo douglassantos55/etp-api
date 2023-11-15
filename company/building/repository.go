@@ -219,10 +219,10 @@ func (r *buildingRepository) getRequirements(ctx context.Context, buildingId uin
 
 	err := r.builder.
 		Select(
-			goqu.I("req.quality"),
 			goqu.I("r.id").As(goqu.C("resource.id")),
 			goqu.I("r.name").As(goqu.C("resource.name")),
 			goqu.I("r.image").As(goqu.C("resource.image")),
+			goqu.L("? - 1", goqu.I("cb.level")).As("quality"),
 			goqu.L("? * ?", goqu.I("req.qty"), goqu.I("cb.level")).As("quantity"),
 		).
 		From(goqu.T("buildings_requirements").As("req")).

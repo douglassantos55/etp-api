@@ -69,8 +69,8 @@ func TestMain(t *testing.M) {
 	}
 
 	if _, err := tx.Exec(`
-        INSERT INTO buildings_requirements (building_id, resource_id, qty, quality)
-        VALUES (1, 1, 50, 0), (2, 1, 150, 0)
+        INSERT INTO buildings_requirements (building_id, resource_id, qty)
+        VALUES (1, 1, 50), (2, 1, 150)
     `); err != nil {
 		log.Fatalf("could not seed database 7: %s", err)
 	}
@@ -210,8 +210,13 @@ func TestBuildingRepository(t *testing.T) {
 					}
 
 					for _, req := range building.Requirements {
-						if req.Resource.Id == 1 && req.Qty != 100 {
-							t.Errorf("expected qty %d, got %d", 100, req.Qty)
+						if req.Resource.Id == 1 {
+							if req.Qty != 100 {
+								t.Errorf("expected qty %d, got %d", 100, req.Qty)
+							}
+							if req.Quality != 1 {
+								t.Errorf("expected quality %d, got %d", 1, req.Quality)
+							}
 						}
 					}
 
@@ -243,8 +248,13 @@ func TestBuildingRepository(t *testing.T) {
 					}
 
 					for _, req := range building.Requirements {
-						if req.Resource.Id == 1 && req.Qty != 450 {
-							t.Errorf("expected qty %d, got %d", 450, req.Qty)
+						if req.Resource.Id == 1 {
+							if req.Qty != 450 {
+								t.Errorf("expected qty %d, got %d", 450, req.Qty)
+							}
+							if req.Quality != 2 {
+								t.Errorf("expected quality %d, got %d", 2, req.Quality)
+							}
 						}
 					}
 

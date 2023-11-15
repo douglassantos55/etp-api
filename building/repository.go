@@ -142,7 +142,6 @@ func (r *goquRepository) GetRequirements(ctx context.Context, buildingId uint64)
 
 	err := r.builder.
 		Select(
-			goqu.I("req.quality"),
 			goqu.I("req.qty").As("quantity"),
 			goqu.I("r.id").As(goqu.C("resource.id")),
 			goqu.I("r.name").As(goqu.C("resource.name")),
