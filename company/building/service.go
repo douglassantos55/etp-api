@@ -61,12 +61,19 @@ func (b *CompanyBuilding) GetProductionRequirements(item *resource.Item) ([]*res
 		return nil, err
 	}
 
-	// Considers the qty
+	requirements := make([]*resource.Item, 0)
+
+	// Considers item's qty and quality
 	for _, requirement := range resourceToProduce.Requirements {
-		requirement.Qty *= item.Qty
+		requirements = append(requirements, &resource.Item{
+			Qty:        requirement.Qty * item.Qty,
+			Resource:   requirement.Resource,
+			ResourceId: requirement.ResourceId,
+			Quality:    uint8(max(0, int(item.Quality)-1)),
+		})
 	}
 
-	return resourceToProduce.Requirements, nil
+	return requirements, nil
 }
 
 func (b *CompanyBuilding) GetProductionTime(item *resource.Item) (float64, error) {
@@ -167,6 +174,8 @@ func (s *buildingService) Upgrade(ctx context.Context, companyId, buildingId uin
 	if buildingToUpgrade.BusyUntil != nil {
 		return nil, server.NewBusinessRuleError("cannot upgrade busy building")
 	}
+
+	println(buildingToUpgrade.Level)
 
 	inventory, err := s.warehouseSvc.GetInventory(ctx, companyId)
 	if err != nil {

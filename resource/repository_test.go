@@ -31,8 +31,8 @@ func TestMain(t *testing.M) {
     `)
 
 	tx.Exec(`
-        INSERT INTO resources_requirements (resource_id, requirement_id, qty, quality)
-        VALUES (2, 1, 5, 0), (3, 1, 10, 0), (3, 2, 2, 0)
+        INSERT INTO resources_requirements (resource_id, requirement_id, qty)
+        VALUES (2, 1, 5), (3, 1, 10), (3, 2, 2)
     `)
 
 	if err := tx.Commit(); err != nil {
@@ -142,9 +142,9 @@ func TestResourceRepository(t *testing.T) {
 		resource, err := repository.SaveResource(ctx, &resource.Resource{
 			Name:       "water",
 			CategoryId: 1,
-			Requirements: []*resource.Item{
-				{Qty: 10, Quality: 0, ResourceId: 1},
-				{Qty: 20, Quality: 1, ResourceId: 2},
+			Requirements: []*resource.Requirement{
+				{Qty: 10, ResourceId: 1},
+				{Qty: 20, ResourceId: 2},
 			},
 		})
 

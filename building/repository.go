@@ -146,22 +146,11 @@ func (r *goquRepository) GetRequirements(ctx context.Context, buildingId uint64)
 			goqu.I("r.id").As(goqu.C("resource.id")),
 			goqu.I("r.name").As(goqu.C("resource.name")),
 			goqu.I("r.image").As(goqu.C("resource.image")),
-			goqu.I("c.id").As(goqu.C("resource.category.id")),
-			goqu.I("c.name").As(goqu.C("resource.category.name")),
 		).
 		From(goqu.T("buildings_requirements").As("req")).
 		InnerJoin(
 			goqu.T("resources").As("r"),
 			goqu.On(goqu.I("req.resource_id").Eq(goqu.I("r.id"))),
-		).
-		InnerJoin(
-			goqu.T("categories").As("c"),
-			goqu.On(
-				goqu.And(
-					goqu.I("r.category_id").Eq(goqu.I("c.id")),
-					goqu.I("c.deleted_at").IsNull(),
-				),
-			),
 		).
 		Where(goqu.I("req.building_id").Eq(buildingId)).
 		ScanStructsContext(ctx, &requirements)

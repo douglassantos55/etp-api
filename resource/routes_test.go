@@ -14,14 +14,25 @@ import (
 
 type fakeRepository struct {
 	data map[uint64]*resource.Resource
+	reqs map[uint64][]*resource.Requirement
 }
 
 func NewFakeRepository() resource.Repository {
 	data := map[uint64]*resource.Resource{
 		1: {Id: 1, Name: "Water", Category: &resource.Category{Id: 1, Name: "Food"}},
 		2: {Id: 2, Name: "Seeds", Category: &resource.Category{Id: 1, Name: "Food"}},
+		3: {Id: 3, Name: "Apple", Category: &resource.Category{Id: 1, Name: "Food"}},
 	}
-	return &fakeRepository{data}
+	requirements := map[uint64][]*resource.Requirement{
+		2: {
+			{ResourceId: 1, Qty: 10, Resource: data[1]},
+		},
+		3: {
+			{ResourceId: 1, Qty: 50, Resource: data[1]},
+			{ResourceId: 2, Qty: 100, Resource: data[2]},
+		},
+	}
+	return &fakeRepository{data, requirements}
 }
 
 func (r *fakeRepository) FetchResources(ctx context.Context) ([]*resource.Resource, error) {
@@ -36,19 +47,24 @@ func (r *fakeRepository) GetById(ctx context.Context, id uint64) (*resource.Reso
 	return r.data[id], nil
 }
 
-func (r *fakeRepository) GetRequirements(ctx context.Context, resourceId uint64) ([]*resource.Item, error) {
-	return nil, nil
+func (r *fakeRepository) GetRequirements(ctx context.Context, resourceId uint64) ([]*resource.Requirement, error) {
+	return r.reqs[resourceId], nil
 }
 
 func (r *fakeRepository) SaveResource(ctx context.Context, resource *resource.Resource) (*resource.Resource, error) {
 	id := uint64(len(r.data) + 1)
 	resource.Id = id
+
 	r.data[id] = resource
+	r.reqs[id] = resource.Requirements
+
 	return resource, nil
 }
 
 func (r *fakeRepository) UpdateResource(ctx context.Context, resource *resource.Resource) (*resource.Resource, error) {
 	r.data[resource.Id] = resource
+	r.reqs[resource.Id] = resource.Requirements
+
 	return resource, nil
 }
 
@@ -95,7 +111,7 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("should validate requirements", func(t *testing.T) {
-        t.Parallel()
+		t.Parallel()
 
 		body := strings.NewReader(`{"name":"Wood","category_id":1,"image":"http://placeimg.com/10","requirements":[{"quantity":0,"quality":0,"resource_id":0}]}`)
 
@@ -113,7 +129,7 @@ func TestService(t *testing.T) {
 	})
 
 	t.Run("should validate input when updating resource", func(t *testing.T) {
-        t.Parallel()
+		t.Parallel()
 
 		req := httptest.NewRequest("PUT", "/resources/1", strings.NewReader(`{"name":""}`))
 		req.Header.Set("Content-Type", "application/json")

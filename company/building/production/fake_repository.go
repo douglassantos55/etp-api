@@ -42,8 +42,8 @@ func NewFakeProductionRepository() ProductionRepository {
 								Resource: &resource.Resource{
 									Id:   6,
 									Name: "Iron bar",
-									Requirements: []*resource.Item{
-										{Qty: 1500, Quality: 0, Resource: &resource.Resource{Id: 3}},
+									Requirements: []*resource.Requirement{
+										{Qty: 1500, Resource: &resource.Resource{Id: 3}},
 									},
 								},
 							},
@@ -76,8 +76,8 @@ func NewFakeProductionRepository() ProductionRepository {
 								Resource: &resource.Resource{
 									Id:   6,
 									Name: "Iron bar",
-									Requirements: []*resource.Item{
-										{Qty: 1500, Quality: 0, Resource: &resource.Resource{Id: 3}},
+									Requirements: []*resource.Requirement{
+										{Qty: 1500, Resource: &resource.Resource{Id: 3}},
 									},
 								},
 							},

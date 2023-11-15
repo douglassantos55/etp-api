@@ -14,7 +14,7 @@ type Repository interface {
 	// Get a resource by id, returns nil if it can't be found
 	GetById(ctx context.Context, id uint64) (*Resource, error)
 
-	GetRequirements(ctx context.Context, resourceId uint64) ([]*Item, error)
+	GetRequirements(ctx context.Context, resourceId uint64) ([]*Requirement, error)
 
 	// Creates a resource
 	SaveResource(ctx context.Context, resource *Resource) (*Resource, error)
@@ -95,18 +95,15 @@ func (r *goquRepository) GetById(ctx context.Context, id uint64) (*Resource, err
 	return resource, err
 }
 
-func (r *goquRepository) GetRequirements(ctx context.Context, resourceId uint64) ([]*Item, error) {
-	requirements := make([]*Item, 0)
+func (r *goquRepository) GetRequirements(ctx context.Context, resourceId uint64) ([]*Requirement, error) {
+	requirements := make([]*Requirement, 0)
 
 	err := r.builder.
 		Select(
-			goqu.I("req.quality"),
 			goqu.I("req.qty").As("quantity"),
 			goqu.I("r.id").As(goqu.C("resource.id")),
 			goqu.I("r.name").As(goqu.C("resource.name")),
 			goqu.I("r.image").As(goqu.C("resource.image")),
-			goqu.I("c.id").As(goqu.C("resource.category.id")),
-			goqu.I("c.name").As(goqu.C("resource.category.name")),
 		).
 		From(goqu.T("resources_requirements").As("req")).
 		InnerJoin(
@@ -114,13 +111,8 @@ func (r *goquRepository) GetRequirements(ctx context.Context, resourceId uint64)
 			goqu.On(goqu.I("req.requirement_id").Eq(goqu.I("r.id"))),
 		).
 		InnerJoin(
-			goqu.T("categories").As("c"),
-			goqu.On(
-				goqu.And(
-					goqu.I("r.category_id").Eq(goqu.I("c.id")),
-					goqu.I("c.deleted_at").IsNull(),
-				),
-			),
+			goqu.T("resources").As("source"),
+			goqu.On(goqu.I("req.resource_id").Eq(goqu.I("source.id"))),
 		).
 		Where(goqu.I("req.resource_id").Eq(resourceId)).
 		ScanStructsContext(ctx, &requirements)
@@ -202,7 +194,7 @@ func (r *goquRepository) UpdateResource(ctx context.Context, resource *Resource)
 	return resource, nil
 }
 
-func (r *goquRepository) saveRequirements(tx *goqu.TxDatabase, id int64, requirements []*Item) error {
+func (r *goquRepository) saveRequirements(tx *goqu.TxDatabase, id int64, requirements []*Requirement) error {
 	_, err := tx.Delete(goqu.T("resources_requirements")).
 		Where(goqu.I("resource_id").Eq(id)).
 		Executor().
@@ -218,7 +210,6 @@ func (r *goquRepository) saveRequirements(tx *goqu.TxDatabase, id int64, require
 		for _, requirement := range requirements {
 			reqs = append(reqs, goqu.Record{
 				"qty":            requirement.Qty,
-				"quality":        requirement.Quality,
 				"requirement_id": requirement.ResourceId,
 				"resource_id":    id,
 			})

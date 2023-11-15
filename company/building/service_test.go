@@ -21,15 +21,15 @@ func TestCompanyBuilding(t *testing.T) {
 					QtyPerHours: 50,
 					Resource: &resource.Resource{
 						Id:           1,
-						Requirements: []*resource.Item{},
+						Requirements: []*resource.Requirement{},
 					},
 				},
 				{
 					QtyPerHours: 100,
 					Resource: &resource.Resource{
 						Id: 2,
-						Requirements: []*resource.Item{
-							{Qty: 10, Quality: 0, ResourceId: 1},
+						Requirements: []*resource.Requirement{
+							{Qty: 10, ResourceId: 1},
 						},
 					},
 				},
@@ -303,8 +303,8 @@ func TestBuildingService(t *testing.T) {
 				t.Fatalf("could not find building: %s", err)
 			}
 
-			if building.Level != 2 {
-				t.Errorf("expected level %d, got %d", 2, building.Level)
+			if building.Level != 3 {
+				t.Errorf("expected level %d, got %d", 3, building.Level)
 			}
 
 			if building.CompletesAt != completesAt {

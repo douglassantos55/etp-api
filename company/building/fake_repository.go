@@ -10,7 +10,7 @@ import (
 
 type fakeBuildingRepository struct {
 	data         map[uint64]map[uint64]*CompanyBuilding
-	requirements map[uint64][]resource.Item
+	requirements map[uint64][]resource.Requirement
 	lastId       uint64
 }
 
@@ -18,22 +18,22 @@ func NewFakeBuildingRepository() BuildingRepository {
 	downtime := uint16(80)
 	busyUntil := time.Now().Add(time.Minute)
 
-	requirements := map[uint64][]resource.Item{
+	requirements := map[uint64][]resource.Requirement{
 		1: {
-			{Qty: 15, Quality: 0, Resource: &resource.Resource{Id: 2}},
+			{Qty: 15, Resource: &resource.Resource{Id: 2}},
 		},
 		5: {
-			{Qty: 15, Quality: 0, Resource: &resource.Resource{Id: 2}},
+			{Qty: 15, Resource: &resource.Resource{Id: 2}},
 		},
 		6: {
-			{Qty: 1500, Quality: 0, Resource: &resource.Resource{Id: 3}},
+			{Qty: 1500, Resource: &resource.Resource{Id: 3}},
 		},
 	}
 
 	data := map[uint64]map[uint64]*CompanyBuilding{
 		1: {
 			1: {
-				Level: 1,
+				Level: 2,
 				Building: &building.Building{
 					Id:        1,
 					Name:      "Plantation",
@@ -151,11 +151,10 @@ func (r *fakeBuildingRepository) GetById(ctx context.Context, buildingId, compan
 
 func (r *fakeBuildingRepository) getRequirements(companyBuilding *CompanyBuilding) {
 	for _, buildingResource := range companyBuilding.Resources {
-		requirements := make([]*resource.Item, 0)
+		requirements := make([]*resource.Requirement, 0)
 		for _, req := range r.requirements[buildingResource.Resource.Id] {
-			requirements = append(requirements, &resource.Item{
+			requirements = append(requirements, &resource.Requirement{
 				Qty:        req.Qty,
-				Quality:    req.Quality,
 				ResourceId: req.ResourceId,
 				Resource:   req.Resource,
 			})
