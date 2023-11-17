@@ -7,6 +7,7 @@ import (
 	"api/company/building/production"
 	"api/database"
 	"api/resource"
+	"api/scheduler"
 	"api/server"
 	"api/warehouse"
 	"log"
@@ -42,12 +43,13 @@ func main() {
 
 	companyBuildingRepo := companyBuilding.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
 	companyBuildingSvc := companyBuilding.NewBuildingService(companyBuildingRepo, warehouseSvc, buildingSvc)
+	scheduledBuildingSvc := scheduler.NewScheduledBuildingService(companyBuildingSvc)
 
 	productionRepo := production.NewProductionRepository(conn, companyRepo, companyBuildingRepo, warehouseRepo)
 	productionSvc := production.NewProductionService(productionRepo, companySvc, companyBuildingSvc, warehouseSvc)
 
 	company.CreateEndpoints(svr, companySvc)
-	production.CreateEndpoints(svr, productionSvc, companyBuildingSvc, companySvc)
+	production.CreateEndpoints(svr, productionSvc, scheduledBuildingSvc, companySvc)
 
 	svr.GET("/", server.Greeting(events))
 	svr.GET("/private", server.Private(events))

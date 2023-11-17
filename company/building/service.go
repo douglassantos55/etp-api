@@ -15,7 +15,7 @@ type (
 		GetBuildings(ctx context.Context, companyId uint64) ([]*CompanyBuilding, error)
 		AddBuilding(ctx context.Context, companyId, buildingId uint64, position uint8) (*CompanyBuilding, error)
 		Demolish(ctx context.Context, companyId, buildingId uint64) error
-		Upgrade(ctx context.Context, companyId, buildingId uint64) (*time.Time, error)
+		Upgrade(ctx context.Context, companyId, buildingId uint64) (*CompanyBuilding, error)
 		Update(ctx context.Context, companyId uint64, companyBuilding *CompanyBuilding) error
 	}
 
@@ -162,7 +162,7 @@ func (s *buildingService) Demolish(ctx context.Context, companyId, buildingId ui
 	return s.repository.Demolish(ctx, companyId, buildingId)
 }
 
-func (s *buildingService) Upgrade(ctx context.Context, companyId, buildingId uint64) (*time.Time, error) {
+func (s *buildingService) Upgrade(ctx context.Context, companyId, buildingId uint64) (*CompanyBuilding, error) {
 	buildingToUpgrade, err := s.GetBuilding(ctx, companyId, buildingId)
 	if err != nil {
 		return nil, err
@@ -201,5 +201,5 @@ func (s *buildingService) Upgrade(ctx context.Context, companyId, buildingId uin
 		return nil, err
 	}
 
-	return &completesAt, nil
+	return buildingToUpgrade, nil
 }

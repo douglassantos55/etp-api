@@ -284,31 +284,22 @@ func TestBuildingService(t *testing.T) {
 		})
 
 		t.Run("should start upgrade", func(t *testing.T) {
-			completesAt, err := service.Upgrade(ctx, 1, 1)
+			companyBuilding, err := service.Upgrade(ctx, 1, 1)
 			if err != nil {
 				t.Fatalf("could not upgrade building: %s", err)
 			}
 
-			if completesAt == nil {
+			if companyBuilding == nil {
 				t.Error("should return time of completion")
 			}
 
-			diff := math.Round(completesAt.Sub(time.Now()).Minutes())
+			diff := math.Round(companyBuilding.CompletesAt.Sub(time.Now()).Minutes())
 			if diff != 80.0 {
 				t.Errorf("expected completion in %d minutes, got %f", 80, diff)
 			}
 
-			building, err := service.GetBuilding(ctx, 1, 1)
-			if err != nil {
-				t.Fatalf("could not find building: %s", err)
-			}
-
-			if building.Level != 3 {
-				t.Errorf("expected level %d, got %d", 3, building.Level)
-			}
-
-			if building.CompletesAt != completesAt {
-				t.Errorf("expected completes at %+v, got %+v", completesAt, building.CompletesAt)
+			if companyBuilding.Level != 3 {
+				t.Errorf("expected level %d, got %d", 3, companyBuilding.Level)
 			}
 
 			inventory, err := warehouseSvc.GetInventory(ctx, 1)
