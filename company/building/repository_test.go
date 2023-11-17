@@ -500,4 +500,39 @@ func TestBuildingRepository(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("Update", func(t *testing.T) {
+		companyBuilding, err := repository.GetById(ctx, 1, 1)
+		if err != nil {
+			t.Fatalf("could not get building: %s", err)
+		}
+
+		position := uint8(8)
+		companyBuilding.Position = &position
+		companyBuilding.Name = "foobar"
+		companyBuilding.Level = 52
+		companyBuilding.CompletesAt = nil
+
+		if err := repository.Update(ctx, 1, companyBuilding); err != nil {
+			t.Fatalf("could not update building: %s", err)
+		}
+
+		companyBuilding, err = repository.GetById(ctx, 1, 1)
+		if err != nil {
+			t.Fatalf("could not get building: %s", err)
+		}
+
+		if companyBuilding.Level != 52 {
+			t.Errorf("expected level %d, got %d", 52, companyBuilding.Level)
+		}
+		if companyBuilding.Name != "foobar" {
+			t.Errorf("expected name %s, got %s", "foobar", companyBuilding.Name)
+		}
+		if *companyBuilding.Position != 8 {
+			t.Errorf("expected position %d, got %d", 8, *companyBuilding.Position)
+		}
+		if companyBuilding.CompletesAt != nil {
+			t.Errorf("should have updated completes_at: %+v", companyBuilding.CompletesAt)
+		}
+	})
 }

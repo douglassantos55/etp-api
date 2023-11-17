@@ -16,6 +16,7 @@ type (
 		AddBuilding(ctx context.Context, companyId, buildingId uint64, position uint8) (*CompanyBuilding, error)
 		Demolish(ctx context.Context, companyId, buildingId uint64) error
 		Upgrade(ctx context.Context, companyId, buildingId uint64) (*time.Time, error)
+		Update(ctx context.Context, companyId uint64, companyBuilding *CompanyBuilding) error
 	}
 
 	Building struct {
@@ -116,6 +117,10 @@ func (s *buildingService) GetBuildings(ctx context.Context, companyId uint64) ([
 	return s.repository.GetAll(ctx, companyId)
 }
 
+func (s *buildingService) Update(ctx context.Context, companyId uint64, companyBuilding *CompanyBuilding) error {
+	return s.repository.Update(ctx, companyId, companyBuilding)
+}
+
 func (s *buildingService) AddBuilding(ctx context.Context, companyId, buildingId uint64, position uint8) (*CompanyBuilding, error) {
 	buildingToConstruct, err := s.buildingSvc.GetById(ctx, buildingId)
 	if err != nil {
@@ -174,8 +179,6 @@ func (s *buildingService) Upgrade(ctx context.Context, companyId, buildingId uin
 	if buildingToUpgrade.BusyUntil != nil {
 		return nil, server.NewBusinessRuleError("cannot upgrade busy building")
 	}
-
-	println(buildingToUpgrade.Level)
 
 	inventory, err := s.warehouseSvc.GetInventory(ctx, companyId)
 	if err != nil {

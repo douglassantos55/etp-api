@@ -19,6 +19,7 @@ type (
 		AddBuilding(ctx context.Context, companyId uint64, inventory *warehouse.Inventory, building *building.Building, position uint8) (*CompanyBuilding, error)
 		Demolish(ctx context.Context, companyId, building uint64) error
 		Upgrade(ctx context.Context, inventory *warehouse.Inventory, building *CompanyBuilding) error
+		Update(ctx context.Context, companyId uint64, companyBuilding *CompanyBuilding) error
 	}
 
 	buildingRepository struct {
@@ -144,6 +145,25 @@ func (r *buildingRepository) Demolish(ctx context.Context, companyId, buildingId
 		)).
 		Executor().
 		Exec()
+
+	return err
+}
+
+func (r *buildingRepository) Update(ctx context.Context, companyId uint64, companyBuilding *CompanyBuilding) error {
+	_, err := r.builder.
+		Update(goqu.T("companies_buildings")).
+		Set(goqu.Record{
+			"name":         companyBuilding.Name,
+			"level":        companyBuilding.Level,
+			"position":     companyBuilding.Position,
+			"completes_at": companyBuilding.CompletesAt,
+		}).
+		Where(goqu.And(
+			goqu.I("id").Eq(companyBuilding.Id),
+			goqu.I("company_id").Eq(companyId),
+		)).
+		Executor().
+		ExecContext(ctx)
 
 	return err
 }

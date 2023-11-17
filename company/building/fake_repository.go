@@ -191,3 +191,8 @@ func (r *fakeBuildingRepository) Demolish(ctx context.Context, companyId, buildi
 func (r *fakeBuildingRepository) Upgrade(ctx context.Context, inventory *warehouse.Inventory, buildingToUpgrade *CompanyBuilding) error {
 	return nil
 }
+
+func (r *fakeBuildingRepository) Update(ctx context.Context, companyId uint64, companyBuilding *CompanyBuilding) error {
+	r.data[companyId][companyBuilding.Id] = companyBuilding
+	return nil
+}
