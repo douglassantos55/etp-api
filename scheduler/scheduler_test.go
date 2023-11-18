@@ -44,4 +44,22 @@ func TestScheduler(t *testing.T) {
 			t.Errorf("expected count %d, got %d", 2, count)
 		}
 	})
+
+	t.Run("Remove", func(t *testing.T) {
+		counter := make(chan int)
+		scheduler := scheduler.NewScheduler()
+
+		scheduler.Add(1, time.Second, func() error {
+			counter <- 1
+			return nil
+		})
+
+		scheduler.Remove(1)
+
+		select {
+		case <-time.After(70 * time.Millisecond):
+		case c := <-counter:
+			t.Errorf("should not receive on channel, got: %d", c)
+		}
+	})
 }
