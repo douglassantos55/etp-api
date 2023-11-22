@@ -1,6 +1,7 @@
 package market_test
 
 import (
+	"api/company"
 	"api/database"
 	"api/market"
 	"api/resource"
@@ -47,11 +48,21 @@ func TestMarketRepository(t *testing.T) {
 		t.Fatalf("could not seed database: %s", err)
 	}
 
+	if _, err := tx.Exec(`
+        INSERT INTO transactions (company_id, value)
+        VALUES (1, 100000);
+    `); err != nil {
+		t.Fatalf("could not seed database: %s", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("could not commit transaction: %s", err)
 	}
 
 	t.Cleanup(func() {
+		if _, err := conn.DB.Exec(`DELETE FROM transactions`); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
 		if _, err := conn.DB.Exec(`DELETE FROM inventories`); err != nil {
 			t.Fatalf("could not cleanup database: %s", err)
 		}
@@ -66,49 +77,61 @@ func TestMarketRepository(t *testing.T) {
 		}
 	})
 
+	companyRepo := company.NewRepository(conn)
 	warehouseRepo := warehouse.NewRepository(conn)
-	repository := market.NewRepository(conn, warehouseRepo)
+	repository := market.NewRepository(conn, companyRepo, warehouseRepo)
 
 	ctx := context.Background()
 
 	t.Run("PlaceOrder", func(t *testing.T) {
-		t.Run("updates inventory", func(t *testing.T) {
-			inventory, err := warehouseRepo.FetchInventory(ctx, 1)
-			if err != nil {
-				t.Fatalf("could not get inventory: %s", err)
-			}
+		inventory, err := warehouseRepo.FetchInventory(ctx, 1)
+		if err != nil {
+			t.Fatalf("could not get inventory: %s", err)
+		}
 
-			inventory.ReduceStock([]*resource.Item{
-				{Qty: 100, Quality: 0, Resource: &resource.Resource{Id: 2}},
-			})
-
-			order := &market.Order{
-				CompanyId:    1,
-				Quality:      0,
-				ResourceId:   2,
-				Quantity:     100,
-				Price:        2275,
-				SourcingCost: 1553,
-			}
-
-			dbOrder, err := repository.PlaceOrder(ctx, order, inventory)
-			if err != nil {
-				t.Fatalf("could not place order: %s", err)
-			}
-
-			if dbOrder.Id == 0 {
-				t.Errorf("should have an ID, got %d", dbOrder.Id)
-			}
-
-			inventory, err = warehouseRepo.FetchInventory(ctx, 1)
-			if err != nil {
-				t.Fatalf("could not get inventory: %s", err)
-			}
-
-			stock := inventory.GetStock(2, 0)
-			if stock != 600 {
-				t.Errorf("expected stock %d, got %d", 600, stock)
-			}
+		inventory.ReduceStock([]*resource.Item{
+			{Qty: 100, Quality: 0, Resource: &resource.Resource{Id: 2}},
 		})
+
+		order := &market.Order{
+			CompanyId:    1,
+			Quality:      0,
+			ResourceId:   2,
+			Quantity:     100,
+			Price:        2275,
+			TransportFee: 776,
+			SourcingCost: 1553,
+		}
+
+		dbOrder, err := repository.PlaceOrder(ctx, order, inventory)
+		if err != nil {
+			t.Fatalf("could not place order: %s", err)
+		}
+
+		if dbOrder.Id == 0 {
+			t.Errorf("should have an ID, got %d", dbOrder.Id)
+		}
+
+		// Test if inventory is reduced
+		inventory, err = warehouseRepo.FetchInventory(ctx, 1)
+		if err != nil {
+			t.Fatalf("could not get inventory: %s", err)
+		}
+
+		stock := inventory.GetStock(2, 0)
+		if stock != 600 {
+			t.Errorf("expected stock %d, got %d", 600, stock)
+		}
+
+		// Test if transport fee is paid
+		company, err := companyRepo.GetById(ctx, 1)
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+
+		expectedCash := 100000 - 776
+		if company.AvailableCash != expectedCash {
+			t.Errorf("expected cash %d, got %d", expectedCash, company.AvailableCash)
+		}
 	})
 }

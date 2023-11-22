@@ -1,6 +1,7 @@
 package market
 
 import (
+	"api/company"
 	"api/database"
 	"api/warehouse"
 	"context"
@@ -14,14 +15,16 @@ type (
 	}
 
 	goquRepository struct {
-		builder   *goqu.Database
-		warehouse warehouse.Repository
+		builder       *goqu.Database
+		companyRepo   company.Repository
+		warehouseRepo warehouse.Repository
 	}
 )
 
-func NewRepository(conn *database.Connection, warehouse warehouse.Repository) Repository {
+func NewRepository(conn *database.Connection, companyRepo company.Repository, warehouseRepo warehouse.Repository) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
-	return &goquRepository{builder, warehouse}
+	return &goquRepository{builder, companyRepo, warehouseRepo}
+}
 }
 
 func (r *goquRepository) PlaceOrder(ctx context.Context, order *Order, inventory *warehouse.Inventory) (*Order, error) {
@@ -32,7 +35,18 @@ func (r *goquRepository) PlaceOrder(ctx context.Context, order *Order, inventory
 
 	defer tx.Rollback()
 
-	if err := r.warehouse.UpdateInventory(&database.DB{TxDatabase: tx}, inventory); err != nil {
+	dbTx := &database.DB{TxDatabase: tx}
+	if err := r.warehouseRepo.UpdateInventory(dbTx, inventory); err != nil {
+		return nil, err
+	}
+
+	if err := r.companyRepo.RegisterTransaction(
+		dbTx,
+		order.CompanyId,
+		company.TRANSPORT_FEE,
+		int(order.TransportFee)*-1,
+		"Market transport fee",
+	); err != nil {
 		return nil, err
 	}
 
