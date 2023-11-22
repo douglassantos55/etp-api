@@ -17,6 +17,7 @@ func NewFakeRepository() Repository {
 			{Cost: 137, Item: &resource.Item{Quality: 0, Qty: 100, Resource: &resource.Resource{Id: 1}}},
 			{Cost: 47, Item: &resource.Item{Quality: 1, Qty: 1000, Resource: &resource.Resource{Id: 3}}},
 			{Cost: 1553, Item: &resource.Item{Quality: 0, Qty: 700, Resource: &resource.Resource{Id: 2}}},
+			{Cost: 153553, Item: &resource.Item{Quality: 2, Qty: 1700, Resource: &resource.Resource{Id: 4}}},
 		}},
 		2: {Items: []*StockItem{
 			{Cost: 525, Item: &resource.Item{Quality: 1, Qty: 50, Resource: &resource.Resource{Id: 1}}},
