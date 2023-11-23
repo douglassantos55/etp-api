@@ -11,6 +11,7 @@ const (
 	WAGES          = 1
 	SOCIAL_CAPITAL = 2
 	TRANSPORT_FEE  = 3
+	REFUNDS        = 4
 )
 
 type (

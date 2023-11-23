@@ -70,5 +70,43 @@ func TestMarketService(t *testing.T) {
 				t.Errorf("expected sourcing cost %d, got %d", expectedSourcingCost, order.SourcingCost)
 			}
 		})
+
+		t.Run("should reduce stocks", func(t *testing.T) {
+			_, err := service.PlaceOrder(ctx, &market.Order{
+				CompanyId:  1,
+				Quality:    0,
+				Quantity:   50,
+				Price:      5,
+				ResourceId: 2,
+			})
+
+			inventory, err := warehouseSvc.GetInventory(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get inventory: %s", err)
+			}
+
+			stock := inventory.GetStock(2, 0)
+			if stock != 600 {
+				t.Errorf("expected stock %d, got %d", 600, stock)
+			}
+		})
+	})
+
+	t.Run("CancelOrder", func(t *testing.T) {
+		t.Run("should increment stocks", func(t *testing.T) {
+			if err := service.CancelOrder(ctx, 1); err != nil {
+				t.Fatalf("could not cancel order: %s", err)
+			}
+
+			inventory, err := warehouseSvc.GetInventory(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get inventory: %s", err)
+			}
+
+			stock := inventory.GetStock(2, 0)
+			if stock != 750 {
+				t.Errorf("expected stock %d, got %d", 750, stock)
+			}
+		})
 	})
 }

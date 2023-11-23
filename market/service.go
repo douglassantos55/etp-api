@@ -28,6 +28,7 @@ type (
 
 	Service interface {
 		PlaceOrder(ctx context.Context, order *Order) (*Order, error)
+		CancelOrder(ctx context.Context, orderId uint64) error
 	}
 
 	service struct {
@@ -72,4 +73,29 @@ func (s *service) PlaceOrder(ctx context.Context, order *Order) (*Order, error) 
 	}
 
 	return s.repository.PlaceOrder(ctx, order, inventory)
+}
+
+func (s *service) CancelOrder(ctx context.Context, orderId uint64) error {
+	order, err := s.repository.GetById(ctx, orderId)
+	if err != nil {
+		return err
+	}
+
+	inventory, err := s.warehouseSvc.GetInventory(ctx, order.CompanyId)
+	if err != nil {
+		return err
+	}
+
+	inventory.IncrementStock([]*warehouse.StockItem{
+		{
+			Item: &resource.Item{
+				Qty:      order.Quantity,
+				Quality:  order.Quality,
+				Resource: &resource.Resource{Id: order.Resource.Id},
+			},
+			Cost: order.SourcingCost,
+		},
+	})
+
+	return s.repository.CancelOrder(ctx, order, inventory)
 }

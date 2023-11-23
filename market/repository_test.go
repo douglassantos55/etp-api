@@ -49,6 +49,13 @@ func TestMarketRepository(t *testing.T) {
 	}
 
 	if _, err := tx.Exec(`
+        INSERT INTO orders (id, company_id, resource_id, quality, quantity, price, sourcing_cost, transport_fee)
+        VALUES (1, 1, 1, 0, 100, 1824, 1553, 1137), (2, 1, 2, 1, 1000, 4335, 3768, 5000)
+    `); err != nil {
+		t.Fatalf("could not seed database: %s", err)
+	}
+
+	if _, err := tx.Exec(`
         INSERT INTO transactions (company_id, value)
         VALUES (1, 100000);
     `); err != nil {
@@ -61,6 +68,9 @@ func TestMarketRepository(t *testing.T) {
 
 	t.Cleanup(func() {
 		if _, err := conn.DB.Exec(`DELETE FROM transactions`); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec(`DELETE FROM orders`); err != nil {
 			t.Fatalf("could not cleanup database: %s", err)
 		}
 		if _, err := conn.DB.Exec(`DELETE FROM inventories`); err != nil {
@@ -132,6 +142,61 @@ func TestMarketRepository(t *testing.T) {
 		expectedCash := 100000 - 776
 		if company.AvailableCash != expectedCash {
 			t.Errorf("expected cash %d, got %d", expectedCash, company.AvailableCash)
+		}
+	})
+
+	t.Run("CancelOrder", func(t *testing.T) {
+		inventory, err := warehouseRepo.FetchInventory(ctx, 1)
+		if err != nil {
+			t.Fatalf("could not get inventory: %s", err)
+		}
+
+		inventory.IncrementStock([]*warehouse.StockItem{
+			{
+				Item: &resource.Item{
+					Qty:      100,
+					Quality:  0,
+					Resource: &resource.Resource{Id: 1},
+				},
+				Cost: 1553,
+			},
+		})
+
+		order := &market.Order{
+			Id:           1,
+			CompanyId:    1,
+			Quality:      0,
+			ResourceId:   1,
+			Quantity:     100,
+			Price:        1824,
+			TransportFee: 1137,
+			SourcingCost: 1553,
+		}
+
+		if err := repository.CancelOrder(ctx, order, inventory); err != nil {
+			t.Fatalf("could not cancel order: %s", err)
+		}
+
+		// Test if transport fee is refunded
+		company, err := companyRepo.GetById(ctx, 1)
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+
+		expectedCash := 100000 - 776 + 1137
+		if company.AvailableCash != expectedCash {
+			t.Errorf("expected cash %d, got %d", expectedCash, company.AvailableCash)
+		}
+
+		// Test if stock is restored
+		inventory, err = warehouseRepo.FetchInventory(ctx, 1)
+		if err != nil {
+			t.Fatalf("could not get inventory: %s", err)
+		}
+
+		stock := inventory.GetStock(1, 0)
+		if stock != 200 {
+			t.Errorf("expected stock %d, got %d", 200, stock)
 		}
 	})
 }
