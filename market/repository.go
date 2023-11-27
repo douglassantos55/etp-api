@@ -33,9 +33,35 @@ func (r *goquRepository) GetById(ctx context.Context, orderId uint64) (*Order, e
 	order := new(Order)
 
 	found, err := r.builder.
-		Select().
-		From(goqu.T("orders")).
-		Where(goqu.And()).
+		Select(
+			goqu.I("o.id"),
+			goqu.I("o.price"),
+			goqu.I("o.quality"),
+			goqu.I("o.quantity"),
+			goqu.I("o.market_fee"),
+			goqu.I("o.sourcing_cost"),
+			goqu.I("o.purchased_at").As("last_purchase"),
+			goqu.I("c.id").As(goqu.C("company.id")),
+			goqu.I("c.name").As(goqu.C("company.name")),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+			goqu.I("r.id").As(goqu.C("resource.id")),
+			goqu.I("r.name").As(goqu.C("resource.name")),
+			goqu.I("r.image").As(goqu.C("resource.image")),
+		).
+		From(goqu.T("orders").As("o")).
+		InnerJoin(
+			goqu.T("companies").As("c"),
+			goqu.On(goqu.I("o.company_id").Eq(goqu.I("c.id"))),
+		).
+		InnerJoin(
+			goqu.T("resources").As("r"),
+			goqu.On(goqu.I("o.resource_id").Eq(goqu.I("r.id"))),
+		).
+		Where(goqu.And(
+			goqu.I("o.id").Eq(orderId),
+			goqu.I("o.quantity").Gt(0),
+			goqu.I("o.canceled_at").IsNull(),
+		)).
 		ScanStructContext(ctx, order)
 
 	if err != nil || !found {
@@ -115,7 +141,7 @@ func (r *goquRepository) CancelOrder(ctx context.Context, order *Order, inventor
 
 	if err := r.companyRepo.RegisterTransaction(
 		dbTx,
-		order.CompanyId,
+		order.Company.Id,
 		company.REFUNDS,
 		int(order.TransportFee),
 		"Market transport fee refund",
@@ -130,7 +156,7 @@ func (r *goquRepository) CancelOrder(ctx context.Context, order *Order, inventor
 		}).
 		Where(goqu.And(
 			goqu.I("id").Eq(order.Id),
-			goqu.I("company_id").Eq(order.CompanyId),
+			goqu.I("company_id").Eq(order.Company.Id),
 		)).
 		Executor().
 		Exec()

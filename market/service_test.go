@@ -94,7 +94,12 @@ func TestMarketService(t *testing.T) {
 
 	t.Run("CancelOrder", func(t *testing.T) {
 		t.Run("should increment stocks", func(t *testing.T) {
-			if err := service.CancelOrder(ctx, 1); err != nil {
+			order, err := service.GetById(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get order: %s", err)
+			}
+
+			if err := service.CancelOrder(ctx, order); err != nil {
 				t.Fatalf("could not cancel order: %s", err)
 			}
 

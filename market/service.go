@@ -6,29 +6,32 @@ import (
 	"api/server"
 	"api/warehouse"
 	"context"
+	"time"
 )
 
 const TRANSPORT_FEE_PERCENTAGE = 0.005
 
 type (
 	Order struct {
-		Id           uint64 `db:"id" json:"id" goqu:"skipinsert,skipupdate" validate:"-"`
-		Price        uint64 `db:"price" json:"price" validate:"required,gt=0"`
-		Quality      uint8  `db:"quality" json:"quality" validate:"gte=0"`
-		Quantity     uint64 `db:"quantity" json:"quantity" validate:"required,gte=1"`
-		MarketFee    uint64 `db:"market_fee" json:"market_fee" validate:"-"`
-		TransportFee uint64 `db:"transport_fee" json:"transport_fee" validate:"-"`
-		CompanyId    uint64 `db:"company_id" json:"company_id,omitempty" validate:"-"`
-		ResourceId   uint64 `db:"resource_id" json:"resource_id,omitempty" validate:"required"`
-		SourcingCost uint64 `db:"sourcing_cost" json:"-" validate:"-"`
+		Id           uint64     `db:"id" json:"id" goqu:"skipinsert,skipupdate" validate:"-"`
+		Price        uint64     `db:"price" json:"price" validate:"required,gt=0"`
+		Quality      uint8      `db:"quality" json:"quality" validate:"gte=0"`
+		Quantity     uint64     `db:"quantity" json:"quantity" validate:"required,gte=1"`
+		MarketFee    uint64     `db:"market_fee" json:"market_fee" validate:"-"`
+		TransportFee uint64     `db:"transport_fee" json:"transport_fee" validate:"-"`
+		CompanyId    uint64     `db:"company_id" json:"company_id,omitempty" validate:"-"`
+		ResourceId   uint64     `db:"resource_id" json:"resource_id,omitempty" validate:"required"`
+		SourcingCost uint64     `db:"sourcing_cost" json:"-" validate:"-"`
+		LastPurchase *time.Time `db:"last_purchase" json:"-" validate:"-"`
 
 		Resource *resource.Resource `db:"resource" json:"resource" validate:"-"`
 		Company  *company.Company   `db:"company" json:"company" validate:"-"`
 	}
 
 	Service interface {
+		GetById(ctx context.Context, orderId uint64) (*Order, error)
 		PlaceOrder(ctx context.Context, order *Order) (*Order, error)
-		CancelOrder(ctx context.Context, orderId uint64) error
+		CancelOrder(ctx context.Context, order *Order) error
 	}
 
 	service struct {
@@ -40,6 +43,10 @@ type (
 
 func NewService(repository Repository, companySvc company.Service, warehouseSvc warehouse.Service) Service {
 	return &service{repository, companySvc, warehouseSvc}
+}
+
+func (s *service) GetById(ctx context.Context, orderId uint64) (*Order, error) {
+	return s.repository.GetById(ctx, orderId)
 }
 
 func (s *service) PlaceOrder(ctx context.Context, order *Order) (*Order, error) {
@@ -75,12 +82,7 @@ func (s *service) PlaceOrder(ctx context.Context, order *Order) (*Order, error) 
 	return s.repository.PlaceOrder(ctx, order, inventory)
 }
 
-func (s *service) CancelOrder(ctx context.Context, orderId uint64) error {
-	order, err := s.repository.GetById(ctx, orderId)
-	if err != nil {
-		return err
-	}
-
+func (s *service) CancelOrder(ctx context.Context, order *Order) error {
 	inventory, err := s.warehouseSvc.GetInventory(ctx, order.CompanyId)
 	if err != nil {
 		return err

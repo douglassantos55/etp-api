@@ -1,6 +1,7 @@
 package market
 
 import (
+	"api/company"
 	"api/resource"
 	"api/warehouse"
 	"context"
@@ -24,11 +25,25 @@ func NewFakeRepository() Repository {
 			TransportFee: 1164,
 			MarketFee:    8203,
 			Resource:     &resource.Resource{Id: 2},
+			Company:      &company.Company{Id: 1},
+		},
+		2: {
+			Id:           2,
+			Price:        1823,
+			Quality:      0,
+			Quantity:     150,
+			CompanyId:    2,
+			ResourceId:   2,
+			SourcingCost: 1553,
+			TransportFee: 1164,
+			MarketFee:    8203,
+			Resource:     &resource.Resource{Id: 2},
+			Company:      &company.Company{Id: 2},
 		},
 	}
 
 	return &fakeRepository{
-		lastId: 1,
+		lastId: 2,
 		orders: orders,
 	}
 }

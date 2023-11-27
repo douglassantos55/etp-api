@@ -92,4 +92,45 @@ func TestMarketRoutes(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("CancelOrder", func(t *testing.T) {
+		t.Run("should not cancel from other companies", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/market/orders/2", nil)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Errorf("expected status %d, got %d: %s", http.StatusForbidden, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should not cancel non existing order", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/market/orders/5142532", nil)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNotFound {
+				t.Errorf("expected status %d, got %d: %s", http.StatusNotFound, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should not cancel invalid order ID", func(t *testing.T) {
+			req := httptest.NewRequest("DELETE", "/market/orders/somethinghere", nil)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+		})
+	})
 }
