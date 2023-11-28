@@ -8,10 +8,13 @@ import (
 )
 
 const (
-	WAGES          = 1
-	SOCIAL_CAPITAL = 2
-	TRANSPORT_FEE  = 3
-	REFUNDS        = 4
+	WAGES           = 1
+	SOCIAL_CAPITAL  = 2
+	TRANSPORT_FEE   = 3
+	REFUNDS         = 4
+	MARKET_PURCHASE = 5
+	MARKET_SALE     = 6
+	MARKET_FEE      = 7
 )
 
 type (

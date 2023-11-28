@@ -133,4 +133,81 @@ func TestMarketRoutes(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("Purchase", func(t *testing.T) {
+		t.Run("should validate bind", func(t *testing.T) {
+			body := strings.NewReader(`{"resource_id":1,"quality":"0","quantity":1}`)
+
+			req := httptest.NewRequest("POST", "/market/orders/purchase", body)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should validate struct", func(t *testing.T) {
+			body := strings.NewReader(`{"resource_id":0,"quality":0,"quantity":0}`)
+
+			req := httptest.NewRequest("POST", "/market/orders/purchase", body)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+
+			var validationErrors server.ValidationErrors
+			if err := json.Unmarshal(rec.Body.Bytes(), &validationErrors); err != nil {
+				t.Fatalf("could not parse json: %s", err)
+			}
+
+			expectedMessage := "resource_id is a required field"
+			if msg, ok := validationErrors.Errors["resource_id"]; !ok || msg != expectedMessage {
+				t.Errorf("expected validation error for price: %s, got %s", expectedMessage, msg)
+			}
+
+			expectedMessage = "quantity is a required field"
+			if msg, ok := validationErrors.Errors["quantity"]; !ok || msg != expectedMessage {
+				t.Errorf("expected validation error for quantity: %s, got %s", expectedMessage, msg)
+			}
+		})
+
+		t.Run("should return ok", func(t *testing.T) {
+			body := strings.NewReader(`{"resource_id":2,"quality":0,"quantity":1}`)
+
+			req := httptest.NewRequest("POST", "/market/orders/purchase", body)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should return unprocessable entity", func(t *testing.T) {
+			body := strings.NewReader(`{"resource_id":10,"quality":0,"quantity":1}`)
+
+			req := httptest.NewRequest("POST", "/market/orders/purchase", body)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnprocessableEntity {
+				t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+			}
+		})
+	})
 }

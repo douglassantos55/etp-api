@@ -68,8 +68,10 @@ func (r *goquRepository) UpdateInventory(db *database.DB, inventory *Inventory) 
 				return err
 			}
 		} else {
-			if err := r.updateStock(db, inventory.CompanyId, item); err != nil {
-				return err
+			if updated, err := r.updateStock(db, inventory.CompanyId, item); err != nil || updated == 0 {
+				if err := r.insertStock(db, inventory.CompanyId, item); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -90,8 +92,8 @@ func (r *goquRepository) removeStock(tx *database.DB, companyId uint64, item *St
 	return err
 }
 
-func (r *goquRepository) updateStock(tx *database.DB, companyId uint64, item *StockItem) error {
-	_, err := tx.
+func (r *goquRepository) updateStock(tx *database.DB, companyId uint64, item *StockItem) (int64, error) {
+	result, err := tx.
 		Update(goqu.T("inventories")).
 		Set(goqu.Record{"quantity": item.Qty}).
 		Where(goqu.And(
@@ -99,6 +101,26 @@ func (r *goquRepository) updateStock(tx *database.DB, companyId uint64, item *St
 			goqu.I("company_id").Eq(companyId),
 			goqu.I("resource_id").Eq(item.Resource.Id),
 		)).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
+}
+
+func (r *goquRepository) insertStock(tx *database.DB, companyId uint64, item *StockItem) error {
+	_, err := tx.
+		Insert(goqu.T("inventories")).
+		Rows(goqu.Record{
+			"sourcing_cost": item.Cost,
+			"quantity":      item.Qty,
+			"quality":       item.Quality,
+			"company_id":    companyId,
+			"resource_id":   item.Resource.Id,
+		}).
 		Executor().
 		Exec()
 

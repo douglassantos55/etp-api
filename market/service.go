@@ -28,10 +28,17 @@ type (
 		Company  *company.Company   `db:"company" json:"company" validate:"-"`
 	}
 
+	Purchase struct {
+		ResourceId uint64 `json:"resource_id" validate:"required"`
+		Quantity   uint64 `json:"quantity" validate:"required"`
+		Quality    uint8  `json:"quality" validate:"gte=0"`
+	}
+
 	Service interface {
 		GetById(ctx context.Context, orderId uint64) (*Order, error)
 		PlaceOrder(ctx context.Context, order *Order) (*Order, error)
 		CancelOrder(ctx context.Context, order *Order) error
+		Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error)
 	}
 
 	service struct {
@@ -47,6 +54,10 @@ func NewService(repository Repository, companySvc company.Service, warehouseSvc 
 
 func (s *service) GetById(ctx context.Context, orderId uint64) (*Order, error) {
 	return s.repository.GetById(ctx, orderId)
+}
+
+func (s *service) Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error) {
+	return s.repository.Purchase(ctx, purchase, companyId)
 }
 
 func (s *service) PlaceOrder(ctx context.Context, order *Order) (*Order, error) {

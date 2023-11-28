@@ -65,4 +65,28 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 
 		return service.CancelOrder(ctx, order)
 	})
+
+	group.POST("/orders/purchase", func(c echo.Context) error {
+		purchase := new(Purchase)
+
+		if err := c.Bind(purchase); err != nil {
+			return err
+		}
+
+		if err := c.Validate(purchase); err != nil {
+			return err
+		}
+
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		items, err := service.Purchase(c.Request().Context(), purchase, companyId)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, items)
+	})
 }

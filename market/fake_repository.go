@@ -3,6 +3,7 @@ package market
 import (
 	"api/company"
 	"api/resource"
+	"api/server"
 	"api/warehouse"
 	"context"
 )
@@ -52,6 +53,18 @@ func (r *fakeRepository) GetById(ctx context.Context, orderId uint64) (*Order, e
 	return r.orders[orderId], nil
 }
 
+func (r *fakeRepository) GetByResource(ctx context.Context, resourceId uint64, quality uint8) ([]*Order, error) {
+	orders := make([]*Order, 0)
+
+	for _, order := range r.orders {
+		if order.ResourceId == resourceId && order.Quality >= quality {
+			orders = append(orders, order)
+		}
+	}
+
+	return orders, nil
+}
+
 func (r *fakeRepository) PlaceOrder(ctx context.Context, order *Order, inventory *warehouse.Inventory) (*Order, error) {
 	r.lastId++
 
@@ -63,4 +76,48 @@ func (r *fakeRepository) PlaceOrder(ctx context.Context, order *Order, inventory
 
 func (r *fakeRepository) CancelOrder(ctx context.Context, order *Order, inventory *warehouse.Inventory) error {
 	return nil
+}
+
+func (r *fakeRepository) Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error) {
+
+	orders, err := r.GetByResource(ctx, purchase.ResourceId, purchase.Quality)
+	if err != nil {
+		return nil, err
+	}
+
+	remaining := purchase.Quantity
+	items := make([]*warehouse.StockItem, 0)
+
+	for _, order := range orders {
+		if order.Quantity > remaining {
+			items = append(items, &warehouse.StockItem{
+				Cost: order.SourcingCost,
+				Item: &resource.Item{
+					Qty:        remaining,
+					Quality:    order.Quality,
+					Resource:   order.Resource,
+					ResourceId: order.ResourceId,
+				},
+			})
+			remaining = 0
+			break
+		} else {
+			remaining -= order.Quantity
+			items = append(items, &warehouse.StockItem{
+				Cost: order.SourcingCost,
+				Item: &resource.Item{
+					Qty:        order.Quantity,
+					Quality:    order.Quality,
+					Resource:   order.Resource,
+					ResourceId: order.ResourceId,
+				},
+			})
+		}
+	}
+
+	if remaining > 0 {
+		return nil, server.NewBusinessRuleError("nope")
+	}
+
+	return items, nil
 }

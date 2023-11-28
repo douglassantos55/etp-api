@@ -25,7 +25,10 @@ func TestMarketRepository(t *testing.T) {
 
 	if _, err := tx.Exec(`
         INSERT INTO companies (id, name, email, password) VALUES
-        (1, "Coca-Cola", "coke@email.com", "aoeu")
+        (1, "Coca-Cola", "coke@email.com", "aoeu"),
+        (2, "McDonalds", "mcdonalds@email.com", "aoeu"),
+        (3, "McDonalds", "mcdonalds@email.com", "aoeu"),
+        (4, "McDonalds", "mcdonalds@email.com", "aoeu")
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
@@ -49,15 +52,21 @@ func TestMarketRepository(t *testing.T) {
 	}
 
 	if _, err := tx.Exec(`
-        INSERT INTO orders (id, company_id, resource_id, quality, quantity, price, sourcing_cost, transport_fee)
-        VALUES (1, 1, 1, 0, 100, 1824, 1553, 1137), (2, 1, 2, 1, 1000, 4335, 3768, 5000)
+        INSERT INTO orders (id, company_id, resource_id, quality, quantity, price, sourcing_cost, transport_fee) VALUES
+        (1, 1, 1, 0, 100, 1824, 1553, 1137),
+
+        (2, 1, 2, 1, 1000, 4335, 3768, 5000),
+
+        (3, 1, 3, 1, 500, 4335, 3768, 5000),
+        (4, 3, 3, 0, 500, 4435, 3868, 5100),
+        (5, 4, 3, 2, 2000, 4535, 3968, 5200)
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
 
 	if _, err := tx.Exec(`
         INSERT INTO transactions (company_id, value)
-        VALUES (1, 100000);
+        VALUES (1, 100000), (2, 100000000);
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
@@ -92,6 +101,9 @@ func TestMarketRepository(t *testing.T) {
 	repository := market.NewRepository(conn, companyRepo, warehouseRepo)
 
 	ctx := context.Background()
+
+	t.Run("GetById", func(t *testing.T) {
+	})
 
 	t.Run("PlaceOrder", func(t *testing.T) {
 		inventory, err := warehouseRepo.FetchInventory(ctx, 1)
@@ -164,13 +176,13 @@ func TestMarketRepository(t *testing.T) {
 
 		order := &market.Order{
 			Id:           1,
-			CompanyId:    1,
 			Quality:      0,
 			ResourceId:   1,
 			Quantity:     100,
 			Price:        1824,
 			TransportFee: 1137,
 			SourcingCost: 1553,
+			Company:      &company.Company{Id: 1},
 		}
 
 		if err := repository.CancelOrder(ctx, order, inventory); err != nil {
@@ -198,5 +210,212 @@ func TestMarketRepository(t *testing.T) {
 		if stock != 200 {
 			t.Errorf("expected stock %d, got %d", 200, stock)
 		}
+	})
+
+	t.Run("Purchase", func(t *testing.T) {
+		t.Run("not enough resources", func(t *testing.T) {
+			// Single order
+			purchase := &market.Purchase{
+				ResourceId: 2,
+				Quantity:   100,
+				Quality:    3,
+			}
+
+			_, err := repository.Purchase(ctx, purchase, 2)
+			expectedError := "not enough market orders"
+
+			if err.Error() != expectedError {
+				t.Errorf("expected error \"%s\", got \"%s\"", expectedError, err)
+			}
+
+			// Multiple orders
+			purchase = &market.Purchase{
+				ResourceId: 3,
+				Quantity:   10000,
+				Quality:    0,
+			}
+
+			_, err = repository.Purchase(ctx, purchase, 2)
+			if err.Error() != expectedError {
+				t.Errorf("expected error \"%s\", got \"%s\"", expectedError, err)
+			}
+		})
+
+		t.Run("not enough cash", func(t *testing.T) {
+			purchase := &market.Purchase{
+				ResourceId: 3,
+				Quantity:   1000,
+				Quality:    0,
+			}
+
+			_, err := repository.Purchase(ctx, purchase, 3)
+			expectedError := "not enough cash"
+
+			if err.Error() != expectedError {
+				t.Errorf("expected error \"%s\", got \"%s\"", expectedError, err)
+			}
+		})
+
+		t.Run("single order", func(t *testing.T) {
+			purchase := &market.Purchase{
+				ResourceId: 2,
+				Quantity:   500,
+				Quality:    1,
+			}
+
+			items, err := repository.Purchase(ctx, purchase, 2)
+			if err != nil {
+				t.Fatalf("could not purchase order: %s", err)
+			}
+
+			if len(items) != 1 {
+				t.Errorf("expected 1 item, got %d", len(items))
+			}
+
+			if items[0].Qty != 500 {
+				t.Errorf("expected qty %d, got %d", 500, items[0].Qty)
+			}
+
+			inventory, err := warehouseRepo.FetchInventory(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get inventory: %s", err)
+			}
+
+			stock := inventory.GetStock(2, 1)
+			if stock != 500 {
+				t.Errorf("expected stock %d, got %d", 500, stock)
+			}
+
+			order, err := repository.GetById(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get order: %s", err)
+			}
+
+			if order.Quantity != 500 {
+				t.Errorf("expected qty %d, got %d", 500, order.Quantity)
+			}
+
+			if order.LastPurchase == nil {
+				t.Error("should have set purchased_at")
+			}
+
+			company, err := companyRepo.GetById(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get company: %s", err)
+			}
+
+			expectedCash := 100000000 - (500 * 4335)
+			if company.AvailableCash != expectedCash {
+				t.Errorf("expected cash %d, got %d", expectedCash, company.AvailableCash)
+			}
+
+			seller, err := companyRepo.GetById(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get company: %s", err)
+			}
+
+			expectedCash = 100000 - 776 + 1137 + (500 * 4335)
+			if seller.AvailableCash != expectedCash {
+				t.Errorf("expected cash %d, got %d", expectedCash, seller.AvailableCash)
+			}
+		})
+
+		t.Run("multiple orders", func(t *testing.T) {
+			purchase := &market.Purchase{
+				ResourceId: 3,
+				Quantity:   1500,
+				Quality:    0,
+			}
+
+			items, err := repository.Purchase(ctx, purchase, 2)
+			if err != nil {
+				t.Fatalf("could not purchase order: %s", err)
+			}
+
+			if len(items) != 3 {
+				t.Errorf("expected 3 items, got %d", len(items))
+			}
+
+			inventory, err := warehouseRepo.FetchInventory(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get inventory: %s", err)
+			}
+
+			for _, item := range items {
+				if item.Qty != 500 {
+					t.Errorf("expected qty %d, got %d", 500, item.Qty)
+				}
+
+				stock := inventory.GetStock(item.Resource.Id, item.Quality)
+				if stock != 500 {
+					t.Errorf("expected stock %d, got %d", 500, stock)
+				}
+			}
+
+			for _, i := range []int{3, 4} {
+				order, err := repository.GetById(ctx, uint64(i))
+				if err != nil {
+					t.Fatalf("could not get order: %s", err)
+				}
+				if order != nil {
+					t.Errorf("should not find zeroed order, got quantity: %d", order.Quantity)
+				}
+			}
+
+			order, err := repository.GetById(ctx, 5)
+			if err != nil {
+				t.Fatalf("could not get order: %s", err)
+			}
+
+			if order == nil {
+				t.Fatal("should find order")
+			}
+
+			if order.Quantity != 1500 {
+				t.Errorf("expected qty %d, got %d", 1500, order.Quantity)
+			}
+
+			if order.LastPurchase == nil {
+				t.Error("should have set purchased_at")
+			}
+
+			buyer, err := companyRepo.GetById(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get company: %s", err)
+			}
+
+			expectedCash := 100000000 - ((500 * 4335) + (500 * 4335) + (500 * 4435) + (500 * 4535))
+			if buyer.AvailableCash != expectedCash {
+				t.Errorf("expected cash %d, got %d", expectedCash, buyer.AvailableCash)
+			}
+
+			for _, i := range []int{1, 3, 4} {
+				seller, err := companyRepo.GetById(ctx, uint64(i))
+				if err != nil {
+					t.Fatalf("could not get company: %s", err)
+				}
+
+				if i == 1 {
+					expectedCash = 100000 - 776 + 1137 + ((500 * 4335) * 2)
+					if seller.AvailableCash != expectedCash {
+						t.Errorf("expected cash %d, got %d", expectedCash, seller.AvailableCash)
+					}
+				}
+
+				if i == 3 {
+					expectedCash = (500 * 4435)
+					if seller.AvailableCash != expectedCash {
+						t.Errorf("expected cash %d, got %d", expectedCash, seller.AvailableCash)
+					}
+				}
+
+				if i == 4 {
+					expectedCash = (500 * 4535)
+					if seller.AvailableCash != expectedCash {
+						t.Errorf("expected cash %d, got %d", expectedCash, seller.AvailableCash)
+					}
+				}
+			}
+		})
 	})
 }
