@@ -11,6 +11,25 @@ import (
 func CreateEndpoints(e *echo.Echo, service Service) {
 	group := e.Group("/market")
 
+	group.GET("/orders", func(c echo.Context) error {
+		resourceId, err := strconv.ParseUint(c.QueryParam("resource"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest)
+		}
+
+		quality, err := strconv.ParseUint(c.QueryParam("quality"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest)
+		}
+
+		orders, err := service.GetByResource(c.Request().Context(), resourceId, quality)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, orders)
+	})
+
 	group.POST("/orders", func(c echo.Context) error {
 		order := new(Order)
 

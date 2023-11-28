@@ -52,14 +52,16 @@ func TestMarketRepository(t *testing.T) {
 	}
 
 	if _, err := tx.Exec(`
-        INSERT INTO orders (id, company_id, resource_id, quality, quantity, price, sourcing_cost, transport_fee) VALUES
-        (1, 1, 1, 0, 100, 1824, 1553, 1137),
+        INSERT INTO orders (id, company_id, resource_id, quality, quantity, price, sourcing_cost, transport_fee, canceled_at) VALUES
+        (1, 1, 1, 0, 100, 1824, 1553, 1137, NULL),
 
-        (2, 1, 2, 1, 1000, 4335, 3768, 5000),
+        (2, 1, 2, 1, 1000, 4335, 3768, 5000, NULL),
 
-        (3, 1, 3, 1, 500, 4335, 3768, 5000),
-        (4, 3, 3, 0, 500, 4435, 3868, 5100),
-        (5, 4, 3, 2, 2000, 4535, 3968, 5200)
+        (3, 1, 3, 1, 500, 4335, 3768, 5000, NULL),
+        (4, 3, 3, 0, 500, 4435, 3868, 5100, NULL),
+        (5, 4, 3, 2, 2000, 4535, 3968, 5200, NULL),
+        (6, 4, 3, 3, 0, 4545, 3968, 5200, NULL),
+        (7, 4, 3, 4, 2000, 4555, 3968, 5200, '2023-11-11')
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
@@ -103,6 +105,54 @@ func TestMarketRepository(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("GetById", func(t *testing.T) {
+	})
+
+	t.Run("GetByResource", func(t *testing.T) {
+		t.Run("should list greater qualities", func(t *testing.T) {
+			orders, err := repository.GetByResource(ctx, 3, 0)
+			if err != nil {
+				t.Fatalf("could not list orders: %s", err)
+			}
+
+			if len(orders) != 3 {
+				t.Errorf("expected %d orders, got %d", 3, len(orders))
+			}
+		})
+
+		t.Run("should not list lower qualities", func(t *testing.T) {
+			orders, err := repository.GetByResource(ctx, 3, 1)
+			if err != nil {
+				t.Fatalf("could not list orders: %s", err)
+			}
+
+			if len(orders) != 2 {
+				t.Errorf("expected %d orders, got %d", 2, len(orders))
+			}
+		})
+
+		t.Run("should return empty when nothing found", func(t *testing.T) {
+			orders, err := repository.GetByResource(ctx, 7, 1)
+			if err != nil {
+				t.Fatalf("could not list orders: %s", err)
+			}
+
+			if len(orders) != 0 {
+				t.Errorf("expected %d orders, got %d", 0, len(orders))
+			}
+		})
+
+		t.Run("should order by ascending price", func(t *testing.T) {
+			orders, err := repository.GetByResource(ctx, 3, 0)
+			if err != nil {
+				t.Fatalf("could not list orders: %s", err)
+			}
+
+			for i, order := range orders {
+				if i > 0 && order.Price < orders[i-1].Price {
+					t.Errorf("should have higher price: %d, %d", order.Price, orders[i-1].Price)
+				}
+			}
+		})
 	})
 
 	t.Run("PlaceOrder", func(t *testing.T) {

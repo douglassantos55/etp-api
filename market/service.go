@@ -36,6 +36,7 @@ type (
 
 	Service interface {
 		GetById(ctx context.Context, orderId uint64) (*Order, error)
+		GetByResource(ctx context.Context, resourceId, quality uint64) ([]*Order, error)
 		PlaceOrder(ctx context.Context, order *Order) (*Order, error)
 		CancelOrder(ctx context.Context, order *Order) error
 		Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error)
@@ -54,6 +55,10 @@ func NewService(repository Repository, companySvc company.Service, warehouseSvc 
 
 func (s *service) GetById(ctx context.Context, orderId uint64) (*Order, error) {
 	return s.repository.GetById(ctx, orderId)
+}
+
+func (s *service) GetByResource(ctx context.Context, resourceId, quality uint64) ([]*Order, error) {
+	return s.repository.GetByResource(ctx, resourceId, uint8(quality))
 }
 
 func (s *service) Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error) {

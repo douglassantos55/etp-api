@@ -210,4 +210,76 @@ func TestMarketRoutes(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("GetByResource", func(t *testing.T) {
+		t.Run("should validate quality", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/market/orders?resource=1&quality=aoeu", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should validate resource", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/market/orders?resource=1&quality=aoeu", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+			}
+		})
+
+		t.Run("should return orders", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/market/orders?resource=2&quality=0", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+			}
+
+			var orders []*market.Order
+			if err := json.Unmarshal(rec.Body.Bytes(), &orders); err != nil {
+				t.Fatalf("could not parse json: %s", err)
+			}
+
+			if len(orders) != 2 {
+				t.Errorf("expected %d orders, got %d", 2, len(orders))
+			}
+		})
+
+		t.Run("should return empty orders", func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/market/orders?resource=2&quality=1", nil)
+			req.Header.Set("Accept", "application/json")
+			req.Header.Set("Authorization", "Bearer "+token)
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusOK {
+				t.Errorf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+			}
+
+			var orders []*market.Order
+			if err := json.Unmarshal(rec.Body.Bytes(), &orders); err != nil {
+				t.Fatalf("could not parse json: %s", err)
+			}
+
+			if len(orders) != 0 {
+				t.Errorf("expected %d orders, got %d", 0, len(orders))
+			}
+		})
+	})
 }
