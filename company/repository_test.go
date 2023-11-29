@@ -34,7 +34,7 @@ func TestMain(t *testing.M) {
 		log.Fatalf("could not seed database: %s", err)
 	}
 
-	_, err = tx.Exec(`INSERT INTO transactions (id, company_id, value) VALUES (1, 1, 1000000)`)
+	_, err = tx.Exec(`INSERT INTO transactions (id, company_id, value) VALUES (1, 1, 100000000)`)
 	if err != nil {
 		log.Fatalf("could not seed database: %s", err)
 	}
@@ -78,8 +78,8 @@ func TestRepository(t *testing.T) {
 			t.Fatalf("could not get company: %s", err)
 		}
 
-		if company.AvailableCash != 1_000_000 {
-			t.Errorf("expected cash %d, got %d", 1_000_000, company.AvailableCash)
+		if company.AvailableCash != 1_000_000_00 {
+			t.Errorf("expected cash %d, got %d", 1_000_000_00, company.AvailableCash)
 		}
 	})
 
@@ -159,5 +159,38 @@ func TestRepository(t *testing.T) {
 		if company != nil {
 			t.Errorf("should not find deleted company, got %+v", company)
 		}
+	})
+
+	t.Run("PurchaseTerrain", func(t *testing.T) {
+		t.Run("should increment available terrains", func(t *testing.T) {
+			if err := repository.PurchaseTerrain(ctx, 0, 1); err != nil {
+				t.Fatalf("could not purchase terrain: %s", err)
+			}
+
+			company, err := repository.GetById(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get company: %s", err)
+			}
+
+			if company.AvailableTerrains != 4 {
+				t.Errorf("expected %d terrains, got %d", 4, company.AvailableTerrains)
+			}
+		})
+
+		t.Run("should reduce cash", func(t *testing.T) {
+			if err := repository.PurchaseTerrain(ctx, 500_000_00, 1); err != nil {
+				t.Fatalf("could not purchase terrain: %s", err)
+			}
+
+			company, err := repository.GetById(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get company: %s", err)
+			}
+
+			expectedCash := 500_000_00
+			if company.AvailableCash != expectedCash {
+				t.Errorf("expected cash %d, got %d", expectedCash, company.AvailableCash)
+			}
+		})
 	})
 }

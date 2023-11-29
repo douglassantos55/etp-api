@@ -22,13 +22,14 @@ type (
 	}
 
 	Company struct {
-		Id            uint64     `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
-		Name          string     `db:"name" json:"name"`
-		Email         string     `db:"email" json:"email"`
-		Pass          string     `db:"password" json:"-"`
-		LastLogin     *time.Time `db:"last_login" json:"last_login"`
-		CreatedAt     time.Time  `db:"created_at" json:"created_at"`
-		AvailableCash int        `db:"cash" json:"available_cash"`
+		Id                uint64     `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
+		Name              string     `db:"name" json:"name"`
+		Email             string     `db:"email" json:"email"`
+		Pass              string     `db:"password" json:"-"`
+		LastLogin         *time.Time `db:"last_login" json:"last_login"`
+		CreatedAt         time.Time  `db:"created_at" json:"created_at"`
+		AvailableCash     int        `db:"cash" json:"available_cash"`
+		AvailableTerrains int8       `db:"available_terrains" json:"available_terrains"`
 	}
 
 	Service interface {
@@ -36,6 +37,7 @@ type (
 		GetByEmail(ctx context.Context, email string) (*Company, error)
 		Login(ctx context.Context, credentials Credentials) (string, error)
 		Register(ctx context.Context, registration *Registration) (*Company, error)
+		PurchaseTerrain(ctx context.Context, companyId uint64, position int) error
 	}
 
 	service struct {
@@ -53,6 +55,24 @@ func (s *service) GetById(ctx context.Context, id uint64) (*Company, error) {
 
 func (s *service) GetByEmail(ctx context.Context, email string) (*Company, error) {
 	return s.repository.GetByEmail(ctx, email)
+}
+
+func (s *service) PurchaseTerrain(ctx context.Context, companyId uint64, position int) error {
+	company, err := s.repository.GetById(ctx, companyId)
+	if err != nil {
+		return err
+	}
+
+	if company == nil {
+		return server.NewBusinessRuleError("company not found")
+	}
+
+	total := (1_000_000 + (500_000 * (int(company.AvailableTerrains) / 5)) + (100_000 * position)) * 100
+	if company.AvailableCash < total {
+		return server.NewBusinessRuleError("not enough cash")
+	}
+
+	return s.repository.PurchaseTerrain(ctx, total, companyId)
 }
 
 func (s *service) Login(ctx context.Context, credentials Credentials) (string, error) {
