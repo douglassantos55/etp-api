@@ -1,6 +1,7 @@
 package market_test
 
 import (
+	"api/accounting"
 	"api/company"
 	"api/database"
 	"api/market"
@@ -98,9 +99,10 @@ func TestMarketRepository(t *testing.T) {
 		}
 	})
 
-	companyRepo := company.NewRepository(conn)
+	accountingRepo := accounting.NewRepository(conn)
+	companyRepo := company.NewRepository(conn, accountingRepo)
 	warehouseRepo := warehouse.NewRepository(conn)
-	repository := market.NewRepository(conn, companyRepo, warehouseRepo)
+	repository := market.NewRepository(conn, companyRepo, warehouseRepo, accountingRepo)
 
 	ctx := context.Background()
 

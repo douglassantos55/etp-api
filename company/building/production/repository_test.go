@@ -1,6 +1,7 @@
 package production_test
 
 import (
+	"api/accounting"
 	"api/company"
 	companyBuilding "api/company/building"
 	"api/company/building/production"
@@ -149,12 +150,13 @@ func TestProductionRepository(t *testing.T) {
 		}
 	})
 
-	companyRepo := company.NewRepository(conn)
+	accountingRepo := accounting.NewRepository(conn)
+	companyRepo := company.NewRepository(conn, accountingRepo)
 	warehouseRepo := warehouse.NewRepository(conn)
 	resourceRepo := resource.NewRepository(conn)
 	buildingRepo := companyBuilding.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
 
-	repository := production.NewProductionRepository(conn, companyRepo, buildingRepo, warehouseRepo)
+	repository := production.NewProductionRepository(conn, accountingRepo, buildingRepo, warehouseRepo)
 
 	t.Run("Produce", func(t *testing.T) {
 		t.Run("should set sourcing cost and register transaction", func(t *testing.T) {

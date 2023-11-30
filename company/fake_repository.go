@@ -1,9 +1,6 @@
 package company
 
-import (
-	"api/database"
-	"context"
-)
+import "context"
 
 type fakeRepository struct {
 	data map[uint64]*Company
@@ -41,11 +38,6 @@ func (r *fakeRepository) GetByEmail(ctx context.Context, email string) (*Company
 		}
 	}
 	return nil, nil
-}
-
-func (r *fakeRepository) RegisterTransaction(tx *database.DB, companyId, classificationId uint64, amount int, description string) error {
-	r.data[companyId].AvailableCash += amount
-	return nil
 }
 
 func (r *fakeRepository) PurchaseTerrain(ctx context.Context, total int, companyId uint64) error {

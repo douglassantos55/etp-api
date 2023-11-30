@@ -1,6 +1,7 @@
 package market
 
 import (
+	"api/accounting"
 	"api/company"
 	"api/database"
 	"api/resource"
@@ -23,15 +24,16 @@ type (
 	}
 
 	goquRepository struct {
-		builder       *goqu.Database
-		companyRepo   company.Repository
-		warehouseRepo warehouse.Repository
+		builder        *goqu.Database
+		companyRepo    company.Repository
+		warehouseRepo  warehouse.Repository
+		accountingRepo accounting.Repository
 	}
 )
 
-func NewRepository(conn *database.Connection, companyRepo company.Repository, warehouseRepo warehouse.Repository) Repository {
+func NewRepository(conn *database.Connection, companyRepo company.Repository, warehouseRepo warehouse.Repository, accountingRepo accounting.Repository) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
-	return &goquRepository{builder, companyRepo, warehouseRepo}
+	return &goquRepository{builder, companyRepo, warehouseRepo, accountingRepo}
 }
 
 func (r *goquRepository) GetById(ctx context.Context, orderId uint64) (*Order, error) {
@@ -133,12 +135,14 @@ func (r *goquRepository) PlaceOrder(ctx context.Context, order *Order, inventory
 		return nil, err
 	}
 
-	if err := r.companyRepo.RegisterTransaction(
+	if err := r.accountingRepo.RegisterTransaction(
 		dbTx,
+		accounting.Transaction{
+			Classification: accounting.TRANSPORT_FEE,
+			Value:          int(order.TransportFee) * -1,
+			Description:    "Market transport fee",
+		},
 		order.CompanyId,
-		company.TRANSPORT_FEE,
-		int(order.TransportFee)*-1,
-		"Market transport fee",
 	); err != nil {
 		return nil, err
 	}
@@ -188,12 +192,14 @@ func (r *goquRepository) CancelOrder(ctx context.Context, order *Order, inventor
 		return err
 	}
 
-	if err := r.companyRepo.RegisterTransaction(
+	if err := r.accountingRepo.RegisterTransaction(
 		dbTx,
+		accounting.Transaction{
+			Classification: accounting.REFUNDS,
+			Value:          int(order.TransportFee),
+			Description:    "Market transport fee refund",
+		},
 		order.Company.Id,
-		company.REFUNDS,
-		int(order.TransportFee),
-		"Market transport fee refund",
 	); err != nil {
 		return err
 	}
@@ -340,22 +346,26 @@ func (r *goquRepository) registerPurchaseTransactions(tx *goqu.TxDatabase, order
 		total -= int(order.MarketFee)
 	}
 
-	if err := r.companyRepo.RegisterTransaction(
+	if err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
+		accounting.Transaction{
+			Classification: accounting.MARKET_PURCHASE,
+			Value:          total * -1,
+			Description:    fmt.Sprintf("Purchase of %dx %s on market", quantity, order.Resource.Name),
+		},
 		companyId,
-		company.MARKET_PURCHASE,
-		total*-1,
-		fmt.Sprintf("Purchase of %dx %s on market", quantity, order.Resource.Name),
 	); err != nil {
 		return err
 	}
 
-	if err := r.companyRepo.RegisterTransaction(
+	if err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
+		accounting.Transaction{
+			Classification: accounting.MARKET_SALE,
+			Value:          total,
+			Description:    fmt.Sprintf("Sale of %dx %s on market", quantity, order.Resource.Name),
+		},
 		order.Company.Id,
-		company.MARKET_SALE,
-		total,
-		fmt.Sprintf("Sale of %dx %s on market", quantity, order.Resource.Name),
 	); err != nil {
 		return err
 	}

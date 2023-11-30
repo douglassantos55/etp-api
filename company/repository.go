@@ -1,22 +1,12 @@
 package company
 
 import (
+	"api/accounting"
 	"api/database"
 	"context"
 
 	"github.com/doug-martin/goqu/v9"
 	"github.com/doug-martin/goqu/v9/exp"
-)
-
-const (
-	WAGES            = 1
-	SOCIAL_CAPITAL   = 2
-	TRANSPORT_FEE    = 3
-	REFUNDS          = 4
-	MARKET_PURCHASE  = 5
-	MARKET_SALE      = 6
-	MARKET_FEE       = 7
-	TERRAIN_PURCHASE = 8
 )
 
 type (
@@ -25,17 +15,17 @@ type (
 		GetById(ctx context.Context, id uint64) (*Company, error)
 		GetByEmail(ctx context.Context, email string) (*Company, error)
 		PurchaseTerrain(ctx context.Context, total int, companyId uint64) error
-		RegisterTransaction(tx *database.DB, companyId, classificationId uint64, amount int, description string) error
 	}
 
 	goquRepository struct {
-		builder *goqu.Database
+		builder        *goqu.Database
+		accountingRepo accounting.Repository
 	}
 )
 
-func NewRepository(conn *database.Connection) Repository {
+func NewRepository(conn *database.Connection, accountingRepo accounting.Repository) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
-	return &goquRepository{builder}
+	return &goquRepository{builder, accountingRepo}
 }
 
 func (r *goquRepository) GetById(ctx context.Context, id uint64) (*Company, error) {
@@ -82,12 +72,14 @@ func (r *goquRepository) PurchaseTerrain(ctx context.Context, total int, company
 		return err
 	}
 
-	if err := r.RegisterTransaction(
+	if err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
+		accounting.Transaction{
+			Value:          -total,
+			Description:    "Purchase of terrain",
+			Classification: accounting.TERRAIN_PURCHASE,
+		},
 		companyId,
-		TERRAIN_PURCHASE,
-		-total,
-		"Purchase of terrain",
 	); err != nil {
 		return err
 	}
@@ -120,12 +112,14 @@ func (r *goquRepository) Register(ctx context.Context, registration *Registratio
 		return nil, err
 	}
 
-	if err = r.RegisterTransaction(
+	if err = r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
+		accounting.Transaction{
+			Classification: accounting.SOCIAL_CAPITAL,
+			Value:          1_000_000 * 100,
+			Description:    "Initial capital",
+		},
 		uint64(id),
-		SOCIAL_CAPITAL,
-		1_000_000*100,
-		"Initial capital",
 	); err != nil {
 		return nil, err
 	}
@@ -135,21 +129,6 @@ func (r *goquRepository) Register(ctx context.Context, registration *Registratio
 	}
 
 	return r.GetById(ctx, uint64(id))
-}
-
-func (r *goquRepository) RegisterTransaction(tx *database.DB, companyId, classificationId uint64, amount int, description string) error {
-	_, err := tx.
-		Insert(goqu.T("transactions")).
-		Rows(goqu.Record{
-			"company_id":        companyId,
-			"classification_id": classificationId,
-			"description":       description,
-			"value":             amount,
-		}).
-		Executor().
-		Exec()
-
-	return err
 }
 
 func (r *goquRepository) getSelect() *goqu.SelectDataset {

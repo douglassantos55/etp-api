@@ -1,6 +1,7 @@
 package company_test
 
 import (
+	"api/accounting"
 	"api/company"
 	"api/database"
 	"context"
@@ -70,7 +71,8 @@ func TestRepository(t *testing.T) {
 		}
 	})
 
-	repository := company.NewRepository(conn)
+	accountingRepo := accounting.NewRepository(conn)
+	repository := company.NewRepository(conn, accountingRepo)
 
 	t.Run("should return with cash", func(t *testing.T) {
 		company, err := repository.GetById(ctx, 1)

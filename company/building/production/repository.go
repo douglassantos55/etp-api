@@ -1,7 +1,7 @@
 package production
 
 import (
-	"api/company"
+	"api/accounting"
 	"api/company/building"
 	"api/database"
 	"api/warehouse"
@@ -20,16 +20,16 @@ type (
 	}
 
 	productionRepository struct {
-		builder   *goqu.Database
-		company   company.Repository
-		building  building.BuildingRepository
-		warehouse warehouse.Repository
+		builder        *goqu.Database
+		accountingRepo accounting.Repository
+		buildingRepo   building.BuildingRepository
+		warehouseRepo  warehouse.Repository
 	}
 )
 
-func NewProductionRepository(conn *database.Connection, company company.Repository, building building.BuildingRepository, warehouse warehouse.Repository) ProductionRepository {
+func NewProductionRepository(conn *database.Connection, accountingRepo accounting.Repository, buildingRepo building.BuildingRepository, warehouseRepo warehouse.Repository) ProductionRepository {
 	builder := goqu.New(conn.Driver, conn.DB)
-	return &productionRepository{builder, company, building, warehouse}
+	return &productionRepository{builder, accountingRepo, buildingRepo, warehouseRepo}
 }
 
 func (r *productionRepository) SaveProduction(ctx context.Context, production *Production, inventory *warehouse.Inventory, companyId uint64) (*Production, error) {
@@ -41,16 +41,18 @@ func (r *productionRepository) SaveProduction(ctx context.Context, production *P
 	defer tx.Rollback()
 
 	dbTx := &database.DB{TxDatabase: tx}
-	if err := r.warehouse.UpdateInventory(dbTx, inventory); err != nil {
+	if err := r.warehouseRepo.UpdateInventory(dbTx, inventory); err != nil {
 		return nil, err
 	}
 
-	if err := r.company.RegisterTransaction(
+	if err := r.accountingRepo.RegisterTransaction(
 		dbTx,
+		accounting.Transaction{
+			Classification: accounting.WAGES,
+			Value:          int(-production.ProductionCost),
+			Description:    fmt.Sprintf("Production of %s", production.Resource.Name),
+		},
 		companyId,
-		company.WAGES,
-		int(-production.ProductionCost),
-		fmt.Sprintf("Production of %s", production.Resource.Name),
 	); err != nil {
 		return nil, err
 	}
@@ -127,7 +129,7 @@ func (r *productionRepository) GetProduction(ctx context.Context, id, buildingId
 		return nil, err
 	}
 
-	building, err := r.building.GetById(ctx, buildingId, companyId)
+	building, err := r.buildingRepo.GetById(ctx, buildingId, companyId)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +146,7 @@ func (r *productionRepository) CancelProduction(ctx context.Context, production 
 
 	defer tx.Rollback()
 
-	err = r.warehouse.UpdateInventory(&database.DB{TxDatabase: tx}, inventory)
+	err = r.warehouseRepo.UpdateInventory(&database.DB{TxDatabase: tx}, inventory)
 	if err != nil {
 		return err
 	}
@@ -173,7 +175,7 @@ func (r *productionRepository) CollectResource(ctx context.Context, production *
 
 	defer tx.Rollback()
 
-	err = r.warehouse.UpdateInventory(&database.DB{TxDatabase: tx}, inventory)
+	err = r.warehouseRepo.UpdateInventory(&database.DB{TxDatabase: tx}, inventory)
 	if err != nil {
 		return err
 	}
