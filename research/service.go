@@ -50,6 +50,8 @@ type (
 
 		HireStaff(ctx context.Context, staffId uint64) (*Staff, error)
 		MakeOffer(ctx context.Context, offer, staffId uint64) (*Staff, error)
+
+		IncreaseSalary(ctx context.Context, salary, staffId uint64) (*Staff, error)
 	}
 
 	service struct {
@@ -177,6 +179,35 @@ func (s *service) MakeOffer(ctx context.Context, offer, staffId uint64) (*Staff,
 		_, err := s.HireStaff(ctx, staffId)
 		return err
 	})
+
+	return staff, nil
+}
+
+func (s *service) IncreaseSalary(ctx context.Context, salary, staffId uint64) (*Staff, error) {
+	staff, err := s.repository.GetStaffById(ctx, staffId)
+	if err != nil {
+		return nil, err
+	}
+
+	if salary <= staff.Salary {
+		return nil, server.NewBusinessRuleError("new salary must be higher than current salary")
+	}
+
+	if staff.Poacher != nil {
+		if salary <= staff.Offer {
+			return nil, server.NewBusinessRuleError("new salary must be higher than current offer")
+		}
+		staff.Offer = 0
+		staff.Poacher = nil
+	}
+
+	staff.Salary = salary
+	if err := s.repository.UpdateStaff(ctx, staff); err != nil {
+		return nil, err
+	}
+
+	// TODO: send message on socket notifying the poaching company, if that's
+	// the case
 
 	return staff, nil
 }

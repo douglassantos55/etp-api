@@ -74,4 +74,26 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 
 		return c.JSON(http.StatusOK, staff)
 	})
+
+	group.POST("/staff/:staff/raise", func(c echo.Context) error {
+		staffId, err := strconv.ParseUint(c.Param("staff"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest)
+		}
+
+		var content struct {
+			Salary uint64 `json:"salary"`
+		}
+
+		if err := c.Bind(&content); err != nil {
+			return err
+		}
+
+		staff, err := service.IncreaseSalary(c.Request().Context(), content.Salary, staffId)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, staff)
+	})
 }

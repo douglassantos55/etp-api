@@ -140,4 +140,46 @@ func TestResearchService(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("IncreaseSalary", func(t *testing.T) {
+		t.Run("less than current salary", func(t *testing.T) {
+			_, err := service.IncreaseSalary(ctx, 2000000, 1)
+			expectedError := "new salary must be higher than current salary"
+
+			if err.Error() != expectedError {
+				t.Errorf("expected error \"%s\", got \"%s\"", expectedError, err)
+			}
+		})
+
+		t.Run("less than offer", func(t *testing.T) {
+			_, err := service.GetExperienced(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get experienced: %s", err)
+			}
+
+			newSalary := uint64(3000000)
+			_, err = service.IncreaseSalary(ctx, newSalary, 1)
+
+			expectedError := "new salary must be higher than current offer"
+			if err.Error() != expectedError {
+				t.Errorf("expected error \"%s\", got \"%s\"", expectedError, err)
+			}
+		})
+
+		t.Run("removes offer", func(t *testing.T) {
+			newSalary := uint64(3500000)
+			staff, err := service.IncreaseSalary(ctx, newSalary, 1)
+			if err != nil {
+				t.Fatalf("could not increase salary: %s", err)
+			}
+
+			if staff.Salary != newSalary {
+				t.Errorf("expected salary %d, got %d", newSalary, staff.Salary)
+			}
+
+			if staff.Poacher != nil {
+				t.Errorf("should have removed poacher, got %d", *staff.Poacher)
+			}
+		})
+	})
 }
