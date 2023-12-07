@@ -3,6 +3,7 @@ package research
 import (
 	"context"
 	"math/rand"
+	"time"
 )
 
 type fakeRepository struct {
@@ -77,5 +78,13 @@ func (r *fakeRepository) SaveStaff(ctx context.Context, staff *Staff, companyId 
 
 func (r *fakeRepository) UpdateStaff(ctx context.Context, staff *Staff) error {
 	r.staff[staff.Employer][staff.Id] = staff
+	return nil
+}
+
+func (r *fakeRepository) StartSearch(ctx context.Context, finishTime time.Time, companyId uint64) (*Search, error) {
+	return &Search{FinishesAt: finishTime}, nil
+}
+
+func (r *fakeRepository) DeleteSearch(ctx context.Context, searchId uint64) error {
 	return nil
 }

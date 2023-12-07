@@ -17,12 +17,12 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return err
 		}
 
-		duration, err := service.FindGraduate(c.Request().Context(), companyId)
+		search, err := service.FindGraduate(c.Request().Context(), companyId)
 		if err != nil {
 			return err
 		}
 
-		return c.JSON(http.StatusOK, duration)
+		return c.JSON(http.StatusOK, search)
 	})
 
 	group.POST("/staff/experienced", func(c echo.Context) error {
@@ -31,12 +31,12 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return err
 		}
 
-		duration, err := service.FindExperienced(c.Request().Context(), companyId)
+		search, err := service.FindExperienced(c.Request().Context(), companyId)
 		if err != nil {
 			return err
 		}
 
-		return c.JSON(http.StatusOK, duration)
+		return c.JSON(http.StatusOK, search)
 	})
 
 	group.POST("/staff/:staff/hire", func(c echo.Context) error {

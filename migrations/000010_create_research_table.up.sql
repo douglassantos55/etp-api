@@ -11,3 +11,11 @@ CREATE TABLE IF NOT EXISTS `research_staff` (
     FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
     FOREIGN KEY (`poacher_id`) REFERENCES `companies` (`id`)
 );
+
+CREATE TABLE IF NOT EXISTS `staff_searches` (
+    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+    `company_id` INTEGER NOT NULL,
+    `finishes_at` TIMESTAMP,
+    `started_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
+);

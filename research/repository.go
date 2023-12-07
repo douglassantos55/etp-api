@@ -4,6 +4,7 @@ import (
 	"api/database"
 	"context"
 	"errors"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 )
@@ -17,21 +18,24 @@ type (
 	Repository interface {
 		GetStaff(ctx context.Context, companyId uint64) ([]*Staff, error)
 		GetStaffById(ctx context.Context, staffId uint64) (*Staff, error)
+		RandomStaff(ctx context.Context, companyId uint64) (*Staff, error)
+
+		StartSearch(ctx context.Context, finishTime time.Time, companyId uint64) (*Search, error)
+		DeleteSearch(ctx context.Context, searchId uint64) error
 
 		SaveStaff(ctx context.Context, staff *Staff, companyId uint64) (*Staff, error)
 		UpdateStaff(ctx context.Context, staff *Staff) error
-
-		RandomStaff(ctx context.Context, companyId uint64) (*Staff, error)
 	}
 
 	goquRepository struct {
 		builder *goqu.Database
+		tx      *goqu.TxDatabase
 	}
 )
 
 func NewRepository(conn *database.Connection) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
-	return &goquRepository{builder}
+	return &goquRepository{builder, nil}
 }
 
 func (r *goquRepository) GetStaff(ctx context.Context, companyId uint64) ([]*Staff, error) {
@@ -71,6 +75,38 @@ func (r *goquRepository) GetStaffById(ctx context.Context, staffId uint64) (*Sta
 	}
 
 	return staff, nil
+}
+
+func (r *goquRepository) StartSearch(ctx context.Context, finishTime time.Time, companyId uint64) (*Search, error) {
+	search := &Search{FinishesAt: finishTime}
+
+	result, err := r.builder.
+		Insert(goqu.T("staff_searches")).
+		Cols(search).
+		Executor().
+		ExecContext(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	search.Id = uint64(id)
+	return search, nil
+}
+
+func (r *goquRepository) DeleteSearch(ctx context.Context, searchId uint64) error {
+	_, err := r.builder.
+		Delete(goqu.T("staff_searchers")).
+		Where(goqu.I("id").Eq(searchId)).
+		Executor().
+		ExecContext(ctx)
+
+	return err
 }
 
 func (r *goquRepository) RandomStaff(ctx context.Context, companyId uint64) (*Staff, error) {

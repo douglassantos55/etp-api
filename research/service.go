@@ -10,6 +10,8 @@ import (
 
 type Status int
 
+const SEARCH_DURATION = 12 * time.Hour
+
 const (
 	PENDING Status = iota
 	HIRED
@@ -29,6 +31,12 @@ var (
 )
 
 type (
+	Search struct {
+		Id         uint64    `db:"id" json:"-"`
+		StartedAt  time.Time `db:"started_at" json:"-"`
+		FinishesAt time.Time `db:"finishes_at" json:"finishes_at"`
+	}
+
 	Staff struct {
 		Id       uint64  `db:"id" json:"id"`
 		Name     string  `db:"name" json:"name"`
@@ -42,8 +50,8 @@ type (
 	}
 
 	Service interface {
-		FindGraduate(ctx context.Context, companyId uint64) (time.Duration, error)
-		FindExperienced(ctx context.Context, companyId uint64) (time.Duration, error)
+		FindGraduate(ctx context.Context, companyId uint64) (*Search, error)
+		FindExperienced(ctx context.Context, companyId uint64) (*Search, error)
 
 		GetGraduate(ctx context.Context, companyId uint64) (*Staff, error)
 		GetExperienced(ctx context.Context, companyId uint64) (*Staff, error)
@@ -64,21 +72,30 @@ func NewService(repository Repository, timer *scheduler.Scheduler) Service {
 	return &service{repository, timer}
 }
 
-func (s *service) FindGraduate(ctx context.Context, companyId uint64) (time.Duration, error) {
-	duration := 12 * time.Hour
+func (s *service) FindGraduate(ctx context.Context, companyId uint64) (*Search, error) {
+	finishTime := time.Now().Add(SEARCH_DURATION)
+	search, err := s.repository.StartSearch(ctx, finishTime, companyId)
+	if err != nil {
+		return nil, err
+	}
 
-	s.timer.Add(companyId, duration, func() error {
+	s.timer.Add(companyId, SEARCH_DURATION, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
+
+		if err := s.repository.DeleteSearch(ctx, search.Id); err != nil {
+			return err
+		}
 
 		_, err := s.GetGraduate(ctx, companyId)
 
 		// TODO: send a message to the socket
 
 		return err
+
 	})
 
-	return duration, nil
+	return search, nil
 }
 
 func (s *service) GetGraduate(ctx context.Context, companyId uint64) (*Staff, error) {
@@ -101,12 +118,20 @@ func (s *service) GetGraduate(ctx context.Context, companyId uint64) (*Staff, er
 	return s.repository.SaveStaff(ctx, staff, companyId)
 }
 
-func (s *service) FindExperienced(ctx context.Context, companyId uint64) (time.Duration, error) {
-	duration := 12 * time.Hour
+func (s *service) FindExperienced(ctx context.Context, companyId uint64) (*Search, error) {
+	finishTime := time.Now().Add(SEARCH_DURATION)
+	search, err := s.repository.StartSearch(ctx, finishTime, companyId)
+	if err != nil {
+		return nil, err
+	}
 
-	s.timer.Add(companyId, duration, func() error {
+	s.timer.Add(companyId, SEARCH_DURATION, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
+
+		if err := s.repository.DeleteSearch(ctx, search.Id); err != nil {
+			return err
+		}
 
 		_, err := s.GetExperienced(ctx, companyId)
 
@@ -115,7 +140,7 @@ func (s *service) FindExperienced(ctx context.Context, companyId uint64) (time.D
 		return err
 	})
 
-	return duration, nil
+	return search, nil
 }
 
 func (s *service) GetExperienced(ctx context.Context, companyId uint64) (*Staff, error) {
