@@ -76,7 +76,7 @@ func TestResearchRoutes(t *testing.T) {
 	t.Run("Raise", func(t *testing.T) {
 		body := strings.NewReader(`{"salary":5100022}`)
 
-		req := httptest.NewRequest("POST", "/research/staff/1/raise", body)
+		req := httptest.NewRequest("POST", "/research/staff/2/raise", body)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+token)
@@ -85,7 +85,7 @@ func TestResearchRoutes(t *testing.T) {
 		svr.ServeHTTP(rec, req)
 
 		if rec.Code != http.StatusOK {
-			t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
+			t.Errorf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 		}
 
 		staff := new(research.Staff)

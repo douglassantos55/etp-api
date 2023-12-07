@@ -45,7 +45,12 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return echo.NewHTTPError(http.StatusBadRequest)
 		}
 
-		staff, err := service.HireStaff(c.Request().Context(), staffId)
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		staff, err := service.HireStaff(c.Request().Context(), staffId, companyId)
 		if err != nil {
 			return err
 		}
@@ -67,7 +72,12 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return err
 		}
 
-		staff, err := service.MakeOffer(c.Request().Context(), content.Offer, staffId)
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		staff, err := service.MakeOffer(c.Request().Context(), content.Offer, staffId, companyId)
 		if err != nil {
 			return err
 		}
@@ -89,7 +99,12 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 			return err
 		}
 
-		staff, err := service.IncreaseSalary(c.Request().Context(), content.Salary, staffId)
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		staff, err := service.IncreaseSalary(c.Request().Context(), content.Salary, staffId, companyId)
 		if err != nil {
 			return err
 		}
@@ -97,3 +112,4 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 		return c.JSON(http.StatusOK, staff)
 	})
 }
+

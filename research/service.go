@@ -56,10 +56,10 @@ type (
 		GetGraduate(ctx context.Context, companyId uint64) (*Staff, error)
 		GetExperienced(ctx context.Context, companyId uint64) (*Staff, error)
 
-		HireStaff(ctx context.Context, staffId uint64) (*Staff, error)
-		MakeOffer(ctx context.Context, offer, staffId uint64) (*Staff, error)
+		HireStaff(ctx context.Context, staffId, companyId uint64) (*Staff, error)
+		MakeOffer(ctx context.Context, offer, staffId, companyId uint64) (*Staff, error)
 
-		IncreaseSalary(ctx context.Context, salary, staffId uint64) (*Staff, error)
+		IncreaseSalary(ctx context.Context, salary, staffId, companyId uint64) (*Staff, error)
 	}
 
 	service struct {
@@ -155,10 +155,14 @@ func (s *service) GetExperienced(ctx context.Context, companyId uint64) (*Staff,
 	return staff, err
 }
 
-func (s *service) HireStaff(ctx context.Context, staffId uint64) (*Staff, error) {
+func (s *service) HireStaff(ctx context.Context, staffId, companyId uint64) (*Staff, error) {
 	staff, err := s.repository.GetStaffById(ctx, staffId)
 	if err != nil {
 		return nil, err
+	}
+
+	if (staff.Poacher != nil && *staff.Poacher != companyId) || (staff.Poacher == nil && staff.Employer != companyId) {
+		return nil, ErrStaffNotFound
 	}
 
 	// If hiring experienced, update the salary and clean up poaching
@@ -179,11 +183,15 @@ func (s *service) HireStaff(ctx context.Context, staffId uint64) (*Staff, error)
 	return staff, nil
 }
 
-func (s *service) MakeOffer(ctx context.Context, offer, staffId uint64) (*Staff, error) {
+func (s *service) MakeOffer(ctx context.Context, offer, staffId, companyId uint64) (*Staff, error) {
 	// Must save the offer and notify the current employer of the staff
 	staff, err := s.repository.GetStaffById(ctx, staffId)
 	if err != nil {
 		return nil, err
+	}
+
+	if staff.Poacher == nil || *staff.Poacher != companyId {
+		return nil, ErrStaffNotFound
 	}
 
 	if offer <= staff.Salary {
@@ -201,17 +209,21 @@ func (s *service) MakeOffer(ctx context.Context, offer, staffId uint64) (*Staff,
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		_, err := s.HireStaff(ctx, staffId)
+		_, err := s.HireStaff(ctx, staffId, companyId)
 		return err
 	})
 
 	return staff, nil
 }
 
-func (s *service) IncreaseSalary(ctx context.Context, salary, staffId uint64) (*Staff, error) {
+func (s *service) IncreaseSalary(ctx context.Context, salary, staffId, companyId uint64) (*Staff, error) {
 	staff, err := s.repository.GetStaffById(ctx, staffId)
 	if err != nil {
 		return nil, err
+	}
+
+	if staff.Employer != companyId {
+		return nil, ErrStaffNotFound
 	}
 
 	if salary <= staff.Salary {

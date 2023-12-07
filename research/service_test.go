@@ -68,58 +68,103 @@ func TestResearchService(t *testing.T) {
 
 	t.Run("HireStaff", func(t *testing.T) {
 		t.Run("graduate", func(t *testing.T) {
-			staff, err := service.GetGraduate(ctx, 1)
-			if err != nil {
-				t.Fatalf("could not get graduate: %s", err)
-			}
+			t.Run("for company", func(t *testing.T) {
+				staff, err := service.GetGraduate(ctx, 1)
+				if err != nil {
+					t.Fatalf("could not get graduate: %s", err)
+				}
 
-			staff, err = service.HireStaff(ctx, staff.Id)
-			if err != nil {
-				t.Fatalf("could not hire staff: %s", err)
-			}
+				staff, err = service.HireStaff(ctx, staff.Id, 1)
+				if err != nil {
+					t.Fatalf("could not hire staff: %s", err)
+				}
 
-			if staff.Status != research.HIRED {
-				t.Errorf("expected status %d, got %d", research.HIRED, staff.Status)
-			}
+				if staff.Status != research.HIRED {
+					t.Errorf("expected status %d, got %d", research.HIRED, staff.Status)
+				}
+			})
+
+			t.Run("other company", func(t *testing.T) {
+				staff, err := service.GetGraduate(ctx, 1)
+				if err != nil {
+					t.Fatalf("could not get graduate: %s", err)
+				}
+
+				staff, err = service.HireStaff(ctx, staff.Id, 2)
+				if err != research.ErrStaffNotFound {
+					t.Errorf("expected \"%s\", got \"%s\"", research.ErrStaffNotFound, err)
+				}
+			})
 		})
 
 		t.Run("experienced", func(t *testing.T) {
-			staff, err := service.GetExperienced(ctx, 1)
-			if err != nil {
-				t.Fatalf("could not get experienced: %s", err)
-			}
+			t.Run("other company", func(t *testing.T) {
+				staff, err := service.GetExperienced(ctx, 1)
+				if err != nil {
+					t.Fatalf("could not get experienced: %s", err)
+				}
 
-			staff, err = service.HireStaff(ctx, staff.Id)
-			if err != nil {
-				t.Fatalf("could not hire staff: %s", err)
-			}
+				staff, err = service.HireStaff(ctx, staff.Id, 2)
+				if err != research.ErrStaffNotFound {
+					t.Errorf("expected \"%s\", got \"%s\"", research.ErrStaffNotFound, err)
+				}
+			})
 
-			if staff.Status != research.HIRED {
-				t.Errorf("expected status %d, got %d", research.HIRED, staff.Status)
-			}
+			t.Run("for company", func(t *testing.T) {
+				staff, err := service.GetExperienced(ctx, 1)
+				if err != nil {
+					t.Fatalf("could not get experienced: %s", err)
+				}
 
-			if staff.Poacher != nil {
-				t.Errorf("expected nil poacher, got %d", *staff.Poacher)
-			}
+				staff, err = service.HireStaff(ctx, staff.Id, 1)
+				if err != nil {
+					t.Fatalf("could not hire staff: %s", err)
+				}
 
-			if staff.Salary != 2000000 {
-				t.Errorf("expected salary %d, got %d", 2000000, staff.Salary)
-			}
+				if staff.Status != research.HIRED {
+					t.Errorf("expected status %d, got %d", research.HIRED, staff.Status)
+				}
 
-			if staff.Offer != 0 {
-				t.Errorf("expected zero offer, got %d", staff.Offer)
-			}
+				if staff.Poacher != nil {
+					t.Errorf("expected nil poacher, got %d", *staff.Poacher)
+				}
 
-			if staff.Employer != 1 {
-				t.Errorf("expected employer ID %d, got %d", 1, staff.Employer)
-			}
+				if staff.Salary != 2000000 {
+					t.Errorf("expected salary %d, got %d", 2000000, staff.Salary)
+				}
+
+				if staff.Offer != 0 {
+					t.Errorf("expected zero offer, got %d", staff.Offer)
+				}
+
+				if staff.Employer != 1 {
+					t.Errorf("expected employer ID %d, got %d", 1, staff.Employer)
+				}
+			})
 		})
 	})
 
 	t.Run("MakeOffer", func(t *testing.T) {
+		t.Run("other company", func(t *testing.T) {
+			staff, err := service.GetExperienced(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get experienced: %s", err)
+			}
+
+			_, err = service.MakeOffer(ctx, 15235, staff.Id, 1)
+			if err != research.ErrStaffNotFound {
+				t.Fatalf("expected error \"%s\", got \"%s\"", research.ErrStaffNotFound, err)
+			}
+		})
+
 		t.Run("should refuse lower than salary", func(t *testing.T) {
+			_, err := service.GetExperienced(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get experienced: %s", err)
+			}
+
 			offer := uint64(1000000)
-			_, err := service.MakeOffer(ctx, offer, 1)
+			_, err = service.MakeOffer(ctx, offer, 1, 1)
 
 			expectedError := "offer is too low"
 			if err.Error() != expectedError {
@@ -130,7 +175,7 @@ func TestResearchService(t *testing.T) {
 		t.Run("should save offer", func(t *testing.T) {
 			offer := uint64(3000000)
 
-			staff, err := service.MakeOffer(ctx, offer, 1)
+			staff, err := service.MakeOffer(ctx, offer, 1, 1)
 			if err != nil {
 				t.Fatalf("could not make offer: %s", err)
 			}
@@ -143,7 +188,7 @@ func TestResearchService(t *testing.T) {
 
 	t.Run("IncreaseSalary", func(t *testing.T) {
 		t.Run("less than current salary", func(t *testing.T) {
-			_, err := service.IncreaseSalary(ctx, 2000000, 1)
+			_, err := service.IncreaseSalary(ctx, 2000000, 1, 1)
 			expectedError := "new salary must be higher than current salary"
 
 			if err.Error() != expectedError {
@@ -158,7 +203,7 @@ func TestResearchService(t *testing.T) {
 			}
 
 			newSalary := uint64(3000000)
-			_, err = service.IncreaseSalary(ctx, newSalary, 1)
+			_, err = service.IncreaseSalary(ctx, newSalary, 1, 1)
 
 			expectedError := "new salary must be higher than current offer"
 			if err.Error() != expectedError {
@@ -168,7 +213,7 @@ func TestResearchService(t *testing.T) {
 
 		t.Run("removes offer", func(t *testing.T) {
 			newSalary := uint64(3500000)
-			staff, err := service.IncreaseSalary(ctx, newSalary, 1)
+			staff, err := service.IncreaseSalary(ctx, newSalary, 1, 1)
 			if err != nil {
 				t.Fatalf("could not increase salary: %s", err)
 			}

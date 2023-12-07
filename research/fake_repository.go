@@ -7,7 +7,8 @@ import (
 )
 
 type fakeRepository struct {
-	staff map[uint64]map[uint64]*Staff
+	lastId uint64
+	staff  map[uint64]map[uint64]*Staff
 }
 
 func NewFakeRepository() Repository {
@@ -24,9 +25,21 @@ func NewFakeRepository() Repository {
 				Employer: 2,
 			},
 		},
+		1: {
+			2: {
+				Id:       2,
+				Name:     "Jane Doe",
+				Skill:    52,
+				Talent:   50,
+				Salary:   200000,
+				Status:   HIRED,
+				Employer: 1,
+			},
+		},
 	}
 	return &fakeRepository{
-		staff: staff,
+		lastId: 2,
+		staff:  staff,
 	}
 }
 
@@ -64,14 +77,14 @@ func (r *fakeRepository) RandomStaff(ctx context.Context, companyId uint64) (*St
 }
 
 func (r *fakeRepository) SaveStaff(ctx context.Context, staff *Staff, companyId uint64) (*Staff, error) {
-	id := uint64(len(r.staff[companyId]) + 1)
+	r.lastId++
 	if _, ok := r.staff[companyId]; !ok {
 		r.staff[companyId] = make(map[uint64]*Staff)
 	}
 
-	staff.Id = id
+	staff.Id = r.lastId
 	staff.Employer = companyId
-	r.staff[companyId][id] = staff
+	r.staff[companyId][r.lastId] = staff
 
 	return staff, nil
 }
