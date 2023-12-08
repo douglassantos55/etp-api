@@ -1,8 +1,8 @@
-package research_test
+package staff_test
 
 import (
 	"api/auth"
-	"api/research"
+	"api/research/staff"
 	"api/scheduler"
 	"api/server"
 	"encoding/json"
@@ -17,9 +17,9 @@ func TestResearchRoutes(t *testing.T) {
 	t.Setenv(server.JWT_SECRET_KEY, "secret")
 
 	svr := server.NewServer()
-	svc := research.NewService(research.NewFakeRepository(), scheduler.NewScheduler())
+	svc := staff.NewService(staff.NewFakeRepository(), scheduler.NewScheduler())
 
-	research.CreateEndpoints(svr, svc)
+	staff.CreateEndpoints(svr, svc)
 	token, err := auth.GenerateToken(1, "secret")
 	if err != nil {
 		t.Fatalf("could not generate token: %s", err)
@@ -37,13 +37,13 @@ func TestResearchRoutes(t *testing.T) {
 			t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
 		}
 
-		var search *research.Search
+		var search *staff.Search
 		if err := json.Unmarshal(rec.Body.Bytes(), &search); err != nil {
 			t.Fatalf("could not parse json: %s", err)
 		}
 
 		duration := search.FinishesAt.Sub(time.Now())
-		diff := research.SEARCH_DURATION - duration
+		diff := staff.SEARCH_DURATION - duration
 		if int(diff.Seconds()) != 0 {
 			t.Errorf("expected duration %+v, got %d", search.FinishesAt, int(diff.Seconds()))
 		}
@@ -61,13 +61,13 @@ func TestResearchRoutes(t *testing.T) {
 			t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
 		}
 
-		var search *research.Search
+		var search *staff.Search
 		if err := json.Unmarshal(rec.Body.Bytes(), &search); err != nil {
 			t.Fatalf("could not parse json: %s", err)
 		}
 
 		duration := search.FinishesAt.Sub(time.Now())
-		diff := research.SEARCH_DURATION - duration
+		diff := staff.SEARCH_DURATION - duration
 		if int(diff.Seconds()) != 0 {
 			t.Errorf("expected duration %+v, got %d", search.FinishesAt, int(diff.Seconds()))
 		}
@@ -88,7 +88,7 @@ func TestResearchRoutes(t *testing.T) {
 			t.Errorf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 		}
 
-		staff := new(research.Staff)
+		staff := new(staff.Staff)
 		if err := json.Unmarshal(rec.Body.Bytes(), staff); err != nil {
 			t.Fatalf("could not parse json: %s", err)
 		}

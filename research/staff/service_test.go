@@ -1,7 +1,7 @@
-package research_test
+package staff_test
 
 import (
-	"api/research"
+	"api/research/staff"
 	"api/scheduler"
 	"context"
 	"testing"
@@ -12,36 +12,36 @@ func TestResearchService(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	service := research.NewService(research.NewFakeRepository(), scheduler.NewScheduler())
+	service := staff.NewService(staff.NewFakeRepository(), scheduler.NewScheduler())
 
 	t.Run("GetGraduate", func(t *testing.T) {
-		staff, err := service.GetGraduate(ctx, 1)
+		employee, err := service.GetGraduate(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not find graduate: %s", err)
 		}
 
-		if staff.Id == 0 {
+		if employee.Id == 0 {
 			t.Error("should have saved staff member")
 		}
 
-		if staff.Employer != 1 {
-			t.Errorf("expected employer %d, got %d", 1, staff.Employer)
+		if employee.Employer != 1 {
+			t.Errorf("expected employer %d, got %d", 1, employee.Employer)
 		}
 
-		if staff.Status != research.PENDING {
-			t.Errorf("expected status %d, got %d", research.PENDING, staff.Status)
+		if employee.Status != staff.PENDING {
+			t.Errorf("expected status %d, got %d", staff.PENDING, employee.Status)
 		}
 
-		if staff.Skill > 100 {
-			t.Errorf("should not have skill higher than 100, got %d", staff.Skill)
+		if employee.Skill > 100 {
+			t.Errorf("should not have skill higher than 100, got %d", employee.Skill)
 		}
 
-		if staff.Talent > 100 {
-			t.Errorf("should not have talent higher than 100, got %d", staff.Talent)
+		if employee.Talent > 100 {
+			t.Errorf("should not have talent higher than 100, got %d", employee.Talent)
 		}
 
-		if staff.Salary < 1000 || staff.Salary > 2000 {
-			t.Errorf("salary should be between 1000 and 2000, got %d", staff.Salary)
+		if employee.Salary < 1000 || employee.Salary > 2000 {
+			t.Errorf("salary should be between 1000 and 2000, got %d", employee.Salary)
 		}
 	})
 
@@ -69,76 +69,76 @@ func TestResearchService(t *testing.T) {
 	t.Run("HireStaff", func(t *testing.T) {
 		t.Run("graduate", func(t *testing.T) {
 			t.Run("for company", func(t *testing.T) {
-				staff, err := service.GetGraduate(ctx, 1)
+				employee, err := service.GetGraduate(ctx, 1)
 				if err != nil {
 					t.Fatalf("could not get graduate: %s", err)
 				}
 
-				staff, err = service.HireStaff(ctx, staff.Id, 1)
+				employee, err = service.HireStaff(ctx, employee.Id, 1)
 				if err != nil {
 					t.Fatalf("could not hire staff: %s", err)
 				}
 
-				if staff.Status != research.HIRED {
-					t.Errorf("expected status %d, got %d", research.HIRED, staff.Status)
+				if employee.Status != staff.HIRED {
+					t.Errorf("expected status %d, got %d", staff.HIRED, employee.Status)
 				}
 			})
 
 			t.Run("other company", func(t *testing.T) {
-				staff, err := service.GetGraduate(ctx, 1)
+				employee, err := service.GetGraduate(ctx, 1)
 				if err != nil {
 					t.Fatalf("could not get graduate: %s", err)
 				}
 
-				staff, err = service.HireStaff(ctx, staff.Id, 2)
-				if err != research.ErrStaffNotFound {
-					t.Errorf("expected \"%s\", got \"%s\"", research.ErrStaffNotFound, err)
+				employee, err = service.HireStaff(ctx, employee.Id, 2)
+				if err != staff.ErrStaffNotFound {
+					t.Errorf("expected \"%s\", got \"%s\"", staff.ErrStaffNotFound, err)
 				}
 			})
 		})
 
 		t.Run("experienced", func(t *testing.T) {
 			t.Run("other company", func(t *testing.T) {
-				staff, err := service.GetExperienced(ctx, 1)
+				employee, err := service.GetExperienced(ctx, 1)
 				if err != nil {
 					t.Fatalf("could not get experienced: %s", err)
 				}
 
-				staff, err = service.HireStaff(ctx, staff.Id, 2)
-				if err != research.ErrStaffNotFound {
-					t.Errorf("expected \"%s\", got \"%s\"", research.ErrStaffNotFound, err)
+				employee, err = service.HireStaff(ctx, employee.Id, 2)
+				if err != staff.ErrStaffNotFound {
+					t.Errorf("expected \"%s\", got \"%s\"", staff.ErrStaffNotFound, err)
 				}
 			})
 
 			t.Run("for company", func(t *testing.T) {
-				staff, err := service.GetExperienced(ctx, 1)
+				employee, err := service.GetExperienced(ctx, 1)
 				if err != nil {
 					t.Fatalf("could not get experienced: %s", err)
 				}
 
-				staff, err = service.HireStaff(ctx, staff.Id, 1)
+				employee, err = service.HireStaff(ctx, employee.Id, 1)
 				if err != nil {
 					t.Fatalf("could not hire staff: %s", err)
 				}
 
-				if staff.Status != research.HIRED {
-					t.Errorf("expected status %d, got %d", research.HIRED, staff.Status)
+				if employee.Status != staff.HIRED {
+					t.Errorf("expected status %d, got %d", staff.HIRED, employee.Status)
 				}
 
-				if staff.Poacher != nil {
-					t.Errorf("expected nil poacher, got %d", *staff.Poacher)
+				if employee.Poacher != nil {
+					t.Errorf("expected nil poacher, got %d", *employee.Poacher)
 				}
 
-				if staff.Salary != 2000000 {
-					t.Errorf("expected salary %d, got %d", 2000000, staff.Salary)
+				if employee.Salary != 2000000 {
+					t.Errorf("expected salary %d, got %d", 2000000, employee.Salary)
 				}
 
-				if staff.Offer != 0 {
-					t.Errorf("expected zero offer, got %d", staff.Offer)
+				if employee.Offer != 0 {
+					t.Errorf("expected zero offer, got %d", employee.Offer)
 				}
 
-				if staff.Employer != 1 {
-					t.Errorf("expected employer ID %d, got %d", 1, staff.Employer)
+				if employee.Employer != 1 {
+					t.Errorf("expected employer ID %d, got %d", 1, employee.Employer)
 				}
 			})
 		})
@@ -146,14 +146,14 @@ func TestResearchService(t *testing.T) {
 
 	t.Run("MakeOffer", func(t *testing.T) {
 		t.Run("other company", func(t *testing.T) {
-			staff, err := service.GetExperienced(ctx, 2)
+			employee, err := service.GetExperienced(ctx, 2)
 			if err != nil {
 				t.Fatalf("could not get experienced: %s", err)
 			}
 
-			_, err = service.MakeOffer(ctx, 15235, staff.Id, 1)
-			if err != research.ErrStaffNotFound {
-				t.Fatalf("expected error \"%s\", got \"%s\"", research.ErrStaffNotFound, err)
+			_, err = service.MakeOffer(ctx, 15235, employee.Id, 1)
+			if err != staff.ErrStaffNotFound {
+				t.Fatalf("expected error \"%s\", got \"%s\"", staff.ErrStaffNotFound, err)
 			}
 		})
 

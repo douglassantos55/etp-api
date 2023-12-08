@@ -1,4 +1,4 @@
-package research
+package staff
 
 import (
 	"api/database"

@@ -1,15 +1,15 @@
-package research_test
+package staff_test
 
 import (
 	"api/database"
-	"api/research"
+	"api/research/staff"
 	"context"
 	"testing"
 	"time"
 )
 
 func TestResearchRepository(t *testing.T) {
-	conn, err := database.GetConnection(database.SQLITE, "../test.db")
+	conn, err := database.GetConnection(database.SQLITE, "../../test.db")
 	if err != nil {
 		t.Fatalf("could not connect to database: %s", err)
 	}
@@ -49,7 +49,7 @@ func TestResearchRepository(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	repository := research.NewRepository(conn)
+	repository := staff.NewRepository(conn)
 
 	t.Run("GetStaff", func(t *testing.T) {
 		t.Run("brings poached as well", func(t *testing.T) {
@@ -67,8 +67,8 @@ func TestResearchRepository(t *testing.T) {
 	t.Run("GetStaffById", func(t *testing.T) {
 		t.Run("not found", func(t *testing.T) {
 			_, err := repository.GetStaffById(ctx, 1543)
-			if err != research.ErrStaffNotFound {
-				t.Errorf("expected error \"%s\", got \"%s\"", research.ErrStaffNotFound, err)
+			if err != staff.ErrStaffNotFound {
+				t.Errorf("expected error \"%s\", got \"%s\"", staff.ErrStaffNotFound, err)
 			}
 		})
 
