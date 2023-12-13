@@ -17,5 +17,17 @@ CREATE TABLE IF NOT EXISTS `staff_searches` (
     `company_id` INTEGER NOT NULL,
     `finishes_at` TIMESTAMP,
     `started_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
+    FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`)
+);
+
+CREATE TABLE IF NOT EXISTS `trainings` (
+    `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+    `result` TINYINT,
+    `staff_id` INTEGER,
+    `company_id` INTEGER,
+    `investment` INTEGER,
+    `finishes_at` TIMESTAMP,
+    `completed_at` TIMESTAMP,
+    FOREIGN KEY (`staff_id`) REFERENCES `research_staff` (`id`),
+    FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`)
 );

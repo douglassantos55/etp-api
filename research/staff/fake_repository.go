@@ -7,8 +7,10 @@ import (
 )
 
 type fakeRepository struct {
-	lastId uint64
-	staff  map[uint64]map[uint64]*Staff
+	lastStaffId    uint64
+	lastTrainingId uint64
+	staff          map[uint64]map[uint64]*Staff
+	trainings      map[uint64]*Training
 }
 
 func NewFakeRepository() Repository {
@@ -37,9 +39,24 @@ func NewFakeRepository() Repository {
 			},
 		},
 	}
+
+	trainings := map[uint64]*Training{
+		1: {
+			Id:          1,
+			Result:      0,
+			Investment:  10000000,
+			StaffId:     2,
+			CompanyId:   1,
+			FinishesAt:  time.Now(),
+			CompletedAt: time.Now(),
+		},
+	}
+
 	return &fakeRepository{
-		lastId: 2,
-		staff:  staff,
+		lastStaffId:    2,
+		lastTrainingId: 1,
+		staff:          staff,
+		trainings:      trainings,
 	}
 }
 
@@ -77,14 +94,14 @@ func (r *fakeRepository) RandomStaff(ctx context.Context, companyId uint64) (*St
 }
 
 func (r *fakeRepository) SaveStaff(ctx context.Context, staff *Staff, companyId uint64) (*Staff, error) {
-	r.lastId++
+	r.lastStaffId++
 	if _, ok := r.staff[companyId]; !ok {
 		r.staff[companyId] = make(map[uint64]*Staff)
 	}
 
-	staff.Id = r.lastId
+	staff.Id = r.lastStaffId
 	staff.Employer = companyId
-	r.staff[companyId][r.lastId] = staff
+	r.staff[companyId][r.lastStaffId] = staff
 
 	return staff, nil
 }
@@ -99,5 +116,23 @@ func (r *fakeRepository) StartSearch(ctx context.Context, finishTime time.Time, 
 }
 
 func (r *fakeRepository) DeleteSearch(ctx context.Context, searchId uint64) error {
+	return nil
+}
+
+func (r *fakeRepository) GetTraining(ctx context.Context, trainingId, companyId uint64) (*Training, error) {
+	training, ok := r.trainings[trainingId]
+	if !ok {
+		return nil, ErrTrainingNotFound
+	}
+	return training, nil
+}
+
+func (r *fakeRepository) SaveTraining(ctx context.Context, training *Training) (*Training, error) {
+	r.lastTrainingId++
+	training.Id = r.lastTrainingId
+	return training, nil
+}
+
+func (r *fakeRepository) UpdateTraining(ctx context.Context, training *Training) error {
 	return nil
 }

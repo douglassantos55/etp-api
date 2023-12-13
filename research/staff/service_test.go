@@ -12,7 +12,8 @@ func TestResearchService(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	service := staff.NewService(staff.NewFakeRepository(), scheduler.NewScheduler())
+	repository := staff.NewFakeRepository()
+	service := staff.NewService(repository, scheduler.NewScheduler())
 
 	t.Run("GetGraduate", func(t *testing.T) {
 		employee, err := service.GetGraduate(ctx, 1)
@@ -224,6 +225,63 @@ func TestResearchService(t *testing.T) {
 
 			if staff.Poacher != nil {
 				t.Errorf("should have removed poacher, got %d", *staff.Poacher)
+			}
+		})
+	})
+
+	t.Run("Train", func(t *testing.T) {
+		t.Run("other company", func(t *testing.T) {
+			_, err := service.Train(ctx, 1, 3)
+
+			if err != staff.ErrStaffNotFound {
+				t.Errorf("expected error \"%s\", got \"%s\"", staff.ErrStaffNotFound, err)
+			}
+		})
+
+		t.Run("duration", func(t *testing.T) {
+			training, err := service.Train(ctx, 2, 1)
+			if err != nil {
+				t.Fatalf("could not train: %s", err)
+			}
+
+			expected := time.Now().Add(13 * time.Hour)
+			diff := training.FinishesAt.Sub(expected)
+
+			if int(diff.Seconds()) != 0 {
+				t.Errorf("expected finishes at %+v, got %+v", expected, training.FinishesAt)
+			}
+		})
+
+		t.Run("investment", func(t *testing.T) {
+			training, err := service.Train(ctx, 2, 1)
+			if err != nil {
+				t.Fatalf("could not train: %s", err)
+			}
+
+			expected := uint64(6000000)
+			if training.Investment != expected {
+				t.Errorf("expected investiment %d, got %d", expected, training.Investment)
+			}
+		})
+	})
+
+	t.Run("FinishTraining", func(t *testing.T) {
+		t.Run("result", func(t *testing.T) {
+			if err := service.FinishTraining(ctx, 1, 1); err != nil {
+				t.Fatalf("could not finish training: %s", err)
+			}
+
+			training, err := repository.GetTraining(ctx, 1, 1)
+			if err != nil {
+				t.Fatalf("could not get training: %s", err)
+			}
+
+			if training.Result == 0 {
+				t.Error("should have set result")
+			}
+
+			if training.CompletedAt.IsZero() {
+				t.Error("should have set completed at")
 			}
 		})
 	})

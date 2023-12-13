@@ -4,6 +4,7 @@ import (
 	"api/scheduler"
 	"api/server"
 	"context"
+	"math"
 	"math/rand"
 	"time"
 )
@@ -11,6 +12,7 @@ import (
 type Status int
 
 const SEARCH_DURATION = 12 * time.Hour
+const TRAINING_DURATION = 8 * time.Hour
 
 const (
 	PENDING Status = iota
@@ -37,6 +39,16 @@ type (
 		FinishesAt time.Time `db:"finishes_at" json:"finishes_at"`
 	}
 
+	Training struct {
+		Id          uint64    `db:"id" goqu:"skipinsert" json:"id"`
+		Result      uint8     `db:"result" json:"result,omitempty"`
+		Investment  uint64    `db:"investment" json:"-"`
+		StaffId     uint64    `db:"staff_id" json:"-"`
+		CompanyId   uint64    `db:"company_id" json:"-"`
+		FinishesAt  time.Time `db:"finishes_at" json:"finishes_at,omitempty"`
+		CompletedAt time.Time `db:"completed_at" json:"completed_at,omitempty"`
+	}
+
 	Staff struct {
 		Id       uint64  `db:"id" json:"id"`
 		Name     string  `db:"name" json:"name"`
@@ -60,6 +72,8 @@ type (
 		MakeOffer(ctx context.Context, offer, staffId, companyId uint64) (*Staff, error)
 
 		IncreaseSalary(ctx context.Context, salary, staffId, companyId uint64) (*Staff, error)
+		Train(ctx context.Context, staffId, companyId uint64) (*Training, error)
+		FinishTraining(ctx context.Context, trainingId, companyId uint64) error
 	}
 
 	service struct {
@@ -247,4 +261,62 @@ func (s *service) IncreaseSalary(ctx context.Context, salary, staffId, companyId
 	// the case
 
 	return staff, nil
+}
+
+func (s *service) Train(ctx context.Context, staffId, companyId uint64) (*Training, error) {
+	staff, err := s.repository.GetStaffById(ctx, staffId)
+	if err != nil {
+		return nil, err
+	}
+
+	if staff.Employer != companyId {
+		return nil, ErrStaffNotFound
+	}
+
+	// Calculate time (relative to skill)
+	duration := TRAINING_DURATION + time.Duration(int64(staff.Skill)/10)*time.Hour
+
+	// Save training
+	training, err := s.repository.SaveTraining(ctx, &Training{
+		StaffId:    staffId,
+		CompanyId:  companyId,
+		FinishesAt: time.Now().Add(duration),
+		Investment: 1000000 + (1000000 * (uint64(staff.Skill) / 10)),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	s.timer.Add(staffId, TRAINING_DURATION, func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		return s.FinishTraining(ctx, training.Id, companyId)
+	})
+
+	return training, nil
+}
+
+func (s *service) FinishTraining(ctx context.Context, trainingId, companyId uint64) error {
+	training, err := s.repository.GetTraining(ctx, trainingId, companyId)
+	if err != nil {
+		return err
+	}
+
+	staff, err := s.repository.GetStaffById(ctx, training.StaffId)
+	if err != nil {
+		return err
+	}
+
+	// Complete training
+	training.CompletedAt = time.Now()
+
+	// Calculate points (relative to talent, e.g., rand(0, talent / 10))
+	randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
+	base := int(math.Min(float64(staff.Talent), float64(staff.Talent/10)))
+	training.Result = uint8(randomizer.Intn(base) + (base / 2))
+
+	// Save new skill
+	return s.repository.UpdateTraining(ctx, training)
 }

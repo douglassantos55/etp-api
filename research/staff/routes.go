@@ -111,5 +111,23 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 
 		return c.JSON(http.StatusOK, staff)
 	})
-}
 
+	group.POST("/staff/:staff/train", func(c echo.Context) error {
+		staffId, err := strconv.ParseUint(c.Param("staff"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest)
+		}
+
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		training, err := service.Train(c.Request().Context(), staffId, companyId)
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, training)
+	})
+}
