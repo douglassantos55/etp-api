@@ -5,6 +5,7 @@ import (
 	"api/company"
 	companyBuilding "api/company/building"
 	"api/company/building/production"
+	"api/research"
 	"api/resource"
 	"api/warehouse"
 	"context"
@@ -19,11 +20,36 @@ func TestProductionService(t *testing.T) {
 	companyBuildingSvc := companyBuilding.NewBuildingService(companyBuilding.NewFakeBuildingRepository(), warehouseSvc, buildingSvc)
 
 	repository := production.NewFakeProductionRepository()
-	service := production.NewProductionService(repository, companySvc, companyBuildingSvc, warehouseSvc)
+	researchSvc := research.NewService(research.NewFakeRepository(), companySvc)
+	service := production.NewProductionService(repository, companySvc, companyBuildingSvc, warehouseSvc, researchSvc)
 
 	ctx := context.Background()
 
 	t.Run("Produce", func(t *testing.T) {
+		t.Run("should not produce higher quality", func(t *testing.T) {
+			_, err := service.Produce(ctx, 1, 3, &resource.Item{
+				Qty:        1,
+				Quality:    3,
+				ResourceId: 5,
+				Resource:   &resource.Resource{Id: 5},
+			})
+
+			if err.Error() != "cannot produce at this quality" {
+				t.Errorf("expected cannot produce at this quality, got %s", err)
+			}
+
+			_, err = service.Produce(ctx, 1, 3, &resource.Item{
+				Qty:        1,
+				Quality:    1,
+				ResourceId: 5,
+				Resource:   &resource.Resource{Id: 5},
+			})
+
+			if err.Error() != "not enough cash" {
+				t.Errorf("expected not enough cash, got %s", err)
+			}
+		})
+
 		t.Run("should not produce on building from other companies", func(t *testing.T) {
 			_, err := service.Produce(ctx, 1, 2, &resource.Item{Qty: 10, Quality: 0, ResourceId: 1})
 			if err.Error() != "building not found" {

@@ -6,6 +6,7 @@ import (
 	"api/company"
 	companyBuilding "api/company/building"
 	"api/company/building/production"
+	"api/research"
 	"api/server"
 	"api/warehouse"
 	"net/http"
@@ -26,8 +27,9 @@ func TestProductionRoutes(t *testing.T) {
 	buildingSvc := building.NewService(building.NewFakeRepository())
 	warehouseSvc := warehouse.NewService(warehouse.NewFakeRepository())
 
+	researchSvc := research.NewService(research.NewFakeRepository(), companySvc)
 	companyBuildingSvc := companyBuilding.NewBuildingService(companyBuilding.NewFakeBuildingRepository(), warehouseSvc, buildingSvc)
-	svc := production.NewProductionService(production.NewFakeProductionRepository(), companySvc, companyBuildingSvc, warehouseSvc)
+	svc := production.NewProductionService(production.NewFakeProductionRepository(), companySvc, companyBuildingSvc, warehouseSvc, researchSvc)
 
 	svr := server.NewServer()
 	production.CreateEndpoints(svr, svc, companyBuildingSvc, companySvc)

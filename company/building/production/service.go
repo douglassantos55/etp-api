@@ -3,6 +3,7 @@ package production
 import (
 	"api/company"
 	"api/company/building"
+	"api/research"
 	"api/resource"
 	"api/server"
 	"api/warehouse"
@@ -35,6 +36,7 @@ type (
 		companySvc   company.Service
 		buildingSvc  building.BuildingService
 		warehouseSvc warehouse.Service
+		researchSvc  research.Service
 	}
 )
 
@@ -69,8 +71,8 @@ func (p *Production) ProducedUntil(t time.Time) (*warehouse.StockItem, error) {
 	}, nil
 }
 
-func NewProductionService(repository ProductionRepository, companySvc company.Service, buildingSvc building.BuildingService, warehouseSvc warehouse.Service) ProductionService {
-	return &productionService{repository, companySvc, buildingSvc, warehouseSvc}
+func NewProductionService(repository ProductionRepository, companySvc company.Service, buildingSvc building.BuildingService, warehouseSvc warehouse.Service, researchSvc research.Service) ProductionService {
+	return &productionService{repository, companySvc, buildingSvc, warehouseSvc, researchSvc}
 }
 
 func (s *productionService) Produce(ctx context.Context, companyId, buildingId uint64, item *resource.Item) (*Production, error) {
@@ -89,6 +91,15 @@ func (s *productionService) Produce(ctx context.Context, companyId, buildingId u
 
 	if buildingToProduce.CompletesAt != nil {
 		return nil, server.NewBusinessRuleError("building is not ready")
+	}
+
+	quality, err := s.researchSvc.GetQuality(ctx, item.ResourceId, companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	if item.Quality > quality.Quality {
+		return nil, server.NewBusinessRuleError("cannot produce at this quality")
 	}
 
 	inventory, err := s.warehouseSvc.GetInventory(ctx, companyId)

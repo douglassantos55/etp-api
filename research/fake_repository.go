@@ -19,6 +19,7 @@ func NewFakeRepository() Repository {
 	busyStaff := map[uint64]bool{1: true, 2: true}
 	qualities := map[uint64]map[uint64]Quality{
 		3: {1: {Quality: 2, Patents: 0, ResourceId: 1}},
+		1: {5: {Quality: 1, Patents: 0, ResourceId: 5}},
 	}
 
 	researches := map[uint64]*Research{

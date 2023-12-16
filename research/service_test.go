@@ -3,16 +3,15 @@ package research_test
 import (
 	"api/company"
 	"api/research"
-	"api/scheduler"
 	"context"
 	"testing"
 	"time"
 )
 
 func TestResearchService(t *testing.T) {
-	companyRepo := company.NewFakeRepository()
 	researchRepo := research.NewFakeRepository()
-	service := research.NewService(researchRepo, companyRepo, scheduler.NewScheduler())
+	companySvc := company.NewService(company.NewFakeRepository())
+	service := research.NewService(researchRepo, companySvc)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

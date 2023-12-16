@@ -36,19 +36,24 @@ type (
 	}
 
 	Service interface {
+		GetQuality(ctx context.Context, resourceId, companyId uint64) (Quality, error)
 		StartResearch(ctx context.Context, staffIds []uint64, resourceId, companyId uint64) (*Research, error)
 		CompleteResearch(ctx context.Context, researchId uint64) (*Research, error)
 	}
 
 	service struct {
-		repository  Repository
-		companyRepo company.Repository
-		timer       *scheduler.Scheduler
+		repository Repository
+		companySvc company.Service
+		timer      *scheduler.Scheduler
 	}
 )
 
-func NewService(repository Repository, companyRepo company.Repository, timer *scheduler.Scheduler) Service {
-	return &service{repository, companyRepo, timer}
+func NewService(repository Repository, companySvc company.Service) Service {
+	return &service{repository, companySvc, scheduler.NewScheduler()}
+}
+
+func (s *service) GetQuality(ctx context.Context, resourceId, companyId uint64) (Quality, error) {
+	return s.repository.GetQuality(ctx, resourceId, companyId)
 }
 
 func (s *service) StartResearch(ctx context.Context, staffIds []uint64, resourceId, companyId uint64) (*Research, error) {
@@ -74,7 +79,7 @@ func (s *service) StartResearch(ctx context.Context, staffIds []uint64, resource
 	// Investment should be relative to level - 100k * ((L*2) + (1 / L))
 	investment := 10000000 * ((int(quality.Quality) * 2) + (1 / int(math.Max(1, float64(quality.Quality)))))
 
-	investingCompany, err := s.companyRepo.GetById(ctx, companyId)
+	investingCompany, err := s.companySvc.GetById(ctx, companyId)
 	if err != nil {
 		return nil, err
 	}
