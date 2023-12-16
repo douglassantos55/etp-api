@@ -49,7 +49,7 @@ func main() {
 
 	productionRepo := production.NewProductionRepository(conn, accountingRepo, companyBuildingRepo, warehouseRepo)
 	productionSvc := production.NewProductionService(productionRepo, companySvc, companyBuildingSvc, warehouseSvc)
-	scheduledProductionSvc := scheduler.NewScheduledProductionService(productionSvc)
+	scheduledProductionSvc := production.NewScheduledProductionService(productionSvc)
 
 	company.CreateEndpoints(svr, companySvc)
 	production.CreateEndpoints(svr, scheduledProductionSvc, scheduledBuildingSvc, companySvc)

@@ -2,9 +2,6 @@ package scheduler
 
 import (
 	"api/company/building"
-	"api/company/building/production"
-	"api/resource"
-	"api/warehouse"
 	"context"
 	"log"
 	"sync"
@@ -20,11 +17,6 @@ type (
 	ScheduledBuildingService struct {
 		scheduler *Scheduler
 		service   building.BuildingService
-	}
-
-	ScheduledProductionService struct {
-		scheduler *Scheduler
-		service   production.ProductionService
 	}
 )
 
@@ -131,44 +123,4 @@ func (s *ScheduledBuildingService) completeConstruction(companyId uint64, compan
 
 	companyBuilding.CompletesAt = nil
 	return s.service.Update(ctx, companyId, companyBuilding)
-}
-
-func NewScheduledProductionService(service production.ProductionService) production.ProductionService {
-	return &ScheduledProductionService{
-		scheduler: NewScheduler(),
-		service:   service,
-	}
-}
-
-func (s *ScheduledProductionService) Produce(ctx context.Context, companyId, companyBuildingId uint64, item *resource.Item) (*production.Production, error) {
-	startedProduction, err := s.service.Produce(ctx, companyId, companyBuildingId, item)
-	if err != nil {
-		return nil, err
-	}
-
-	duration := startedProduction.FinishesAt.Sub(time.Now())
-	s.scheduler.Add(startedProduction.Id, duration, func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		_, err := s.service.CollectResource(ctx, companyId, companyBuildingId, startedProduction.Id)
-
-		return err
-	})
-
-	return startedProduction, nil
-}
-
-func (s *ScheduledProductionService) CancelProduction(ctx context.Context, companyId, companyBuildingId, productionId uint64) error {
-	err := s.service.CancelProduction(ctx, companyId, companyBuildingId, productionId)
-	if err != nil {
-		return err
-	}
-
-	s.scheduler.Remove(productionId)
-	return nil
-}
-
-func (s *ScheduledProductionService) CollectResource(ctx context.Context, companyId, companyBuildingId, productionId uint64) (*warehouse.StockItem, error) {
-	return s.service.CollectResource(ctx, companyId, companyBuildingId, productionId)
 }
