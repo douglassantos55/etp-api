@@ -16,6 +16,7 @@ const (
 	MARKET_FEE       = 7
 	TERRAIN_PURCHASE = 8
 	STAFF_TRAINING   = 9
+	RESEARCH         = 10
 )
 
 type (
