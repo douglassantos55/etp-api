@@ -93,7 +93,7 @@ func (s *service) FindGraduate(ctx context.Context, companyId uint64) (*Search, 
 		return nil, err
 	}
 
-	s.timer.Add(companyId, SEARCH_DURATION, func() error {
+	s.timer.Add(search.Id, SEARCH_DURATION, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
@@ -139,7 +139,7 @@ func (s *service) FindExperienced(ctx context.Context, companyId uint64) (*Searc
 		return nil, err
 	}
 
-	s.timer.Add(companyId, SEARCH_DURATION, func() error {
+	s.timer.Add(search.Id, SEARCH_DURATION, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
