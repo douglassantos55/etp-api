@@ -20,7 +20,7 @@ func NewScheduler() *Scheduler {
 	}
 }
 
-func (s *Scheduler) Add(id uint64, duration time.Duration, callback func() error) {
+func (s *Scheduler) Add(id any, duration time.Duration, callback func() error) {
 	s.timers.Store(id, time.AfterFunc(duration, func() {
 		s.timers.Delete(id)
 
@@ -31,14 +31,14 @@ func (s *Scheduler) Add(id uint64, duration time.Duration, callback func() error
 				s.retries.Delete(id)
 
 				if err := callback(); err != nil {
-					log.Printf("could not run callback: %d", id)
+					log.Printf("could not run callback: %s", id)
 				}
 			}))
 		}
 	}))
 }
 
-func (s *Scheduler) Remove(id uint64) {
+func (s *Scheduler) Remove(id any) {
 	if retry, found := s.retries.LoadAndDelete(id); found {
 		timer := retry.(*time.Timer)
 		if !timer.Stop() {
