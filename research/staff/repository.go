@@ -14,6 +14,7 @@ var (
 	ErrNoStaffFound     = errors.New("no staff found")
 	ErrStaffNotFound    = errors.New("staff not found")
 	ErrTrainingNotFound = errors.New("training not found")
+	ErrSearchNotFound   = errors.New("search not found")
 )
 
 type (
@@ -23,7 +24,7 @@ type (
 		RandomStaff(ctx context.Context, companyId uint64) (*Staff, error)
 
 		StartSearch(ctx context.Context, finishTime time.Time, companyId uint64) (*Search, error)
-		DeleteSearch(ctx context.Context, searchId uint64) error
+		DeleteSearch(ctx context.Context, searchId, companyId uint64) error
 
 		SaveStaff(ctx context.Context, staff *Staff, companyId uint64) (*Staff, error)
 		UpdateStaff(ctx context.Context, staff *Staff) error
@@ -84,11 +85,15 @@ func (r *goquRepository) GetStaffById(ctx context.Context, staffId uint64) (*Sta
 }
 
 func (r *goquRepository) StartSearch(ctx context.Context, finishTime time.Time, companyId uint64) (*Search, error) {
-	search := &Search{FinishesAt: finishTime}
+	search := &Search{
+		StartedAt:  time.Now(),
+		FinishesAt: finishTime,
+		CompanyId:  companyId,
+	}
 
 	result, err := r.builder.
 		Insert(goqu.T("staff_searches")).
-		Cols(search).
+		Rows(search).
 		Executor().
 		ExecContext(ctx)
 
@@ -105,14 +110,30 @@ func (r *goquRepository) StartSearch(ctx context.Context, finishTime time.Time, 
 	return search, nil
 }
 
-func (r *goquRepository) DeleteSearch(ctx context.Context, searchId uint64) error {
-	_, err := r.builder.
-		Delete(goqu.T("staff_searchers")).
-		Where(goqu.I("id").Eq(searchId)).
+func (r *goquRepository) DeleteSearch(ctx context.Context, searchId, companyId uint64) error {
+	result, err := r.builder.
+		Delete(goqu.T("staff_searches")).
+		Where(goqu.And(
+			goqu.I("id").Eq(searchId),
+			goqu.I("company_id").Eq(companyId),
+		)).
 		Executor().
 		ExecContext(ctx)
 
-	return err
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return ErrSearchNotFound
+	}
+
+	return nil
 }
 
 func (r *goquRepository) RandomStaff(ctx context.Context, companyId uint64) (*Staff, error) {

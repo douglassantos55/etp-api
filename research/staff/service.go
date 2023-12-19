@@ -37,6 +37,7 @@ type (
 		Id         uint64    `db:"id" json:"-"`
 		StartedAt  time.Time `db:"started_at" json:"-"`
 		FinishesAt time.Time `db:"finishes_at" json:"finishes_at"`
+		CompanyId  uint64    `db:"company_id" json:"-"`
 	}
 
 	Training struct {
@@ -64,6 +65,7 @@ type (
 	Service interface {
 		FindGraduate(ctx context.Context, companyId uint64) (*Search, error)
 		FindExperienced(ctx context.Context, companyId uint64) (*Search, error)
+		CancelSearch(ctx context.Context, searchId, companyId uint64) error
 
 		GetGraduate(ctx context.Context, companyId uint64) (*Staff, error)
 		GetExperienced(ctx context.Context, companyId uint64) (*Staff, error)
@@ -97,7 +99,7 @@ func (s *service) FindGraduate(ctx context.Context, companyId uint64) (*Search, 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
-		if err := s.repository.DeleteSearch(ctx, search.Id); err != nil {
+		if err := s.repository.DeleteSearch(ctx, search.Id, companyId); err != nil {
 			return err
 		}
 
@@ -143,7 +145,7 @@ func (s *service) FindExperienced(ctx context.Context, companyId uint64) (*Searc
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		if err := s.repository.DeleteSearch(ctx, search.Id); err != nil {
+		if err := s.repository.DeleteSearch(ctx, search.Id, companyId); err != nil {
 			return err
 		}
 
@@ -167,6 +169,16 @@ func (s *service) GetExperienced(ctx context.Context, companyId uint64) (*Staff,
 	err = s.repository.UpdateStaff(ctx, staff)
 
 	return staff, err
+}
+
+func (s *service) CancelSearch(ctx context.Context, searchId, companyId uint64) error {
+	err := s.repository.DeleteSearch(ctx, searchId, companyId)
+	if err != nil {
+		return err
+	}
+
+	s.timer.Remove(searchId)
+	return nil
 }
 
 func (s *service) HireStaff(ctx context.Context, staffId, companyId uint64) (*Staff, error) {

@@ -58,6 +58,20 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 		return c.JSON(http.StatusOK, staff)
 	})
 
+	group.DELETE("/staff/searches/:search", func(c echo.Context) error {
+		searchId, err := strconv.ParseUint(c.Param("search"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest)
+		}
+
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		return service.CancelSearch(c.Request().Context(), searchId, companyId)
+	})
+
 	group.POST("/staff/:staff/offer", func(c echo.Context) error {
 		staffId, err := strconv.ParseUint(c.Param("staff"), 10, 64)
 		if err != nil {

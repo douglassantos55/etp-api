@@ -13,7 +13,8 @@ func TestResearchService(t *testing.T) {
 	defer cancel()
 
 	repository := staff.NewFakeRepository()
-	service := staff.NewService(repository, scheduler.NewScheduler())
+	timer := scheduler.NewScheduler()
+	service := staff.NewService(repository, timer)
 
 	t.Run("GetGraduate", func(t *testing.T) {
 		employee, err := service.GetGraduate(ctx, 1)
@@ -283,6 +284,29 @@ func TestResearchService(t *testing.T) {
 			if training.CompletedAt.IsZero() {
 				t.Error("should have set completed at")
 			}
+		})
+	})
+
+	t.Run("CancelSearch", func(t *testing.T) {
+		t.Run("should not cancel from other company", func(t *testing.T) {
+			err := service.CancelSearch(ctx, 1, 2)
+			if err != staff.ErrSearchNotFound {
+				t.Errorf("expected error \"%s\", got \"%s\"", staff.ErrSearchNotFound, err)
+			}
+		})
+
+		t.Run("should cancel timer", func(t *testing.T) {
+			timer.Add(uint64(42069), 900*time.Millisecond, func() error {
+				t.Fatal("should not execute callback")
+				return nil
+			})
+
+			err := service.CancelSearch(ctx, 42069, 1)
+			if err != nil {
+				t.Fatalf("could not cancel search: %s", err)
+			}
+
+			time.Sleep(time.Second)
 		})
 	})
 }

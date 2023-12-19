@@ -188,4 +188,24 @@ func TestResearchRepository(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("DeleteSearch", func(t *testing.T) {
+		t.Run("should return error if no rows affected", func(t *testing.T) {
+			err := repository.DeleteSearch(ctx, 23, 3)
+			if err != staff.ErrSearchNotFound {
+				t.Errorf("expected error \"%s\", got \"%s\"", staff.ErrSearchNotFound, err)
+			}
+		})
+
+		t.Run("should delete normally", func(t *testing.T) {
+			search, err := repository.StartSearch(ctx, time.Now().Add(time.Second), 1)
+			if err != nil {
+				t.Fatalf("could not start search: %s", err)
+			}
+
+			if err := repository.DeleteSearch(ctx, search.Id, 1); err != nil {
+				t.Fatalf("could not delete search: %s", err)
+			}
+		})
+	})
 }

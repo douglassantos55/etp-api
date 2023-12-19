@@ -9,8 +9,10 @@ import (
 type fakeRepository struct {
 	lastStaffId    uint64
 	lastTrainingId uint64
-	staff          map[uint64]map[uint64]*Staff
+	lastSearchId   uint64
 	trainings      map[uint64]*Training
+	staff          map[uint64]map[uint64]*Staff
+	searches       map[uint64]map[uint64]*Search
 }
 
 func NewFakeRepository() Repository {
@@ -52,10 +54,27 @@ func NewFakeRepository() Repository {
 		},
 	}
 
+	searches := map[uint64]map[uint64]*Search{
+		1: {
+			1: {
+				Id:         1,
+				StartedAt:  time.Now(),
+				FinishesAt: time.Now().Add(time.Second),
+			},
+			42069: {
+				Id:         42069,
+				StartedAt:  time.Now(),
+				FinishesAt: time.Now().Add(time.Second),
+			},
+		},
+	}
+
 	return &fakeRepository{
 		lastStaffId:    2,
+		lastSearchId:   1,
 		lastTrainingId: 1,
 		staff:          staff,
+		searches:       searches,
 		trainings:      trainings,
 	}
 }
@@ -112,10 +131,18 @@ func (r *fakeRepository) UpdateStaff(ctx context.Context, staff *Staff) error {
 }
 
 func (r *fakeRepository) StartSearch(ctx context.Context, finishTime time.Time, companyId uint64) (*Search, error) {
-	return &Search{FinishesAt: finishTime}, nil
+	r.lastSearchId++
+	search := &Search{Id: r.lastSearchId, FinishesAt: finishTime}
+	r.searches[companyId][search.Id] = search
+	return search, nil
 }
 
-func (r *fakeRepository) DeleteSearch(ctx context.Context, searchId uint64) error {
+func (r *fakeRepository) DeleteSearch(ctx context.Context, searchId, companyId uint64) error {
+	searches, ok := r.searches[companyId]
+	if !ok {
+		return ErrSearchNotFound
+	}
+	delete(searches, searchId)
 	return nil
 }
 
