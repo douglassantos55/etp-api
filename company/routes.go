@@ -1,6 +1,7 @@
 package company
 
 import (
+	"api/auth"
 	"api/server"
 	"net/http"
 	"strconv"
@@ -65,6 +66,25 @@ func CreateEndpoints(e *echo.Echo, service Service) *echo.Group {
 		}
 
 		return c.JSON(http.StatusOK, map[string]string{"token": token})
+	})
+
+	group.POST("/terrains/:position", func(c echo.Context) error {
+		position, err := strconv.ParseInt(c.Param("position"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest)
+		}
+
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		err = service.PurchaseTerrain(c.Request().Context(), companyId, int(position))
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusNoContent, nil)
 	})
 
 	return group

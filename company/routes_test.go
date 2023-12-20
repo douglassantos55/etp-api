@@ -210,4 +210,48 @@ func TestCompanyRoutes(t *testing.T) {
 		}
 	})
 
+	t.Run("PurchaseTerrain", func(t *testing.T) {
+		t.Run("should validate position", func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/companies/terrains/aoeu", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			req.Header.Set("Accept", "application/json")
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusBadRequest {
+				t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
+			}
+		})
+
+		t.Run("should validate token", func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/companies/terrains/1", nil)
+			req.Header.Set("Accept", "application/json")
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+			}
+		})
+
+		t.Run("should return no content status", func(t *testing.T) {
+			newToken, err := auth.GenerateToken(3, "secret")
+			if err != nil {
+				t.Fatalf("could not generate jwt token: %s", err)
+			}
+
+			req := httptest.NewRequest("POST", "/companies/terrains/1", nil)
+			req.Header.Set("Authorization", "Bearer "+newToken)
+			req.Header.Set("Accept", "application/json")
+
+			rec := httptest.NewRecorder()
+			svr.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNoContent {
+				t.Errorf("expected status %d, got %d", http.StatusNoContent, rec.Code)
+			}
+		})
+	})
 }

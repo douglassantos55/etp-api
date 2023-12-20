@@ -60,8 +60,6 @@ func TestRepository(t *testing.T) {
 	t.Cleanup(func() {
 		cancel()
 
-		log.Println("STARTING CLEANUP OF COMPANY TEST")
-
 		if _, err := conn.DB.Exec("DELETE FROM companies"); err != nil {
 			log.Fatalf("could not cleanup database: %s", err)
 		}
