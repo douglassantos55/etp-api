@@ -45,4 +45,53 @@ func TestFinancingService(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("PayInterest", func(t *testing.T) {
+		t.Run("should count delayed payments", func(t *testing.T) {
+			loan := &financing.Loan{
+				Id:              1,
+				Principal:       1_000_000_00,
+				CompanyId:       1,
+				InterestRate:    0.1,
+				DelayedPayments: 1,
+				PrincipalPaid:   300_000_00,
+			}
+
+			if err := service.PayInterest(ctx, loan); err != nil {
+				t.Fatalf("could not pay interest: %s", err)
+			}
+
+			if loan.DelayedPayments != 2 {
+				t.Errorf("expected delayed payments %d, got %d", 2, loan.DelayedPayments)
+			}
+
+			if loan.InterestPaid != 0 {
+				t.Errorf("expected interest paid %d, got %d", 0, loan.InterestPaid)
+			}
+		})
+
+		t.Run("should pay interest", func(t *testing.T) {
+			loan := &financing.Loan{
+				Id:              2,
+				Principal:       1_000_000_00,
+				CompanyId:       3,
+				InterestRate:    0.1,
+				DelayedPayments: 3,
+				PrincipalPaid:   500_000_00,
+			}
+
+			if err := service.PayInterest(ctx, loan); err != nil {
+				t.Fatalf("could not pay interest: %s", err)
+			}
+
+			if loan.DelayedPayments != 0 {
+				t.Errorf("should reset delayed payments, got %d", loan.DelayedPayments)
+			}
+
+			if loan.InterestPaid != 50_000_00 {
+				t.Errorf("expected interest paid %d, got %d", 50_000_00, loan.InterestPaid)
+			}
+		})
+
+	})
 }

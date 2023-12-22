@@ -7,16 +7,18 @@ import (
 )
 
 const (
-	WAGES            = 1
-	SOCIAL_CAPITAL   = 2
-	TRANSPORT_FEE    = 3
-	REFUNDS          = 4
-	MARKET_PURCHASE  = 5
-	MARKET_SALE      = 6
-	MARKET_FEE       = 7
-	TERRAIN_PURCHASE = 8
-	STAFF_TRAINING   = 9
-	RESEARCH         = 10
+	WAGES                 = 1
+	SOCIAL_CAPITAL        = 2
+	TRANSPORT_FEE         = 3
+	REFUNDS               = 4
+	MARKET_PURCHASE       = 5
+	MARKET_SALE           = 6
+	MARKET_FEE            = 7
+	TERRAIN_PURCHASE      = 8
+	STAFF_TRAINING        = 9
+	RESEARCH              = 10
+	LOAN                  = 11
+	LOAN_INTEREST_PAYMENT = 12
 )
 
 type (

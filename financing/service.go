@@ -9,6 +9,7 @@ import (
 
 const (
 	Week                 = 7 * 24 * time.Hour
+	MAX_DELAYED_PAYMENTS = 4
 )
 
 type (
@@ -26,6 +27,7 @@ type (
 
 	Service interface {
 		TakeLoan(ctx context.Context, amount, companyId int64) (*Loan, error)
+		PayInterest(ctx context.Context, loan *Loan) error
 	}
 
 	service struct {
@@ -33,6 +35,14 @@ type (
 		companySvc company.Service
 	}
 )
+
+func (l *Loan) GetPrincipal() int64 {
+	return l.Principal - l.PrincipalPaid
+}
+
+func (l *Loan) GetInterest() int64 {
+	return int64(float64(l.GetPrincipal()) * l.InterestRate)
+}
 
 func NewService(repository Repository, companySvc company.Service) Service {
 	return &service{repository, companySvc}
@@ -62,4 +72,46 @@ func (s *service) TakeLoan(ctx context.Context, amount int64, companyId int64) (
 	}
 
 	return loan, nil
+}
+
+func (s *service) PayInterest(ctx context.Context, loan *Loan) error {
+	company, err := s.companySvc.GetById(ctx, uint64(loan.CompanyId))
+	if err != nil {
+		return err
+	}
+
+	principal := loan.GetPrincipal()
+	interest := loan.GetInterest()
+
+	// If can't pay 4 consecutive installments lose terrains to cover the debt
+	if company.AvailableCash < int(interest) {
+		loan.DelayedPayments++
+
+		if loan.DelayedPayments >= MAX_DELAYED_PAYMENTS {
+			total := 0
+			for i := company.AvailableTerrains; i > 0; i++ {
+				total += 1_000_000_00 + 500_000_00*((int(i)-1)/5) + (100_000_00 * int(i))
+
+				if total >= int(principal) {
+					if err := s.repository.ForcePrincipalPayment(ctx, i, loan); err != nil {
+						return err
+					}
+					break
+				}
+			}
+
+			// TODO: notify company about the whole thing
+			return nil
+		}
+
+		if _, err := s.repository.UpdateLoan(ctx, loan); err != nil {
+			return err
+		}
+
+		// TODO: notify company
+		return nil
+	}
+
+	loan.DelayedPayments = 0
+	return s.repository.PayInterest(ctx, loan)
 }

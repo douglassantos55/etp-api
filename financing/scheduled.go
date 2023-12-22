@@ -30,3 +30,7 @@ func (s *scheduledService) TakeLoan(ctx context.Context, amount, companyId int64
 
 	return loan, nil
 }
+
+func (s *scheduledService) PayInterest(ctx context.Context, loan *Loan) error {
+	return s.service.PayInterest(ctx, loan)
+}
