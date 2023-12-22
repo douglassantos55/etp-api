@@ -1,15 +1,20 @@
 package financing
 
-import "context"
+import (
+	"api/company"
+	"context"
+)
 
 type fakeRepository struct {
-	lastId int64
-	data   map[int64]*Loan
+	lastId      int64
+	data        map[int64]*Loan
+	companyRepo company.Repository
 }
 
-func NewFakeRepository() Repository {
+func NewFakeRepository(companyRepo company.Repository) Repository {
 	return &fakeRepository{
-		lastId: 2,
+		lastId:      2,
+		companyRepo: companyRepo,
 		data: map[int64]*Loan{
 			1: {
 				Id:              1,
@@ -45,5 +50,15 @@ func (r *fakeRepository) UpdateLoan(ctx context.Context, loan *Loan) (*Loan, err
 func (r *fakeRepository) PayInterest(ctx context.Context, loan *Loan) error {
 	loan.InterestPaid += loan.GetInterest()
 	r.data[loan.Id] = loan
+	return nil
+}
+
+func (r *fakeRepository) ForcePrincipalPayment(ctx context.Context, terrains []int8, loan *Loan) error {
+	loan.PrincipalPaid = loan.GetPrincipal()
+	r.data[loan.Id] = loan
+
+	company, _ := r.companyRepo.GetById(ctx, uint64(loan.CompanyId))
+	company.AvailableTerrains -= int8(len(terrains))
+
 	return nil
 }

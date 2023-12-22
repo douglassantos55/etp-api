@@ -5,6 +5,7 @@ import (
 	"api/database"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/doug-martin/goqu/v9"
 )
@@ -15,6 +16,7 @@ type (
 		UpdateLoan(ctx context.Context, loan *Loan) (*Loan, error)
 
 		PayInterest(ctx context.Context, loan *Loan) error
+		ForcePrincipalPayment(ctx context.Context, terrains []int8, loan *Loan) error
 	}
 
 	goquRepository struct {
@@ -103,6 +105,61 @@ func (r *goquRepository) PayInterest(ctx context.Context, loan *Loan) error {
 	}
 
 	loan.InterestPaid += int64(interest)
+
+	tx.
+		Update(goqu.T("loans")).
+		Set(loan).
+		Where(goqu.And(
+			goqu.I("id").Eq(loan.Id),
+			goqu.I("company_id").Eq(loan.CompanyId),
+		)).
+		Executor().
+		Exec()
+
+	return tx.Commit()
+}
+
+func (r *goquRepository) ForcePrincipalPayment(ctx context.Context, terrains []int8, loan *Loan) error {
+	tx, err := r.builder.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	// Demolish buildings in terrains
+	_, err = tx.
+		Update(goqu.T("companies_buildings")).
+		Set(goqu.Record{"demolished_at": time.Now()}).
+		Where(goqu.And(
+			goqu.I("position").In(terrains),
+			goqu.I("company_id").Eq(loan.CompanyId),
+		)).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return err
+	}
+
+	// Reduce the number of available terrains
+	_, err = tx.Update(goqu.T("companies")).
+		Set(goqu.Record{
+			"available_terrains": goqu.L(
+				"? - ?",
+				goqu.I("available_terrains"),
+				len(terrains),
+			),
+		}).
+		Where(goqu.I("id").Eq(loan.CompanyId)).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return err
+	}
+
+	loan.PrincipalPaid = loan.GetPrincipal()
 
 	tx.
 		Update(goqu.T("loans")).

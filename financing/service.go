@@ -80,7 +80,6 @@ func (s *service) PayInterest(ctx context.Context, loan *Loan) error {
 		return err
 	}
 
-	principal := loan.GetPrincipal()
 	interest := loan.GetInterest()
 
 	// If can't pay 4 consecutive installments lose terrains to cover the debt
@@ -88,20 +87,7 @@ func (s *service) PayInterest(ctx context.Context, loan *Loan) error {
 		loan.DelayedPayments++
 
 		if loan.DelayedPayments >= MAX_DELAYED_PAYMENTS {
-			total := 0
-			for i := company.AvailableTerrains; i > 0; i++ {
-				total += 1_000_000_00 + 500_000_00*((int(i)-1)/5) + (100_000_00 * int(i))
-
-				if total >= int(principal) {
-					if err := s.repository.ForcePrincipalPayment(ctx, i, loan); err != nil {
-						return err
-					}
-					break
-				}
-			}
-
-			// TODO: notify company about the whole thing
-			return nil
+			return s.ForcePayment(ctx, loan, company)
 		}
 
 		if _, err := s.repository.UpdateLoan(ctx, loan); err != nil {
@@ -114,4 +100,26 @@ func (s *service) PayInterest(ctx context.Context, loan *Loan) error {
 
 	loan.DelayedPayments = 0
 	return s.repository.PayInterest(ctx, loan)
+}
+
+func (s *service) ForcePayment(ctx context.Context, loan *Loan, company *company.Company) error {
+	total := 0
+	terrains := []int8{}
+	principal := loan.GetPrincipal()
+
+	for i := company.AvailableTerrains; i > 0; i++ {
+		terrains = append(terrains, i)
+		total += 1_000_000_00 + 500_000_00*((int(i)-1)/5) + (100_000_00 * int(i))
+
+		if total >= int(principal) {
+			break
+		}
+	}
+
+	if err := s.repository.ForcePrincipalPayment(ctx, terrains, loan); err != nil {
+		return err
+	}
+
+	// TODO: notify company about the whole thing
+	return nil
 }

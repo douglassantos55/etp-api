@@ -9,8 +9,9 @@ import (
 )
 
 func TestFinancingService(t *testing.T) {
-	companySvc := company.NewService(company.NewFakeRepository())
-	service := financing.NewService(financing.NewFakeRepository(), companySvc)
+	companyRepo := company.NewFakeRepository()
+	companySvc := company.NewService(companyRepo)
+	service := financing.NewService(financing.NewFakeRepository(companyRepo), companySvc)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -93,5 +94,27 @@ func TestFinancingService(t *testing.T) {
 			}
 		})
 
+		t.Run("should force principal payment", func(t *testing.T) {
+			loan := &financing.Loan{
+				Id:              3,
+				Principal:       4_000_000_00,
+				CompanyId:       1,
+				InterestRate:    0.1,
+				DelayedPayments: 3,
+			}
+
+			if err := service.PayInterest(ctx, loan); err != nil {
+				t.Fatalf("could not pay interest: %s", err)
+			}
+
+			company, err := companySvc.GetById(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get company: %s", err)
+			}
+
+			if company.AvailableTerrains != 0 {
+				t.Errorf("expected %d terrains, got %d", 0, company.AvailableTerrains)
+			}
+		})
 	})
 }
