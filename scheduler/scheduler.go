@@ -10,6 +10,7 @@ type (
 	Scheduler struct {
 		retries *sync.Map
 		timers  *sync.Map
+		tickers *sync.Map
 	}
 )
 
@@ -17,6 +18,7 @@ func NewScheduler() *Scheduler {
 	return &Scheduler{
 		retries: &sync.Map{},
 		timers:  &sync.Map{},
+		tickers: &sync.Map{},
 	}
 }
 
@@ -51,4 +53,24 @@ func (s *Scheduler) Remove(id any) {
 			<-timer.(*time.Timer).C
 		}
 	}
+
+	if ticker, found := s.tickers.LoadAndDelete(id); found {
+		ticker.(*time.Ticker).Stop()
+	}
+}
+
+func (s *Scheduler) Repeat(id any, duration time.Duration, callback func() error) {
+	ticker := time.NewTicker(duration)
+	s.tickers.Store(id, ticker)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				if err := callback(); err != nil {
+					s.Remove(id)
+				}
+			}
+		}
+	}()
 }

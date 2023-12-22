@@ -62,4 +62,22 @@ func TestScheduler(t *testing.T) {
 			t.Errorf("should not receive on channel, got: %d", c)
 		}
 	})
+
+	t.Run("Repeat", func(t *testing.T) {
+		counter := make(chan int, 1)
+		scheduler := scheduler.NewScheduler()
+
+		scheduler.Repeat(1, 10*time.Millisecond, func() error {
+			counter <- <-counter + 1
+			return nil
+		})
+
+		counter <- 0
+		time.Sleep(105 * time.Millisecond)
+
+		total := <-counter
+		if total != 10 {
+			t.Errorf("expected %d, got %d", 10, total)
+		}
+	})
 }
