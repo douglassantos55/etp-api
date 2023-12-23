@@ -19,7 +19,7 @@ type (
 		InterestPaid int64   `db:"interest_paid" json:"interest_paid"`
 		// From when principal may be paid
 		PayableFrom     time.Time `db:"payable_from" json:"payable_from"`
-		Principal       int64     `db:"amount" json:"amount"`
+		Principal       int64     `db:"principal" json:"principal"`
 		PrincipalPaid   int64     `db:"principal_paid" json:"principal_paid"`
 		DelayedPayments int8      `db:"delayed_payments" json:"delayed_payments"`
 		CompanyId       int64     `db:"company_id" json:"-"`

@@ -43,7 +43,7 @@ func (r *goquRepository) SaveLoan(ctx context.Context, loan *Loan) (*Loan, error
 		accounting.Transaction{
 			Classification: accounting.LOAN,
 			Value:          int(loan.Principal),
-			Description:    fmt.Sprintf("Loan of %f.2", float64(loan.Principal/100)),
+			Description:    fmt.Sprintf("Loan of %.2f", float64(loan.Principal/100)),
 		},
 		uint64(loan.CompanyId),
 	); err != nil {
