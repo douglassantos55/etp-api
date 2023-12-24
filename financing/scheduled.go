@@ -25,12 +25,20 @@ func (s *scheduledService) TakeLoan(ctx context.Context, amount, companyId int64
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
-		return s.PayInterest(ctx, loan)
+		_, err := s.PayInterest(ctx, loan.Id, loan.CompanyId)
+		return err
 	})
 
 	return loan, nil
 }
 
-func (s *scheduledService) PayInterest(ctx context.Context, loan *Loan) error {
-	return s.service.PayInterest(ctx, loan)
+func (s *scheduledService) PayInterest(ctx context.Context, loanId, companyId int64) (bool, error) {
+	ok, err := s.service.PayInterest(ctx, loanId, companyId)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		s.scheduler.Remove(loanId)
+	}
+	return true, nil
 }

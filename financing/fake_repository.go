@@ -13,7 +13,7 @@ type fakeRepository struct {
 
 func NewFakeRepository(companyRepo company.Repository) Repository {
 	return &fakeRepository{
-		lastId:      2,
+		lastId:      4,
 		companyRepo: companyRepo,
 		data: map[int64]*Loan{
 			1: {
@@ -21,7 +21,7 @@ func NewFakeRepository(companyRepo company.Repository) Repository {
 				Principal:       1_000_000_00,
 				CompanyId:       1,
 				InterestRate:    0.1,
-				DelayedPayments: 1,
+				DelayedPayments: 2,
 				PrincipalPaid:   300_000_00,
 			},
 			2: {
@@ -32,8 +32,30 @@ func NewFakeRepository(companyRepo company.Repository) Repository {
 				DelayedPayments: 3,
 				PrincipalPaid:   500_000_00,
 			},
+			3: {
+				Id:              3,
+				Principal:       4_000_000_00,
+				CompanyId:       1,
+				InterestRate:    0.1,
+				DelayedPayments: 3,
+			},
+			4: {
+				Id:              4,
+				Principal:       4_000_000_00,
+				CompanyId:       1,
+				InterestRate:    0.1,
+				DelayedPayments: 3,
+			},
 		},
 	}
+}
+
+func (r *fakeRepository) GetLoan(ctx context.Context, loanId, companyId int64) (*Loan, error) {
+	loan, ok := r.data[loanId]
+	if !ok {
+		return nil, ErrLoanNotFound
+	}
+	return loan, nil
 }
 
 func (r *fakeRepository) SaveLoan(ctx context.Context, loan *Loan) (*Loan, error) {
@@ -48,6 +70,7 @@ func (r *fakeRepository) UpdateLoan(ctx context.Context, loan *Loan) (*Loan, err
 }
 
 func (r *fakeRepository) PayInterest(ctx context.Context, loan *Loan) error {
+	loan.DelayedPayments = 0
 	loan.InterestPaid += loan.GetInterest()
 	r.data[loan.Id] = loan
 	return nil

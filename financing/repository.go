@@ -3,6 +3,7 @@ package financing
 import (
 	"api/accounting"
 	"api/database"
+	"api/server"
 	"context"
 	"fmt"
 	"time"
@@ -10,8 +11,11 @@ import (
 	"github.com/doug-martin/goqu/v9"
 )
 
+var ErrLoanNotFound = server.NewBusinessRuleError("loan not found")
+
 type (
 	Repository interface {
+		GetLoan(ctx context.Context, loanId, companyId int64) (*Loan, error)
 		SaveLoan(ctx context.Context, loan *Loan) (*Loan, error)
 		UpdateLoan(ctx context.Context, loan *Loan) (*Loan, error)
 
@@ -81,6 +85,38 @@ func (r *goquRepository) UpdateLoan(ctx context.Context, loan *Loan) (*Loan, err
 	return loan, nil
 }
 
+func (r *goquRepository) GetLoan(ctx context.Context, loanId, companyId int64) (*Loan, error) {
+	loan := new(Loan)
+
+	found, err := r.builder.
+		Select(
+			goqu.I("id"),
+			goqu.I("interest_rate"),
+			goqu.I("interest_paid"),
+			goqu.I("payable_from"),
+			goqu.I("principal"),
+			goqu.I("principal_paid"),
+			goqu.I("delayed_payments"),
+			goqu.I("company_id"),
+		).
+		From(goqu.T("loans")).
+		Where(goqu.And(
+			goqu.I("id").Eq(loanId),
+			goqu.I("company_id").Eq(companyId),
+		)).
+		ScanStructContext(ctx, loan)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !found {
+		return nil, ErrLoanNotFound
+	}
+
+	return loan, nil
+}
+
 func (r *goquRepository) PayInterest(ctx context.Context, loan *Loan) error {
 	tx, err := r.builder.BeginTx(ctx, nil)
 	if err != nil {
@@ -104,11 +140,16 @@ func (r *goquRepository) PayInterest(ctx context.Context, loan *Loan) error {
 		return err
 	}
 
-	loan.InterestPaid += int64(interest)
-
 	tx.
 		Update(goqu.T("loans")).
-		Set(loan).
+		Set(goqu.Record{
+			"delayed_payments": 0,
+			"interest_paid": goqu.L(
+				"? + ?",
+				goqu.I("interest_paid"),
+				interest,
+			),
+		}).
 		Where(goqu.And(
 			goqu.I("id").Eq(loan.Id),
 			goqu.I("company_id").Eq(loan.CompanyId),

@@ -31,8 +31,8 @@ func TestFinancingRepository(t *testing.T) {
 	}
 
 	if _, err := tx.Exec(`
-        INSERT INTO loans (id, company_id, principal, interest_rate, payable_from) VALUES
-        (1, 1, 100000000, 0.15, '2024-12-12 00:00:00')
+        INSERT INTO loans (id, company_id, principal, interest_rate, payable_from, interest_paid, delayed_payments) VALUES
+        (1, 2, 100000000, 0.15, '2024-12-12 00:00:00', 15000000, 2)
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
@@ -88,10 +88,11 @@ func TestFinancingRepository(t *testing.T) {
 
 	t.Run("PayInterest", func(t *testing.T) {
 		loan := &financing.Loan{
-			Id:           1,
-			InterestRate: 0.15,
-			CompanyId:    2,
-			Principal:    1_000_000_00,
+			Id:              1,
+			InterestRate:    0.15,
+			CompanyId:       2,
+			Principal:       1_000_000_00,
+			DelayedPayments: 2,
 		}
 
 		if err := repository.PayInterest(ctx, loan); err != nil {
@@ -105,6 +106,19 @@ func TestFinancingRepository(t *testing.T) {
 
 		if company.AvailableCash != -150_000_00 {
 			t.Errorf("expected cash %d, got %d", -150_000_00, company.AvailableCash)
+		}
+
+		loan, err = repository.GetLoan(ctx, 1, 2)
+		if err != nil {
+			t.Fatalf("could not get loan: %s", err)
+		}
+
+		if loan.InterestPaid != 300_000_00 {
+			t.Errorf("expected interest paid %d, got %d", 300_000_00, loan.InterestPaid)
+		}
+
+		if loan.DelayedPayments != 0 {
+			t.Errorf("shoud have reset delayed payments, got %d", loan.DelayedPayments)
 		}
 	})
 }

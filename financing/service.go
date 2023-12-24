@@ -27,7 +27,7 @@ type (
 
 	Service interface {
 		TakeLoan(ctx context.Context, amount, companyId int64) (*Loan, error)
-		PayInterest(ctx context.Context, loan *Loan) error
+		PayInterest(ctx context.Context, loanId, companyId int64) (bool, error)
 	}
 
 	service struct {
@@ -74,10 +74,15 @@ func (s *service) TakeLoan(ctx context.Context, amount int64, companyId int64) (
 	return loan, nil
 }
 
-func (s *service) PayInterest(ctx context.Context, loan *Loan) error {
-	company, err := s.companySvc.GetById(ctx, uint64(loan.CompanyId))
+func (s *service) PayInterest(ctx context.Context, loanId, companyId int64) (bool, error) {
+	loan, err := s.repository.GetLoan(ctx, loanId, companyId)
 	if err != nil {
-		return err
+		return true, err
+	}
+
+	company, err := s.companySvc.GetById(ctx, uint64(companyId))
+	if err != nil {
+		return true, err
 	}
 
 	interest := loan.GetInterest()
@@ -87,22 +92,21 @@ func (s *service) PayInterest(ctx context.Context, loan *Loan) error {
 		loan.DelayedPayments++
 
 		if loan.DelayedPayments >= MAX_DELAYED_PAYMENTS {
-			return s.ForcePayment(ctx, loan, company)
+			return false, s.forcePayment(ctx, loan, company)
 		}
 
 		if _, err := s.repository.UpdateLoan(ctx, loan); err != nil {
-			return err
+			return true, err
 		}
 
 		// TODO: notify company
-		return nil
+		return true, nil
 	}
 
-	loan.DelayedPayments = 0
-	return s.repository.PayInterest(ctx, loan)
+	return true, s.repository.PayInterest(ctx, loan)
 }
 
-func (s *service) ForcePayment(ctx context.Context, loan *Loan, company *company.Company) error {
+func (s *service) forcePayment(ctx context.Context, loan *Loan, company *company.Company) error {
 	total := 0
 	terrains := []int8{}
 	principal := loan.GetPrincipal()
