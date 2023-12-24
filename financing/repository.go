@@ -200,11 +200,11 @@ func (r *goquRepository) ForcePrincipalPayment(ctx context.Context, terrains []i
 		return err
 	}
 
-	loan.PrincipalPaid = loan.GetPrincipal()
-
 	tx.
 		Update(goqu.T("loans")).
-		Set(loan).
+		Set(goqu.Record{
+			"principal_paid": loan.GetPrincipal(),
+		}).
 		Where(goqu.And(
 			goqu.I("id").Eq(loan.Id),
 			goqu.I("company_id").Eq(loan.CompanyId),

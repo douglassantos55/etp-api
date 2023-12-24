@@ -3,8 +3,11 @@ package financing_test
 import (
 	"api/accounting"
 	"api/company"
+	"api/company/building"
 	"api/database"
 	"api/financing"
+	"api/resource"
+	"api/warehouse"
 	"context"
 	"testing"
 	"time"
@@ -31,6 +34,19 @@ func TestFinancingRepository(t *testing.T) {
 	}
 
 	if _, err := tx.Exec(`
+        INSERT INTO buildings (id, name) VALUES (1, "Mill"), (2, "Plantation")
+    `); err != nil {
+		t.Fatalf("could not seed database: %s", err)
+	}
+
+	if _, err := tx.Exec(`
+        INSERT INTO companies_buildings (id, name, company_id, building_id, position)
+        VALUES (1, "Mill", 2, 1, 0), (2, "Plantation", 2, 2, 2), (3, "Store", 2, 2, 3)
+    `); err != nil {
+		t.Fatalf("could not seed database: %s", err)
+	}
+
+	if _, err := tx.Exec(`
         INSERT INTO loans (id, company_id, principal, interest_rate, payable_from, interest_paid, delayed_payments) VALUES
         (1, 2, 100000000, 0.15, '2024-12-12 00:00:00', 15000000, 2)
     `); err != nil {
@@ -43,6 +59,12 @@ func TestFinancingRepository(t *testing.T) {
 
 	t.Cleanup(func() {
 		if _, err := conn.DB.Exec(`DELETE FROM transactions`); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec(`DELETE FROM companies_buildings`); err != nil {
+			t.Fatalf("could not cleanup database: %s", err)
+		}
+		if _, err := conn.DB.Exec(`DELETE FROM buildings`); err != nil {
 			t.Fatalf("could not cleanup database: %s", err)
 		}
 		if _, err := conn.DB.Exec(`DELETE FROM loans`); err != nil {
@@ -119,6 +141,51 @@ func TestFinancingRepository(t *testing.T) {
 
 		if loan.DelayedPayments != 0 {
 			t.Errorf("shoud have reset delayed payments, got %d", loan.DelayedPayments)
+		}
+	})
+
+	t.Run("ForcePrincipalPayment", func(t *testing.T) {
+		err := repository.ForcePrincipalPayment(ctx, []int8{0, 1, 2}, &financing.Loan{
+			Id:        1,
+			CompanyId: 2,
+			Principal: 1_000_000_00,
+		})
+
+		if err != nil {
+			t.Fatalf("could not force payment: %s", err)
+		}
+
+		company, err := companyRepo.GetById(ctx, 2)
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+
+		if company.AvailableTerrains != 0 {
+			t.Errorf("expected 0 terrains left, got %d", company.AvailableTerrains)
+		}
+
+		loan, err := repository.GetLoan(ctx, 1, 2)
+		if err != nil {
+			t.Fatalf("could not get loan: %s", err)
+		}
+
+		if loan.PrincipalPaid != 1_000_000_00 {
+			t.Errorf("expected principal paid %d, got %d", 1_000_000_00, loan.PrincipalPaid)
+		}
+
+		buildingsRepo := building.NewBuildingRepository(
+			conn,
+			resource.NewRepository(conn),
+			warehouse.NewRepository(conn),
+		)
+
+		buildings, err := buildingsRepo.GetAll(ctx, 2)
+		if err != nil {
+			t.Fatalf("could not get buildings: %s", err)
+		}
+
+		if len(buildings) != 1 {
+			t.Errorf("should have demolished buildings, got %d", len(buildings))
 		}
 	})
 }
