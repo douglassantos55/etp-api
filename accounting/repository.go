@@ -19,6 +19,8 @@ const (
 	RESEARCH              = 10
 	LOAN                  = 11
 	LOAN_INTEREST_PAYMENT = 12
+	BOND_EMISSION         = 13
+	BOND_INTEREST_PAYMENT = 14
 )
 
 type (

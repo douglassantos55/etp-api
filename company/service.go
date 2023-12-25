@@ -45,6 +45,20 @@ type (
 	}
 )
 
+const (
+	TERRAIN_BASE_VALUE     = 1_000_000_00
+	TERRAIN_UNIT_VALUE     = 500_000_00
+	TERRAIN_POSITION_VALUE = 100_000_00
+)
+
+func (c *Company) GetCreditScore() int64 {
+	return c.TerrainValue(c.AvailableTerrains)
+}
+
+func (c *Company) TerrainValue(position int8) int64 {
+	return int64(TERRAIN_BASE_VALUE + TERRAIN_UNIT_VALUE*((int(position)-1)/5) + (TERRAIN_POSITION_VALUE * int(position)))
+}
+
 func NewService(repository Repository) Service {
 	return &service{repository}
 }
@@ -67,7 +81,7 @@ func (s *service) PurchaseTerrain(ctx context.Context, companyId uint64, positio
 		return server.NewBusinessRuleError("company not found")
 	}
 
-	total := (1_000_000 + (500_000 * (int(company.AvailableTerrains) / 5)) + (100_000 * position)) * 100
+	total := (TERRAIN_BASE_VALUE + (TERRAIN_UNIT_VALUE * (int(company.AvailableTerrains) / 5)) + (TERRAIN_POSITION_VALUE * position))
 	if company.AvailableCash < total {
 		return server.NewBusinessRuleError("not enough cash")
 	}
