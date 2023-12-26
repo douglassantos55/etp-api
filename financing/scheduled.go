@@ -39,7 +39,7 @@ func (s *scheduledService) PayLoanInterest(ctx context.Context, loanId, companyI
 		return false, err
 	}
 	if !ok {
-		s.scheduler.Remove(loanId)
+		s.scheduler.Remove(fmt.Sprintf("LOAN_%d", loanId))
 	}
 	return true, nil
 }
