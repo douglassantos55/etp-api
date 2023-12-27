@@ -13,7 +13,10 @@ const (
 	MAX_DELAYED_PAYMENTS = 4
 )
 
-var ErrNotEnoughCash = server.NewBusinessRuleError("not enough cash")
+var (
+	ErrNotEnoughCash             = server.NewBusinessRuleError("not enough cash")
+	ErrAmountHigherThanPrincipal = server.NewBusinessRuleError("amount is higher than principal")
+)
 
 type (
 	Loan struct {
@@ -50,6 +53,7 @@ type (
 	Service interface {
 		TakeLoan(ctx context.Context, amount, companyId int64) (*Loan, error)
 		PayLoanInterest(ctx context.Context, loanId, companyId int64) (bool, error)
+		BuyBackLoan(ctx context.Context, amount, loanId, companyId int64) (*Loan, error)
 
 		EmitBond(ctx context.Context, rate float64, amount, companyId int64) (*Bond, error)
 		BuyBond(ctx context.Context, amount, bondId, companyId int64) (*Bond, *Creditor, error)
@@ -80,6 +84,28 @@ func (l *Loan) GetInterest() int64 {
 
 func NewService(repository Repository, companySvc company.Service) Service {
 	return &service{repository, companySvc}
+}
+
+func (s *service) BuyBackLoan(ctx context.Context, amount, loanId, companyId int64) (*Loan, error) {
+	loan, err := s.repository.GetLoan(ctx, loanId, companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	if amount > loan.GetPrincipal() {
+		return nil, ErrAmountHigherThanPrincipal
+	}
+
+	company, err := s.companySvc.GetById(ctx, uint64(companyId))
+	if err != nil {
+		return nil, err
+	}
+
+	if company.AvailableCash < int(amount) {
+		return nil, ErrNotEnoughCash
+	}
+
+	return s.repository.BuyBackLoan(ctx, amount, loan)
 }
 
 func (s *service) TakeLoan(ctx context.Context, amount int64, companyId int64) (*Loan, error) {

@@ -23,6 +23,7 @@ const (
 	BOND_INTEREST_PAYMENT = 14
 	BOND_PURCHASE         = 15
 	BOND_PURCHASED        = 16
+	LOAN_BUY_BACK         = 17
 )
 
 type (

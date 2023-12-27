@@ -23,6 +23,7 @@ type (
 		UpdateLoan(ctx context.Context, loan *Loan) (*Loan, error)
 		PayLoanInterest(ctx context.Context, loan *Loan) error
 		ForcePrincipalPayment(ctx context.Context, terrains []int8, loan *Loan) error
+		BuyBackLoan(ctx context.Context, amount int64, loan *Loan) (*Loan, error)
 
 		GetBonds(ctx context.Context, companyId int64) ([]*Bond, error)
 		GetBond(ctx context.Context, bondId int64) (*Bond, error)
@@ -40,6 +41,49 @@ type (
 func NewRepository(conn *database.Connection, accountingRepo accounting.Repository) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
 	return &goquRepository{builder, accountingRepo}
+}
+
+func (r *goquRepository) BuyBackLoan(ctx context.Context, amount int64, loan *Loan) (*Loan, error) {
+	tx, err := r.builder.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	if err := r.accountingRepo.RegisterTransaction(
+		&database.DB{TxDatabase: tx},
+		accounting.Transaction{
+			Value:          -int(amount),
+			Description:    "Loan buy back",
+			Classification: accounting.LOAN_BUY_BACK,
+		},
+		uint64(loan.CompanyId),
+	); err != nil {
+		return nil, err
+	}
+
+	_, err = tx.
+		Update(goqu.T("loans")).
+		Set(goqu.Record{
+			"principal_paid": goqu.L("? + ?", goqu.I("principal_paid"), amount),
+		}).
+		Where(goqu.And(
+			goqu.I("id").Eq(loan.Id),
+			goqu.I("company_id").Eq(loan.CompanyId),
+		)).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return r.GetLoan(ctx, loan.Id, loan.CompanyId)
 }
 
 func (r *goquRepository) SaveLoan(ctx context.Context, loan *Loan) (*Loan, error) {

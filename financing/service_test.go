@@ -166,4 +166,31 @@ func TestFinancingService(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("BuyBackLoan", func(t *testing.T) {
+		t.Run("should not buy back more than principal", func(t *testing.T) {
+			_, err := service.BuyBackLoan(ctx, 5_000_000_00, 1, 1)
+			if err != financing.ErrAmountHigherThanPrincipal {
+				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrAmountHigherThanPrincipal, err)
+			}
+		})
+
+		t.Run("should validate cash", func(t *testing.T) {
+			_, err := service.BuyBackLoan(ctx, 1_000_000_00, 3, 1)
+			if err != financing.ErrNotEnoughCash {
+				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrNotEnoughCash, err)
+			}
+		})
+
+		t.Run("should buy back loan", func(t *testing.T) {
+			loan, err := service.BuyBackLoan(ctx, 500_000_00, 2, 3)
+			if err != nil {
+				t.Fatalf("could not buy back loan: %s", err)
+			}
+
+			if loan.PrincipalPaid != 1_000_000_00 {
+				t.Errorf("expected principal paid %d, got %d", 1_000_000_00, loan.PrincipalPaid)
+			}
+		})
+	})
 }

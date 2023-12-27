@@ -16,6 +16,10 @@ func NewScheduledService(service Service, scheduler *scheduler.Scheduler) Servic
 	return &scheduledService{service, scheduler}
 }
 
+func (s *scheduledService) BuyBackLoan(ctx context.Context, amount, loanId, companyId int64) (*Loan, error) {
+	return s.service.BuyBackLoan(ctx, amount, loanId, companyId)
+}
+
 func (s *scheduledService) TakeLoan(ctx context.Context, amount, companyId int64) (*Loan, error) {
 	loan, err := s.service.TakeLoan(ctx, amount, companyId)
 	if err != nil {

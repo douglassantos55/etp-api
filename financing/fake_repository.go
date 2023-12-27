@@ -100,6 +100,11 @@ func (r *fakeRepository) GetLoan(ctx context.Context, loanId, companyId int64) (
 	return loan, nil
 }
 
+func (r *fakeRepository) BuyBackLoan(ctx context.Context, amount int64, loan *Loan) (*Loan, error) {
+	loan.PrincipalPaid += amount
+	return loan, nil
+}
+
 func (r *fakeRepository) SaveLoan(ctx context.Context, loan *Loan) (*Loan, error) {
 	r.lastLoanId++
 	loan.Id = r.lastLoanId
