@@ -162,5 +162,6 @@ func (r *fakeRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 }
 
 func (r *fakeRepository) SaveCreditor(ctx context.Context, bond *Bond, creditor *Creditor) (*Creditor, error) {
+	creditor.AvailableCash -= int(creditor.Principal)
 	return creditor, nil
 }

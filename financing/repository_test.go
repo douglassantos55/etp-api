@@ -30,7 +30,8 @@ func TestFinancingRepository(t *testing.T) {
         INSERT INTO companies (id, name, email, password) VALUES
         (1, "Coca-Cola", "coke@email.com", "aoeu"),
         (2, "Coca-Cola", "coke@email.com", "aoeu"),
-        (3, "Coca-Cola", "coke@email.com", "aoeu")
+        (3, "Coca-Cola", "coke@email.com", "aoeu"),
+        (4, "Coca-Cola", "coke@email.com", "aoeu")
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
@@ -289,6 +290,57 @@ func TestFinancingRepository(t *testing.T) {
 		// Make sure delayed payments is reset
 		if bond.Creditors[1].DelayedPayments != 0 {
 			t.Errorf("should reset delayed payments, got %d", bond.Creditors[1].DelayedPayments)
+		}
+	})
+
+	t.Run("SaveCreditor", func(t *testing.T) {
+		bond := &financing.Bond{
+			Id:           1,
+			Amount:       2_000_000_00,
+			InterestRate: 0.15,
+			Company:      &company.Company{Id: 1},
+		}
+
+		buyer := &financing.Creditor{
+			Company:      &company.Company{Id: 4},
+			InterestRate: 0.15,
+			Principal:    1_000_000_00,
+			PayableFrom:  time.Now().Add(time.Second),
+		}
+
+		_, err := repository.SaveCreditor(ctx, bond, buyer)
+		if err != nil {
+			t.Fatalf("could not save creditor: %s", err)
+		}
+
+		// Reduces creditor's money
+		creditor, err := companyRepo.GetById(ctx, 4)
+		if err != nil {
+			t.Fatalf("could not get creditor: %s", err)
+		}
+
+		if creditor.AvailableCash != -1_000_000_00 {
+			t.Errorf("expected cash %d, got %d", -1_000_000_00, creditor.AvailableCash)
+		}
+
+		// Increments issuer's money
+		issuer, err := companyRepo.GetById(ctx, 1)
+		if err != nil {
+			t.Fatalf("could not get issuer: %s", err)
+		}
+
+		if issuer.AvailableCash != 2_850_000_00 {
+			t.Errorf("expected cash %d, got %d", 2_850_000_00, issuer.AvailableCash)
+		}
+
+		// Adds to bond
+		bond, err = repository.GetBond(ctx, 1)
+		if err != nil {
+			t.Fatalf("could not get bond: %s", err)
+		}
+
+		if len(bond.Creditors) != 3 {
+			t.Errorf("expected %d creditors, got %d", 3, len(bond.Creditors))
 		}
 	})
 }

@@ -165,12 +165,5 @@ func TestFinancingService(t *testing.T) {
 				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrNotEnoughCash, err)
 			}
 		})
-
-		t.Run("should set timer", func(t *testing.T) {
-			bond, creditor, err := service.BuyBond(500_000_00, 1, 3)
-			if err != nil {
-				t.Fatalf("could not buy bond: %s", err)
-			}
-		})
 	})
 }
