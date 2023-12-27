@@ -277,7 +277,7 @@ func TestFinancingRepository(t *testing.T) {
 		}
 
 		// Make sure interest paid is incremented
-		bond, err := repository.GetBond(ctx, 1, 1)
+		bond, err := repository.GetBond(ctx, 1)
 		if err != nil {
 			t.Fatalf("could not get bond: %s", err)
 		}

@@ -21,6 +21,8 @@ const (
 	LOAN_INTEREST_PAYMENT = 12
 	BOND_EMISSION         = 13
 	BOND_INTEREST_PAYMENT = 14
+	BOND_PURCHASE         = 15
+	BOND_PURCHASED        = 16
 )
 
 type (

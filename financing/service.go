@@ -2,6 +2,7 @@ package financing
 
 import (
 	"api/company"
+	"api/server"
 	"context"
 	"fmt"
 	"time"
@@ -11,6 +12,8 @@ const (
 	Week                 = 7 * 24 * time.Hour
 	MAX_DELAYED_PAYMENTS = 4
 )
+
+var ErrNotEnoughCash = server.NewBusinessRuleError("not enough cash")
 
 type (
 	Loan struct {
@@ -49,7 +52,8 @@ type (
 		PayLoanInterest(ctx context.Context, loanId, companyId int64) (bool, error)
 
 		EmitBond(ctx context.Context, rate float64, amount, companyId int64) (*Bond, error)
-		PayBondInterest(ctx context.Context, bondId, companyId int64) error
+		BuyBond(ctx context.Context, amount, bondId, companyId int64) (*Bond, *Creditor, error)
+		PayBondInterest(ctx context.Context, creditor *Creditor, bond *Bond) error
 	}
 
 	service struct {
@@ -180,29 +184,51 @@ func (s *service) EmitBond(ctx context.Context, rate float64, amount, companyId 
 	return bond, nil
 }
 
-func (s *service) PayBondInterest(ctx context.Context, bondId, companyId int64) error {
-	bond, err := s.repository.GetBond(ctx, bondId, companyId)
+func (s *service) PayBondInterest(ctx context.Context, creditor *Creditor, bond *Bond) error {
+	emissor, err := s.companySvc.GetById(ctx, uint64(bond.CompanyId))
 	if err != nil {
 		return err
 	}
 
-	emissor, err := s.companySvc.GetById(ctx, uint64(companyId))
-	if err != nil {
-		return err
-	}
-
-	for _, creditor := range bond.Creditors {
-		interest := creditor.GetInterest()
-		if emissor.AvailableCash < int(interest) {
-			// TODO: notify creditor
-			continue
-		}
-
-		err := s.repository.PayBondInterest(ctx, bond, creditor)
+	if emissor.AvailableCash < int(creditor.GetInterest()) {
+		// TODO: notify creditor that there was no payment
+	} else {
+		err = s.repository.PayBondInterest(ctx, bond, creditor)
 		if err != nil {
 			return err
 		}
+		// TODO: notify creditor that payment was executed
 	}
 
 	return nil
+}
+
+func (s *service) BuyBond(ctx context.Context, amount, bondId, companyId int64) (*Bond, *Creditor, error) {
+	bond, err := s.repository.GetBond(ctx, bondId)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	company, err := s.companySvc.GetById(ctx, uint64(companyId))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if company.AvailableCash < int(amount) {
+		return nil, nil, ErrNotEnoughCash
+	}
+
+	creditor := &Creditor{
+		Company:      company,
+		Principal:    amount,
+		InterestRate: bond.InterestRate,
+		PayableFrom:  time.Now().Add(2 * Week),
+	}
+
+	creditor, err = s.repository.SaveCreditor(ctx, bond, creditor)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return bond, creditor, nil
 }

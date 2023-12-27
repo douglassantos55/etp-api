@@ -25,9 +25,10 @@ type (
 		ForcePrincipalPayment(ctx context.Context, terrains []int8, loan *Loan) error
 
 		GetBonds(ctx context.Context, companyId int64) ([]*Bond, error)
-		GetBond(ctx context.Context, bondId, companyId int64) (*Bond, error)
+		GetBond(ctx context.Context, bondId int64) (*Bond, error)
 		SaveBond(ctx context.Context, bond *Bond) (*Bond, error)
 		PayBondInterest(ctx context.Context, bond *Bond, creditor *Creditor) error
+		SaveCreditor(ctx context.Context, bond *Bond, creditor *Creditor) (*Creditor, error)
 	}
 
 	goquRepository struct {
@@ -54,7 +55,11 @@ func (r *goquRepository) SaveLoan(ctx context.Context, loan *Loan) (*Loan, error
 		accounting.Transaction{
 			Classification: accounting.LOAN,
 			Value:          int(loan.Principal),
-			Description:    fmt.Sprintf("Loan of %.2f", float64(loan.Principal/100)),
+			Description: fmt.Sprintf(
+				"Loan of $ %.2f (%.2f%% interest rate)",
+				float64(loan.Principal/100),
+				loan.InterestRate,
+			),
 		},
 		uint64(loan.CompanyId),
 	); err != nil {
@@ -135,7 +140,10 @@ func (r *goquRepository) PayLoanInterest(ctx context.Context, loan *Loan) error 
 		accounting.Transaction{
 			Value:          -int(interest),
 			Classification: accounting.LOAN_INTEREST_PAYMENT,
-			Description:    fmt.Sprintf("Interest payment over principal %.2f", float64(principal)/100),
+			Description: fmt.Sprintf(
+				"Interest payment over principal $ %.2f",
+				float64(principal/100),
+			),
 		},
 		uint64(loan.CompanyId),
 	); err != nil {
@@ -224,6 +232,7 @@ func (r *goquRepository) GetBonds(ctx context.Context, companyId int64) ([]*Bond
 		Select(
 			goqu.I("id"),
 			goqu.I("amount"),
+			goqu.I("company_id"),
 			goqu.I("interest_rate"),
 		).
 		From(goqu.T("bonds")).
@@ -245,20 +254,23 @@ func (r *goquRepository) GetBonds(ctx context.Context, companyId int64) ([]*Bond
 	return bonds, nil
 }
 
-func (r *goquRepository) GetBond(ctx context.Context, bondId, companyId int64) (*Bond, error) {
+func (r *goquRepository) GetBond(ctx context.Context, bondId int64) (*Bond, error) {
 	bond := new(Bond)
 
 	found, err := r.builder.
 		Select(
-			goqu.I("id"),
-			goqu.I("amount"),
-			goqu.I("interest_rate"),
+			goqu.I("b.id"),
+			goqu.I("b.amount"),
+			goqu.I("b.interest_rate"),
+			goqu.I("c.id").As(goqu.C("company.id")),
+			goqu.I("c.name").As(goqu.C("company.name")),
 		).
-		From(goqu.T("bonds")).
-		Where(goqu.And(
-			goqu.I("id").Eq(bondId),
-			goqu.I("company_id").Eq(companyId),
-		)).
+		From(goqu.T("bonds").As("b")).
+		InnerJoin(
+			goqu.T("companies").As("c"),
+			goqu.On(goqu.I("b.company_id").Eq(goqu.I("c.id"))),
+		).
+		Where(goqu.I("b.id").Eq(bondId)).
 		ScanStructContext(ctx, bond)
 
 	if err != nil {
@@ -316,9 +328,9 @@ func (r *goquRepository) SaveBond(ctx context.Context, bond *Bond) (*Bond, error
 			Value:          int(bond.Amount),
 			Classification: accounting.BOND_EMISSION,
 			Description: fmt.Sprintf(
-				"Emission of %.2f in bonds (%.2f interest rate)",
-				float64(bond.Amount)/100,
-				bond.InterestRate,
+				"Issuance of $ %.2f in bonds (%.2f%% interest rate)",
+				float64(bond.Amount/100),
+				bond.InterestRate*100,
 			),
 		},
 		uint64(bond.CompanyId),
@@ -359,7 +371,10 @@ func (r *goquRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 		accounting.Transaction{
 			Value:          -int(creditor.GetInterest()),
 			Classification: accounting.BOND_INTEREST_PAYMENT,
-			Description:    fmt.Sprintf("Bond interest payment over principal %.2f", float64(creditor.GetPrincipal()/100)),
+			Description: fmt.Sprintf(
+				"Bond interest payment over principal $ %.2f",
+				float64(creditor.GetPrincipal()/100),
+			),
 		},
 		uint64(bond.CompanyId),
 	)
@@ -373,7 +388,10 @@ func (r *goquRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 		accounting.Transaction{
 			Value:          int(creditor.GetInterest()),
 			Classification: accounting.BOND_INTEREST_PAYMENT,
-			Description:    fmt.Sprintf("Bond interest payment over principal %.2f", float64(creditor.GetPrincipal()/100)),
+			Description: fmt.Sprintf(
+				"Bond interest payment over principal $ %.2f",
+				float64(creditor.GetPrincipal()/100),
+			),
 		},
 		uint64(creditor.Id),
 	)
@@ -396,4 +414,69 @@ func (r *goquRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 	}
 
 	return tx.Commit()
+}
+
+func (r *goquRepository) SaveCreditor(ctx context.Context, bond *Bond, creditor *Creditor) (*Creditor, error) {
+	tx, err := r.builder.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	// Transfer to issuer
+	if err := r.accountingRepo.RegisterTransaction(
+		&database.DB{TxDatabase: tx},
+		accounting.Transaction{
+			Value:          int(creditor.Principal),
+			Classification: accounting.BOND_PURCHASED,
+			Description: fmt.Sprintf(
+				"Purchase of $ %.2f in bonds (%.2f%% interest rate)",
+				float64(creditor.Principal/100),
+				creditor.InterestRate*100,
+			),
+		},
+		uint64(bond.Company.Id),
+	); err != nil {
+		return nil, err
+	}
+
+	// Remove from creditor
+	if err := r.accountingRepo.RegisterTransaction(
+		&database.DB{TxDatabase: tx},
+		accounting.Transaction{
+			Value:          -int(creditor.Principal),
+			Classification: accounting.BOND_PURCHASE,
+			Description: fmt.Sprintf(
+				"Purchase of $ %.2f in bonds (%.2f%% interest rate)",
+				float64(creditor.Principal/100),
+				creditor.InterestRate*100,
+			),
+		},
+		creditor.Id,
+	); err != nil {
+		return nil, err
+	}
+
+	_, err = tx.
+		Insert(goqu.T("bonds_creditors")).
+		Rows(goqu.Record{
+			"bond_id":       bond.Id,
+			"company_id":    creditor.Id,
+			"principal":     creditor.Principal,
+			"interest_rate": creditor.InterestRate,
+			"payable_from":  creditor.PayableFrom,
+		}).
+		Executor().
+		ExecContext(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return creditor, nil
 }

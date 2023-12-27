@@ -45,21 +45,25 @@ func (s *scheduledService) PayLoanInterest(ctx context.Context, loanId, companyI
 }
 
 func (s *scheduledService) EmitBond(ctx context.Context, rate float64, amount, companyId int64) (*Bond, error) {
-	bond, err := s.service.EmitBond(ctx, rate, amount, companyId)
+	return s.service.EmitBond(ctx, rate, amount, companyId)
+}
+
+func (s *scheduledService) BuyBond(ctx context.Context, amount, bondId, companyId int64) (*Bond, *Creditor, error) {
+	bond, creditor, err := s.service.BuyBond(ctx, amount, bondId, companyId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	s.scheduler.Repeat(fmt.Sprintf("BOND_%d", bond.Id), Week, func() error {
+	s.scheduler.Repeat(fmt.Sprintf("BOND_%d_CREDITOR_%d", bond.Id, creditor.Id), Week, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
-		return s.PayBondInterest(ctx, bond.Id, bond.CompanyId)
+		return s.PayBondInterest(ctx, creditor, bond)
 	})
 
-	return bond, nil
+	return bond, creditor, nil
 }
 
-func (s *scheduledService) PayBondInterest(ctx context.Context, bondId, companyId int64) error {
-	return s.service.PayBondInterest(ctx, bondId, companyId)
+func (s *scheduledService) PayBondInterest(ctx context.Context, creditor *Creditor, bond *Bond) error {
+	return s.service.PayBondInterest(ctx, creditor, bond)
 }

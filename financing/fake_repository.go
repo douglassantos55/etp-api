@@ -9,7 +9,7 @@ type fakeRepository struct {
 	lastLoanId  int64
 	lastBondId  int64
 	loans       map[int64]*Loan
-	bonds       map[int64]map[int64]*Bond
+	bonds       map[int64]*Bond
 	companyRepo company.Repository
 }
 
@@ -18,45 +18,41 @@ func NewFakeRepository(companyRepo company.Repository) Repository {
 		lastLoanId:  4,
 		lastBondId:  2,
 		companyRepo: companyRepo,
-		bonds: map[int64]map[int64]*Bond{
+		bonds: map[int64]*Bond{
 			1: {
-				1: {
-					Id:           1,
-					Amount:       1_000_000_00,
-					InterestRate: 0.1,
-					CompanyId:    1,
-					Creditors: []*Creditor{
-						{
-							Principal:       500_000_00,
-							InterestRate:    0.1,
-							InterestPaid:    100_000_00,
-							DelayedPayments: 0,
-							PrincipalPaid:   100_000_00,
-						},
+				Id:           1,
+				Amount:       1_000_000_00,
+				InterestRate: 0.1,
+				CompanyId:    1,
+				Creditors: []*Creditor{
+					{
+						Principal:       500_000_00,
+						InterestRate:    0.1,
+						InterestPaid:    100_000_00,
+						DelayedPayments: 0,
+						PrincipalPaid:   100_000_00,
 					},
 				},
 			},
-			3: {
-				2: {
-					Id:           2,
-					Amount:       2_000_000_00,
-					InterestRate: 0.1,
-					CompanyId:    3,
-					Creditors: []*Creditor{
-						{
-							Principal:       500_000_00,
-							InterestRate:    0.1,
-							InterestPaid:    100_000_00,
-							DelayedPayments: 0,
-							PrincipalPaid:   100_000_00,
-						},
-						{
-							Principal:       1_500_000_00,
-							InterestRate:    0.1,
-							InterestPaid:    0,
-							DelayedPayments: 0,
-							PrincipalPaid:   0,
-						},
+			2: {
+				Id:           2,
+				Amount:       2_000_000_00,
+				InterestRate: 0.1,
+				CompanyId:    3,
+				Creditors: []*Creditor{
+					{
+						Principal:       500_000_00,
+						InterestRate:    0.1,
+						InterestPaid:    100_000_00,
+						DelayedPayments: 0,
+						PrincipalPaid:   100_000_00,
+					},
+					{
+						Principal:       1_500_000_00,
+						InterestRate:    0.1,
+						InterestPaid:    0,
+						DelayedPayments: 0,
+						PrincipalPaid:   0,
 					},
 				},
 			},
@@ -134,18 +130,14 @@ func (r *fakeRepository) ForcePrincipalPayment(ctx context.Context, terrains []i
 
 func (r *fakeRepository) GetBonds(ctx context.Context, companyId int64) ([]*Bond, error) {
 	bonds := make([]*Bond, 0)
-	for _, bond := range r.bonds[companyId] {
+	for _, bond := range r.bonds {
 		bonds = append(bonds, bond)
 	}
 	return bonds, nil
 }
 
-func (r *fakeRepository) GetBond(ctx context.Context, bondId, companyId int64) (*Bond, error) {
-	bonds, ok := r.bonds[companyId]
-	if !ok {
-		return nil, ErrBondNotFound
-	}
-	bond, ok := bonds[bondId]
+func (r *fakeRepository) GetBond(ctx context.Context, bondId int64) (*Bond, error) {
+	bond, ok := r.bonds[bondId]
 	if !ok {
 		return nil, ErrBondNotFound
 	}
@@ -155,7 +147,7 @@ func (r *fakeRepository) GetBond(ctx context.Context, bondId, companyId int64) (
 func (r *fakeRepository) SaveBond(ctx context.Context, bond *Bond) (*Bond, error) {
 	r.lastBondId++
 	bond.Id = r.lastBondId
-	r.bonds[bond.CompanyId][bond.Id] = bond
+	r.bonds[bond.Id] = bond
 	return bond, nil
 }
 
@@ -167,4 +159,8 @@ func (r *fakeRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 	company.AvailableCash -= int(creditor.GetInterest())
 
 	return nil
+}
+
+func (r *fakeRepository) SaveCreditor(ctx context.Context, bond *Bond, creditor *Creditor) (*Creditor, error) {
+	return creditor, nil
 }

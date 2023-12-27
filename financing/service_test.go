@@ -5,6 +5,7 @@ import (
 	"api/financing"
 	"api/scheduler"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -71,7 +72,7 @@ func TestFinancingService(t *testing.T) {
 			run := make(chan bool)
 			timer := scheduler.NewScheduler()
 
-			timer.Repeat(int64(4), 100*time.Millisecond, func() error {
+			timer.Repeat(fmt.Sprintf("LOAN_%d", int64(4)), 100*time.Millisecond, func() error {
 				run <- true
 				return nil
 			})
@@ -107,13 +108,6 @@ func TestFinancingService(t *testing.T) {
 	})
 
 	t.Run("PayBondInterest", func(t *testing.T) {
-		t.Run("should validate company", func(t *testing.T) {
-			err := service.PayBondInterest(ctx, 2, 1)
-			if err != financing.ErrBondNotFound {
-				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrBondNotFound, err)
-			}
-		})
-
 		t.Run("should skip if not enough cash", func(t *testing.T) {
 			company, err := companyRepo.GetById(ctx, 1)
 			if err != nil {
@@ -122,7 +116,12 @@ func TestFinancingService(t *testing.T) {
 
 			initialCash := company.AvailableCash
 
-			err = service.PayBondInterest(ctx, 1, 1)
+			err = service.PayBondInterest(ctx, &financing.Creditor{
+				InterestRate:  0.1,
+				Principal:     500_000_00,
+				PrincipalPaid: 100_000_00,
+			}, &financing.Bond{CompanyId: 1})
+
 			if err != nil {
 				t.Fatalf("could not pay interest: %s", err)
 			}
@@ -132,7 +131,7 @@ func TestFinancingService(t *testing.T) {
 			}
 		})
 
-		t.Run("should pay interest for all creditors", func(t *testing.T) {
+		t.Run("should pay interest", func(t *testing.T) {
 			company, err := companyRepo.GetById(ctx, 3)
 			if err != nil {
 				t.Fatalf("could not get company: %s", err)
@@ -140,14 +139,37 @@ func TestFinancingService(t *testing.T) {
 
 			initialCash := company.AvailableCash
 
-			err = service.PayBondInterest(ctx, 2, 3)
+			err = service.PayBondInterest(ctx, &financing.Creditor{
+				Principal:       1_500_000_00,
+				InterestRate:    0.1,
+				InterestPaid:    0,
+				DelayedPayments: 0,
+				PrincipalPaid:   0,
+			}, &financing.Bond{CompanyId: 3})
+
 			if err != nil {
 				t.Fatalf("could not pay interest: %s", err)
 			}
 
-			expectedCash := initialCash - 40_000_00 - 150_000_00
+			expectedCash := initialCash - 150_000_00
 			if company.AvailableCash != expectedCash {
 				t.Errorf("expected cash %d, got %d", expectedCash, company.AvailableCash)
+			}
+		})
+	})
+
+	t.Run("BuyBond", func(t *testing.T) {
+		t.Run("should validate cash", func(t *testing.T) {
+			_, _, err := service.BuyBond(ctx, 500_000_00, 1, 2)
+			if err != financing.ErrNotEnoughCash {
+				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrNotEnoughCash, err)
+			}
+		})
+
+		t.Run("should set timer", func(t *testing.T) {
+			bond, creditor, err := service.BuyBond(500_000_00, 1, 3)
+			if err != nil {
+				t.Fatalf("could not buy bond: %s", err)
 			}
 		})
 	})
