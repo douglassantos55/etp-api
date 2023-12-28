@@ -404,13 +404,13 @@ func TestFinancingRepository(t *testing.T) {
 		}
 
 		// Make sure creditor gets his money
-		creditor, err := companyRepo.GetById(ctx, 2)
+		creditor, err := companyRepo.GetById(ctx, 3)
 		if err != nil {
 			t.Fatalf("could not get company: %s", err)
 		}
 
-		if creditor.AvailableCash != -150_000_00 {
-			t.Errorf("expected cash %d, got %d", -150_000_00, creditor.AvailableCash)
+		if creditor.AvailableCash != 150_000_00 {
+			t.Errorf("expected cash %d, got %d", 150_000_00, creditor.AvailableCash)
 		}
 
 		// Make sure interest paid is incremented
@@ -507,6 +507,50 @@ func TestFinancingRepository(t *testing.T) {
 
 		if loan.GetPrincipal() != 500_000_00 {
 			t.Errorf("expected principal %d, got %d", 500_000_00, loan.GetPrincipal())
+		}
+	})
+
+	t.Run("BuyBackBond", func(t *testing.T) {
+		bond := &financing.Bond{Id: 3, CompanyId: 2}
+
+		creditor := &financing.Creditor{
+			Company: &company.Company{Id: 3},
+		}
+
+		creditor, err := repository.BuyBackBond(ctx, 250_000_00, creditor, bond)
+		if err != nil {
+			t.Fatalf("could not buy back bond: %s", err)
+		}
+
+		// Check issuer transaction
+		issuer, err := companyRepo.GetById(ctx, 2)
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+
+		if issuer.AvailableCash != -900_000_00 {
+			t.Errorf("expected cash %d, got %d", -900_000_00, issuer.AvailableCash)
+		}
+
+		// Check creditor transaction
+		buyer, err := companyRepo.GetById(ctx, 3)
+		if err != nil {
+			t.Fatalf("could not get company: %s", err)
+		}
+
+		if buyer.AvailableCash != 400_000_00 {
+			t.Errorf("expected cash %d, got %d", 400_000_00, buyer.AvailableCash)
+		}
+
+		// Check creditor update
+		if creditor.Principal != 500_000_00 {
+			t.Errorf("expected principal %d, got %d", 500_000_00, creditor.Principal)
+		}
+		if creditor.PrincipalPaid != 250_000_00 {
+			t.Errorf("expected principal paid %d, got %d", 250_000_00, creditor.PrincipalPaid)
+		}
+		if creditor.GetPrincipal() != 250_000_00 {
+			t.Errorf("expected principal %d, got %d", 250_000_00, creditor.GetPrincipal())
 		}
 	})
 }

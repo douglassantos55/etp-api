@@ -30,6 +30,7 @@ type (
 		SaveBond(ctx context.Context, bond *Bond) (*Bond, error)
 		PayBondInterest(ctx context.Context, bond *Bond, creditor *Creditor) error
 		SaveCreditor(ctx context.Context, bond *Bond, creditor *Creditor) (*Creditor, error)
+		BuyBackBond(ctx context.Context, amount int64, creditor *Creditor, bond *Bond) (*Creditor, error)
 	}
 
 	goquRepository struct {
@@ -541,4 +542,68 @@ func (r *goquRepository) SaveCreditor(ctx context.Context, bond *Bond, creditor 
 	}
 
 	return creditor, nil
+}
+
+func (r *goquRepository) BuyBackBond(ctx context.Context, amount int64, creditor *Creditor, bond *Bond) (*Creditor, error) {
+	tx, err := r.builder.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	err = r.accountingRepo.RegisterTransaction(
+		&database.DB{TxDatabase: tx},
+		accounting.Transaction{
+			Value:          -int(amount),
+			Description:    "Bond buy back",
+			Classification: accounting.BOND_BUY_BACK,
+		},
+		uint64(bond.CompanyId),
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = r.accountingRepo.RegisterTransaction(
+		&database.DB{TxDatabase: tx},
+		accounting.Transaction{
+			Value:          int(amount),
+			Description:    "Bond buy back",
+			Classification: accounting.BOND_BUY_BACK,
+		},
+		creditor.Id,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.
+		Update(goqu.T("bonds_creditors")).
+		Set(goqu.Record{
+			"principal_paid": goqu.L("? + ?", goqu.I("principal_paid"), amount),
+		}).
+		Where(goqu.And(
+			goqu.I("bond_id").Eq(bond.Id),
+			goqu.I("company_id").Eq(creditor.Id),
+		)).
+		Executor().
+		Exec()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	bond, err = r.GetBond(ctx, bond.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	return bond.GetCreditor(int64(creditor.Id))
 }

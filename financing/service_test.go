@@ -200,4 +200,34 @@ func TestFinancingService(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("BuyBackBond", func(t *testing.T) {
+		t.Run("should not buy back from other companies", func(t *testing.T) {
+			_, err := service.BuyBackBond(ctx, 500_000_00, 1, 2, 2)
+			if err != financing.ErrBondNotFound {
+				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrBondNotFound, err)
+			}
+		})
+
+		t.Run("should buy back from creditor that does not exist", func(t *testing.T) {
+			_, err := service.BuyBackBond(ctx, 500_000_00, 1, 3, 1)
+			if err != financing.ErrCreditorNotFound {
+				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrCreditorNotFound, err)
+			}
+		})
+
+		t.Run("should not buy back more than available", func(t *testing.T) {
+			_, err := service.BuyBackBond(ctx, 500_000_00, 1, 2, 1)
+			if err != financing.ErrAmountHigherThanPrincipal {
+				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrAmountHigherThanPrincipal, err)
+			}
+		})
+
+		t.Run("should not buy back without enough money", func(t *testing.T) {
+			_, err := service.BuyBackBond(ctx, 100_000_00, 1, 2, 1)
+			if err != financing.ErrNotEnoughCash {
+				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrNotEnoughCash, err)
+			}
+		})
+	})
 }

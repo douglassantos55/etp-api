@@ -17,6 +17,7 @@ var (
 	ErrNotEnoughCash             = server.NewBusinessRuleError("not enough cash")
 	ErrAmountHigherThanPrincipal = server.NewBusinessRuleError("amount is higher than principal")
 	ErrAmountHigherThanAvailable = server.NewBusinessRuleError("amount is higher than available")
+	ErrCreditorNotFound          = server.NewBusinessRuleError("creditor not found")
 )
 
 type (
@@ -60,6 +61,7 @@ type (
 		EmitBond(ctx context.Context, rate float64, amount, companyId int64) (*Bond, error)
 		BuyBond(ctx context.Context, amount, bondId, companyId int64) (*Bond, *Creditor, error)
 		PayBondInterest(ctx context.Context, creditor *Creditor, bond *Bond) error
+		BuyBackBond(ctx context.Context, amount, bondId, creditorId, companyId int64) (*Creditor, error)
 	}
 
 	service struct {
@@ -67,6 +69,15 @@ type (
 		companySvc company.Service
 	}
 )
+
+func (b *Bond) GetCreditor(creditorId int64) (*Creditor, error) {
+	for _, creditor := range b.Creditors {
+		if creditor.Id == uint64(creditorId) {
+			return creditor, nil
+		}
+	}
+	return nil, ErrCreditorNotFound
+}
 
 func (c *Creditor) GetPrincipal() int64 {
 	return c.Principal - c.PrincipalPaid
@@ -263,4 +274,35 @@ func (s *service) BuyBond(ctx context.Context, amount, bondId, companyId int64) 
 	}
 
 	return bond, creditor, nil
+}
+
+func (s *service) BuyBackBond(ctx context.Context, amount, bondId, creditorId, companyId int64) (*Creditor, error) {
+	bond, err := s.repository.GetBond(ctx, bondId)
+	if err != nil {
+		return nil, err
+	}
+
+	if bond.CompanyId != companyId {
+		return nil, ErrBondNotFound
+	}
+
+	creditor, err := bond.GetCreditor(creditorId)
+	if err != nil {
+		return nil, err
+	}
+
+	if amount > creditor.GetPrincipal() {
+		return nil, ErrAmountHigherThanPrincipal
+	}
+
+	company, err := s.companySvc.GetById(ctx, uint64(companyId))
+	if err != nil {
+		return nil, err
+	}
+
+	if company.AvailableCash < int(amount) {
+		return nil, ErrNotEnoughCash
+	}
+
+	return s.repository.BuyBackBond(ctx, amount, creditor, bond)
 }

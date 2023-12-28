@@ -27,6 +27,7 @@ func NewFakeRepository(companyRepo company.Repository) Repository {
 				Purchased:    500_000_00,
 				Creditors: []*Creditor{
 					{
+						Company:         &company.Company{Id: 2},
 						Principal:       500_000_00,
 						InterestRate:    0.1,
 						InterestPaid:    100_000_00,
@@ -169,5 +170,10 @@ func (r *fakeRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 
 func (r *fakeRepository) SaveCreditor(ctx context.Context, bond *Bond, creditor *Creditor) (*Creditor, error) {
 	creditor.AvailableCash -= int(creditor.Principal)
+	return creditor, nil
+}
+
+func (r *fakeRepository) BuyBackBond(ctx context.Context, amount int64, creditor *Creditor, bond *Bond) (*Creditor, error) {
+	creditor.PrincipalPaid += amount
 	return creditor, nil
 }

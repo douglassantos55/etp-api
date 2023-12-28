@@ -24,6 +24,7 @@ const (
 	BOND_PURCHASE         = 15
 	BOND_PURCHASED        = 16
 	LOAN_BUY_BACK         = 17
+	BOND_BUY_BACK         = 18
 )
 
 type (

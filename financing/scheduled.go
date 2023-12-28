@@ -71,3 +71,7 @@ func (s *scheduledService) BuyBond(ctx context.Context, amount, bondId, companyI
 func (s *scheduledService) PayBondInterest(ctx context.Context, creditor *Creditor, bond *Bond) error {
 	return s.service.PayBondInterest(ctx, creditor, bond)
 }
+
+func (s *scheduledService) BuyBackBond(ctx context.Context, amount, bondId, creditorId, companyId int64) (*Creditor, error) {
+	return s.service.BuyBackBond(ctx, amount, bondId, creditorId, companyId)
+}
