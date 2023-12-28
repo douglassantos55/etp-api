@@ -16,6 +16,7 @@ const (
 var (
 	ErrNotEnoughCash             = server.NewBusinessRuleError("not enough cash")
 	ErrAmountHigherThanPrincipal = server.NewBusinessRuleError("amount is higher than principal")
+	ErrAmountHigherThanAvailable = server.NewBusinessRuleError("amount is higher than available")
 )
 
 type (
@@ -35,6 +36,7 @@ type (
 		Amount       int64   `db:"amount" json:"amount"`
 		InterestRate float64 `db:"interest_rate" json:"interest_rate"`
 		CompanyId    int64   `db:"company_id" json:"-"`
+		Purchased    int64   `db:"purchased" json:"purchased"`
 
 		Company   *company.Company `db:"company" json:"company" goqu:"skipinsert,skipupdate"`
 		Creditors []*Creditor      `json:"creditors" goqu:"skipinsert,skipupdate"`
@@ -233,6 +235,10 @@ func (s *service) BuyBond(ctx context.Context, amount, bondId, companyId int64) 
 	bond, err := s.repository.GetBond(ctx, bondId)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if amount > bond.Purchased {
+		return nil, nil, ErrAmountHigherThanAvailable
 	}
 
 	company, err := s.companySvc.GetById(ctx, uint64(companyId))

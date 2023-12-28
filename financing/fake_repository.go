@@ -24,6 +24,7 @@ func NewFakeRepository(companyRepo company.Repository) Repository {
 				Amount:       1_000_000_00,
 				InterestRate: 0.1,
 				CompanyId:    1,
+				Purchased:    500_000_00,
 				Creditors: []*Creditor{
 					{
 						Principal:       500_000_00,

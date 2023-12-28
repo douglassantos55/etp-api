@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS `bonds` (
     `company_id` INTEGER NOT NULL,
     `amount` INTEGER NOT NULL,
     `interest_rate` DECIMAL(4, 2) NOT NULL,
-    `purchased` INTEGER DEFAULT 0,
     FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`)
 );
 

@@ -274,13 +274,19 @@ func (r *goquRepository) GetBonds(ctx context.Context, companyId int64) ([]*Bond
 
 	err := r.builder.
 		Select(
-			goqu.I("id"),
-			goqu.I("amount"),
-			goqu.I("company_id"),
-			goqu.I("interest_rate"),
+			goqu.I("b.id"),
+			goqu.I("b.amount"),
+			goqu.I("b.company_id"),
+			goqu.I("b.interest_rate"),
+			goqu.COALESCE(goqu.SUM("bc.principal"), 0).As("purchased"),
 		).
-		From(goqu.T("bonds")).
-		Where(goqu.I("company_id").Eq(companyId)).
+		From(goqu.T("bonds").As("b")).
+		LeftJoin(
+			goqu.T("bonds_creditors").As("bc"),
+			goqu.On(goqu.I("b.id").Eq(goqu.I("bc.bond_id"))),
+		).
+		Where(goqu.I("b.company_id").Eq(companyId)).
+		GroupBy(goqu.I("b.id")).
 		ScanStructsContext(ctx, &bonds)
 
 	if err != nil {
@@ -305,16 +311,23 @@ func (r *goquRepository) GetBond(ctx context.Context, bondId int64) (*Bond, erro
 		Select(
 			goqu.I("b.id"),
 			goqu.I("b.amount"),
+			goqu.I("b.company_id"),
 			goqu.I("b.interest_rate"),
 			goqu.I("c.id").As(goqu.C("company.id")),
 			goqu.I("c.name").As(goqu.C("company.name")),
+			goqu.COALESCE(goqu.SUM("bc.principal"), 0).As("purchased"),
 		).
 		From(goqu.T("bonds").As("b")).
+		LeftJoin(
+			goqu.T("bonds_creditors").As("bc"),
+			goqu.On(goqu.I("b.id").Eq(goqu.I("bc.bond_id"))),
+		).
 		InnerJoin(
 			goqu.T("companies").As("c"),
 			goqu.On(goqu.I("b.company_id").Eq(goqu.I("c.id"))),
 		).
 		Where(goqu.I("b.id").Eq(bondId)).
+		GroupBy(goqu.I("b.id")).
 		ScanStructContext(ctx, bond)
 
 	if err != nil {
@@ -339,16 +352,21 @@ func (r *goquRepository) getCreditors(ctx context.Context, bondId int64) ([]*Cre
 
 	err := r.builder.
 		Select(
-			goqu.I("company_id").As(goqu.C("company.id")),
-			goqu.I("interest_rate"),
-			goqu.I("interest_paid"),
-			goqu.I("principal"),
-			goqu.I("principal_paid"),
-			goqu.I("payable_from"),
-			goqu.I("delayed_payments"),
+			goqu.I("bc.interest_rate"),
+			goqu.I("bc.interest_paid"),
+			goqu.I("bc.principal"),
+			goqu.I("bc.principal_paid"),
+			goqu.I("bc.payable_from"),
+			goqu.I("bc.delayed_payments"),
+			goqu.I("c.id").As(goqu.C("company.id")),
+			goqu.I("c.name").As(goqu.C("company.name")),
 		).
-		From(goqu.T("bonds_creditors")).
-		Where(goqu.I("bond_id").Eq(bondId)).
+		From(goqu.T("bonds_creditors").As("bc")).
+		InnerJoin(
+			goqu.T("companies").As("c"),
+			goqu.On(goqu.I("bc.company_id").Eq(goqu.I("c.id"))),
+		).
+		Where(goqu.I("bc.bond_id").Eq(bondId)).
 		ScanStructsContext(ctx, &creditors)
 
 	if err != nil {

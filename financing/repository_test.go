@@ -29,9 +29,9 @@ func TestFinancingRepository(t *testing.T) {
 	if _, err := tx.Exec(`
         INSERT INTO companies (id, name, email, password) VALUES
         (1, "Coca-Cola", "coke@email.com", "aoeu"),
-        (2, "Coca-Cola", "coke@email.com", "aoeu"),
-        (3, "Coca-Cola", "coke@email.com", "aoeu"),
-        (4, "Coca-Cola", "coke@email.com", "aoeu")
+        (2, "Pepsi", "coke@email.com", "aoeu"),
+        (3, "Tesla", "coke@email.com", "aoeu"),
+        (4, "Amazon", "coke@email.com", "aoeu")
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
@@ -58,15 +58,17 @@ func TestFinancingRepository(t *testing.T) {
 	}
 
 	if _, err := tx.Exec(`
-        INSERT INTO bonds (id, company_id, amount, interest_rate, purchased) VALUES
-        (1, 1, 200000000, 0.15, 100000000)
+        INSERT INTO bonds (id, company_id, amount, interest_rate) VALUES
+        (1, 1, 200000000, 0.15), (2, 2, 100000000, 0.5), (3, 2, 100000000, 0.1)
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
 
 	if _, err := tx.Exec(`
         INSERT INTO bonds_creditors (bond_id, company_id, principal, interest_rate, payable_from, delayed_payments) VALUES
-        (1, 2, 100000000, 0.15, "2024-12-12 00:00:00", 1), (1, 3, 100000000, 0.15, "2024-12-12 00:00:00", 2)
+        (1, 2, 100000000, 0.15, "2024-12-12 00:00:00", 1),
+        (1, 3, 100000000, 0.15, "2024-12-12 00:00:00", 2),
+        (3, 3, 50000000, 0.5, "2024-12-12 00:00:00", 0)
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
@@ -236,6 +238,139 @@ func TestFinancingRepository(t *testing.T) {
 		if company.AvailableCash != 2_000_000_00 {
 			t.Errorf("expected %d cash, got %d", 2_000_000_00, company.AvailableCash)
 		}
+	})
+
+	t.Run("GetBond", func(t *testing.T) {
+		t.Run("should return error when not found", func(t *testing.T) {
+			_, err := repository.GetBond(ctx, 345254)
+			if err != financing.ErrBondNotFound {
+				t.Errorf("expected error \"%s\", got \"%s\"", financing.ErrBondNotFound, err)
+			}
+		})
+
+		t.Run("should include company", func(t *testing.T) {
+			bond, err := repository.GetBond(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get bond: %s", err)
+			}
+
+			if bond.CompanyId != 1 {
+				t.Errorf("expected company id %d, got %d", 1, bond.CompanyId)
+			}
+
+			if bond.Company.Id != 1 {
+				t.Errorf("expected company id %d, got %d", 1, bond.Company.Id)
+			}
+
+			if bond.Company.Name != "Coca-Cola" {
+				t.Errorf("expected name %s, got %s", "Coca-Cola", bond.Company.Name)
+			}
+		})
+
+		t.Run("should calculate purchased", func(t *testing.T) {
+			bond, err := repository.GetBond(ctx, 1)
+			if err != nil {
+				t.Fatalf("could not get bond: %s", err)
+			}
+
+			if bond.Purchased != 2_000_000_00 {
+				t.Errorf("Expected purchased %d, got %d", 2_000_000_00, bond.Purchased)
+			}
+
+			bond, err = repository.GetBond(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get bond: %s", err)
+			}
+
+			if bond.Purchased != 0 {
+				t.Errorf("Expected purchased %d, got %d", 0, bond.Purchased)
+			}
+
+			bond, err = repository.GetBond(ctx, 3)
+			if err != nil {
+				t.Fatalf("could not get bond: %s", err)
+			}
+
+			if bond.Purchased != 500_000_00 {
+				t.Errorf("Expected purchased %d, got %d", 500_000_00, bond.Purchased)
+			}
+		})
+
+		t.Run("should bring creditors", func(t *testing.T) {
+			bond, err := repository.GetBond(ctx, 3)
+			if err != nil {
+				t.Fatalf("could not get bond: %s", err)
+			}
+
+			if len(bond.Creditors) != 1 {
+				t.Errorf("expected %d creditor, got %d", 1, len(bond.Creditors))
+			}
+
+			if bond.Creditors[0].Name != "Tesla" {
+				t.Errorf("Expected name %s, got %s", "Tesla", bond.Creditors[0].Name)
+			}
+		})
+	})
+
+	t.Run("GetBonds", func(t *testing.T) {
+		t.Run("should return empty list when no bonds found", func(t *testing.T) {
+			bonds, err := repository.GetBonds(ctx, 4)
+			if err != nil {
+				t.Fatalf("could not get bonds: %s", err)
+			}
+
+			if bonds == nil {
+				t.Fatal("should return an empty slice")
+			}
+
+			if len(bonds) != 0 {
+				t.Errorf("expected length %d, got %d", 0, len(bonds))
+			}
+		})
+
+		t.Run("should calculate purchased", func(t *testing.T) {
+			bonds, err := repository.GetBonds(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get bonds: %s", err)
+			}
+
+			if len(bonds) != 2 {
+				t.Fatalf("expeced %d bond, got %d", 2, len(bonds))
+			}
+
+			for i, bond := range bonds {
+				if i == 0 && bond.Purchased != 0 {
+					t.Errorf("expected purchased %d, got %d", 0, bond.Purchased)
+				}
+
+				if i == 1 && bond.Purchased != 500_000_00 {
+					t.Errorf("expected purchased %d, got %d", 500_000_00, bond.Purchased)
+				}
+			}
+		})
+
+		t.Run("should bring creditors", func(t *testing.T) {
+			bonds, err := repository.GetBonds(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get bonds: %s", err)
+			}
+
+			for i, bond := range bonds {
+				if i == 0 {
+					if len(bond.Creditors) != 0 {
+						t.Errorf("expected %d creditors, got %d", 0, len(bond.Creditors))
+					}
+				}
+				if i == 1 {
+					if len(bond.Creditors) != 1 {
+						t.Fatalf("expected %d creditors, got %d", 1, len(bond.Creditors))
+					}
+					if bond.Creditors[0].Name != "Tesla" {
+						t.Errorf("expected name %s, got %s", "Tesla", bond.Creditors[0].Name)
+					}
+				}
+			}
+		})
 	})
 
 	t.Run("PayBondInterest", func(t *testing.T) {
