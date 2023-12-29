@@ -9,7 +9,6 @@ import (
 	"api/database"
 	"api/research"
 	"api/resource"
-	"api/scheduler"
 	"api/server"
 	"api/warehouse"
 	"log"
@@ -46,7 +45,7 @@ func main() {
 
 	companyBuildingRepo := companyBuilding.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
 	companyBuildingSvc := companyBuilding.NewBuildingService(companyBuildingRepo, warehouseSvc, buildingSvc)
-	scheduledBuildingSvc := scheduler.NewScheduledBuildingService(companyBuildingSvc)
+	scheduledBuildingSvc := companyBuilding.NewScheduledBuildingService(companyBuildingSvc)
 
 	researchSvc := research.NewService(research.NewRepository(conn, accountingRepo), companySvc)
 	productionRepo := production.NewProductionRepository(conn, accountingRepo, companyBuildingRepo, warehouseRepo)

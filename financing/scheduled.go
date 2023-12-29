@@ -16,6 +16,10 @@ func NewScheduledService(service Service, scheduler *scheduler.Scheduler) Servic
 	return &scheduledService{service, scheduler}
 }
 
+func (s *scheduledService) GetLoans(ctx context.Context, companyId int64) ([]*Loan, error) {
+	return s.service.GetLoans(ctx, companyId)
+}
+
 func (s *scheduledService) BuyBackLoan(ctx context.Context, amount, loanId, companyId int64) (*Loan, error) {
 	return s.service.BuyBackLoan(ctx, amount, loanId, companyId)
 }

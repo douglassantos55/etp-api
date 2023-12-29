@@ -18,6 +18,7 @@ var (
 
 type (
 	Repository interface {
+		GetLoans(ctx context.Context, companyId int64) ([]*Loan, error)
 		GetLoan(ctx context.Context, loanId, companyId int64) (*Loan, error)
 		SaveLoan(ctx context.Context, loan *Loan) (*Loan, error)
 		UpdateLoan(ctx context.Context, loan *Loan) (*Loan, error)
@@ -42,6 +43,31 @@ type (
 func NewRepository(conn *database.Connection, accountingRepo accounting.Repository) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
 	return &goquRepository{builder, accountingRepo}
+}
+
+func (r *goquRepository) GetLoans(ctx context.Context, companyId int64) ([]*Loan, error) {
+	loans := make([]*Loan, 0)
+
+	err := r.builder.
+		Select(
+			goqu.I("id"),
+			goqu.I("interest_rate"),
+			goqu.I("interest_paid"),
+			goqu.I("payable_from"),
+			goqu.I("principal"),
+			goqu.I("principal_paid"),
+			goqu.I("delayed_payments"),
+			goqu.I("company_id"),
+		).
+		From(goqu.T("loans")).
+		Where(goqu.I("company_id").Eq(companyId)).
+		ScanStructsContext(ctx, &loans)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return loans, nil
 }
 
 func (r *goquRepository) BuyBackLoan(ctx context.Context, amount int64, loan *Loan) (*Loan, error) {

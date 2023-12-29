@@ -54,6 +54,7 @@ type (
 	}
 
 	Service interface {
+		GetLoans(ctx context.Context, companyId int64) ([]*Loan, error)
 		TakeLoan(ctx context.Context, amount, companyId int64) (*Loan, error)
 		PayLoanInterest(ctx context.Context, loanId, companyId int64) (bool, error)
 		BuyBackLoan(ctx context.Context, amount, loanId, companyId int64) (*Loan, error)
@@ -97,6 +98,10 @@ func (l *Loan) GetInterest() int64 {
 
 func NewService(repository Repository, companySvc company.Service) Service {
 	return &service{repository, companySvc}
+}
+
+func (s *service) GetLoans(ctx context.Context, companyId int64) ([]*Loan, error) {
+	return s.repository.GetLoans(ctx, companyId)
 }
 
 func (s *service) BuyBackLoan(ctx context.Context, amount, loanId, companyId int64) (*Loan, error) {

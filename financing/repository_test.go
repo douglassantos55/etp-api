@@ -52,7 +52,8 @@ func TestFinancingRepository(t *testing.T) {
 	if _, err := tx.Exec(`
         INSERT INTO loans (id, company_id, principal, interest_rate, payable_from, interest_paid, delayed_payments) VALUES
         (1, 2, 100000000, 0.15, '2024-12-12 00:00:00', 15000000, 2),
-        (2, 2, 100000000, 0.15, '2024-12-12 00:00:00', 15000000, 2)
+        (2, 2, 100000000, 0.15, '2024-12-12 00:00:00', 15000000, 2),
+        (3, 1, 100000000, 0.15, '2024-12-12 00:00:00', 15000000, 2)
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
@@ -107,6 +108,30 @@ func TestFinancingRepository(t *testing.T) {
 	accountingRepo := accounting.NewRepository(conn)
 	companyRepo := company.NewRepository(conn, accountingRepo)
 	repository := financing.NewRepository(conn, accountingRepo)
+
+	t.Run("GetLoans", func(t *testing.T) {
+		t.Run("should return empty list when not found", func(t *testing.T) {
+			loans, err := repository.GetLoans(ctx, 3)
+			if err != nil {
+				t.Fatalf("could not get loans: %s", err)
+			}
+
+			if len(loans) != 0 {
+				t.Errorf("expected %d loans, got %d", 0, len(loans))
+			}
+		})
+
+		t.Run("should list company's loans", func(t *testing.T) {
+			loans, err := repository.GetLoans(ctx, 2)
+			if err != nil {
+				t.Fatalf("could not get loans: %s", err)
+			}
+
+			if len(loans) != 2 {
+				t.Errorf("expected %d loans, got %d", 2, len(loans))
+			}
+		})
+	})
 
 	t.Run("SaveLoan", func(t *testing.T) {
 		loan, err := repository.SaveLoan(ctx, &financing.Loan{

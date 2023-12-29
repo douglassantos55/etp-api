@@ -94,6 +94,16 @@ func NewFakeRepository(companyRepo company.Repository) Repository {
 	}
 }
 
+func (r *fakeRepository) GetLoans(ctx context.Context, companyId int64) ([]*Loan, error) {
+	loans := make([]*Loan, 0)
+	for _, loan := range r.loans {
+		if loan.CompanyId == companyId {
+			loans = append(loans, loan)
+		}
+	}
+	return loans, nil
+}
+
 func (r *fakeRepository) GetLoan(ctx context.Context, loanId, companyId int64) (*Loan, error) {
 	loan, ok := r.loans[loanId]
 	if !ok {
