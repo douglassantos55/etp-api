@@ -12,6 +12,7 @@ func CreateEndpoints(e *echo.Echo, service Service) {
 	group := e.Group("/financing")
 
 	createLoanEndpoints(group, service)
+	createBondEndpoints(group, service)
 }
 
 func createLoanEndpoints(group *echo.Group, service Service) {
@@ -84,5 +85,35 @@ func createLoanEndpoints(group *echo.Group, service Service) {
 		}
 
 		return c.JSON(http.StatusOK, loan)
+	})
+}
+
+func createBondEndpoints(group *echo.Group, service Service) {
+	group.GET("/bonds", func(c echo.Context) error {
+		companyId, err := strconv.ParseInt(c.QueryParam("company"), 10, 64)
+		if err == nil {
+			bonds, err := service.GetCompanyBonds(c.Request().Context(), companyId)
+			if err != nil {
+				return err
+			}
+			return c.JSON(http.StatusOK, bonds)
+		}
+
+		page, err := strconv.ParseUint(c.QueryParam("page"), 10, 64)
+		if err != nil {
+			page = 1
+		}
+
+		limit, err := strconv.ParseUint(c.QueryParam("limit"), 10, 64)
+		if err != nil {
+			limit = 50
+		}
+
+		bonds, err := service.GetBonds(c.Request().Context(), uint(page-1), uint(limit))
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, bonds)
 	})
 }

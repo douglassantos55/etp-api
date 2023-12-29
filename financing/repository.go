@@ -26,7 +26,8 @@ type (
 		ForcePrincipalPayment(ctx context.Context, terrains []int8, loan *Loan) error
 		BuyBackLoan(ctx context.Context, amount int64, loan *Loan) (*Loan, error)
 
-		GetBonds(ctx context.Context, companyId int64) ([]*Bond, error)
+		GetBonds(ctx context.Context, page, limit uint) ([]*Bond, error)
+		GetCompanyBonds(ctx context.Context, companyId int64) ([]*Bond, error)
 		GetBond(ctx context.Context, bondId int64) (*Bond, error)
 		SaveBond(ctx context.Context, bond *Bond) (*Bond, error)
 		PayBondInterest(ctx context.Context, bond *Bond, creditor *Creditor) error
@@ -296,7 +297,45 @@ func (r *goquRepository) ForcePrincipalPayment(ctx context.Context, terrains []i
 	return tx.Commit()
 }
 
-func (r *goquRepository) GetBonds(ctx context.Context, companyId int64) ([]*Bond, error) {
+func (r *goquRepository) GetBonds(ctx context.Context, page, limit uint) ([]*Bond, error) {
+	bonds := make([]*Bond, 0)
+
+	err := r.builder.
+		Select(
+			goqu.I("b.id"),
+			goqu.I("b.amount"),
+			goqu.I("b.company_id"),
+			goqu.I("b.interest_rate"),
+			goqu.COALESCE(goqu.SUM("bc.principal"), 0).As("purchased"),
+		).
+		From(goqu.T("bonds").As("b")).
+		LeftJoin(
+			goqu.T("bonds_creditors").As("bc"),
+			goqu.On(goqu.I("b.id").Eq(goqu.I("bc.bond_id"))),
+		).
+		GroupBy(goqu.I("b.id")).
+		Having(goqu.COALESCE(goqu.SUM("bc.principal"), 0).Lt(goqu.I("b.amount"))).
+		Order(goqu.I("b.interest_rate").Desc()).
+		Limit(limit).
+		Offset(page*limit).
+		ScanStructsContext(ctx, &bonds)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, bond := range bonds {
+		creditors, err := r.getCreditors(ctx, bond.Id)
+		if err != nil {
+			return nil, err
+		}
+		bond.Creditors = creditors
+	}
+
+	return bonds, nil
+}
+
+func (r *goquRepository) GetCompanyBonds(ctx context.Context, companyId int64) ([]*Bond, error) {
 	bonds := make([]*Bond, 0)
 
 	err := r.builder.

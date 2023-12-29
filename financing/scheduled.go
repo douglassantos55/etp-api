@@ -52,6 +52,14 @@ func (s *scheduledService) PayLoanInterest(ctx context.Context, loanId, companyI
 	return true, nil
 }
 
+func (s *scheduledService) GetBonds(ctx context.Context, page, limit uint) ([]*Bond, error) {
+	return s.service.GetBonds(ctx, page, limit)
+}
+
+func (s *scheduledService) GetCompanyBonds(ctx context.Context, companyId int64) ([]*Bond, error) {
+	return s.service.GetCompanyBonds(ctx, companyId)
+}
+
 func (s *scheduledService) EmitBond(ctx context.Context, rate float64, amount, companyId int64) (*Bond, error) {
 	return s.service.EmitBond(ctx, rate, amount, companyId)
 }

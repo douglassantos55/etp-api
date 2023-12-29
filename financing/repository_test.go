@@ -240,6 +240,72 @@ func TestFinancingRepository(t *testing.T) {
 		}
 	})
 
+	t.Run("GetBonds", func(t *testing.T) {
+		t.Run("should paginate", func(t *testing.T) {
+			bonds, err := repository.GetBonds(ctx, 0, 1)
+			if err != nil {
+				t.Fatalf("could not get bonds: %s", err)
+			}
+
+			if len(bonds) != 1 {
+				t.Fatalf("expected %d bond, got %d", 1, len(bonds))
+			}
+
+			if bonds[0].Id != 2 {
+				t.Errorf("expected bond ID %d, got %d", 2, bonds[0].Id)
+			}
+
+			bonds, err = repository.GetBonds(ctx, 1, 1)
+			if err != nil {
+				t.Fatalf("could not get bonds: %s", err)
+			}
+
+			if len(bonds) != 1 {
+				t.Fatalf("expected %d bond, got %d", 1, len(bonds))
+			}
+
+			if bonds[0].Id != 3 {
+				t.Errorf("expected bond ID %d, got %d", 3, bonds[0].Id)
+			}
+		})
+
+		t.Run("should return empty list when not found", func(t *testing.T) {
+			bonds, err := repository.GetBonds(ctx, 100, 50)
+			if err != nil {
+				t.Fatalf("could not get bonds: %s", err)
+			}
+
+			if len(bonds) != 0 {
+				t.Errorf("expected empty bonds, got %d", len(bonds))
+			}
+		})
+
+		t.Run("should calculate purchased", func(t *testing.T) {
+			bonds, err := repository.GetBonds(ctx, 0, 10)
+			if err != nil {
+				t.Fatalf("could not get bonds: %s", err)
+			}
+
+			if len(bonds) != 2 {
+				t.Fatalf("expected %d bonds, got %d", 2, len(bonds))
+			}
+
+			for _, bond := range bonds {
+				if bond.Id == 1 {
+					t.Errorf("should ignore purchased bond")
+				}
+
+				if bond.Id == 2 && bond.Purchased != 0 {
+					t.Errorf("expected purchased %d, got %d", 0, bond.Purchased)
+				}
+
+				if bond.Id == 3 && bond.Purchased != 500_000_00 {
+					t.Errorf("expected purchased %d, got %d", 500_000_00, bond.Purchased)
+				}
+			}
+		})
+	})
+
 	t.Run("SaveBond", func(t *testing.T) {
 		bond, err := repository.SaveBond(ctx, &financing.Bond{
 			Amount:       1_000_000_00,
@@ -337,9 +403,9 @@ func TestFinancingRepository(t *testing.T) {
 		})
 	})
 
-	t.Run("GetBonds", func(t *testing.T) {
+	t.Run("GetCompanyBonds", func(t *testing.T) {
 		t.Run("should return empty list when no bonds found", func(t *testing.T) {
-			bonds, err := repository.GetBonds(ctx, 4)
+			bonds, err := repository.GetCompanyBonds(ctx, 4)
 			if err != nil {
 				t.Fatalf("could not get bonds: %s", err)
 			}
@@ -354,7 +420,7 @@ func TestFinancingRepository(t *testing.T) {
 		})
 
 		t.Run("should calculate purchased", func(t *testing.T) {
-			bonds, err := repository.GetBonds(ctx, 2)
+			bonds, err := repository.GetCompanyBonds(ctx, 2)
 			if err != nil {
 				t.Fatalf("could not get bonds: %s", err)
 			}
@@ -375,7 +441,7 @@ func TestFinancingRepository(t *testing.T) {
 		})
 
 		t.Run("should bring creditors", func(t *testing.T) {
-			bonds, err := repository.GetBonds(ctx, 2)
+			bonds, err := repository.GetCompanyBonds(ctx, 2)
 			if err != nil {
 				t.Fatalf("could not get bonds: %s", err)
 			}

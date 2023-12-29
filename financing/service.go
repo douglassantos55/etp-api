@@ -59,6 +59,8 @@ type (
 		PayLoanInterest(ctx context.Context, loanId, companyId int64) (bool, error)
 		BuyBackLoan(ctx context.Context, amount, loanId, companyId int64) (*Loan, error)
 
+		GetBonds(ctx context.Context, page, limit uint) ([]*Bond, error)
+		GetCompanyBonds(ctx context.Context, companyId int64) ([]*Bond, error)
 		EmitBond(ctx context.Context, rate float64, amount, companyId int64) (*Bond, error)
 		BuyBond(ctx context.Context, amount, bondId, companyId int64) (*Bond, *Creditor, error)
 		PayBondInterest(ctx context.Context, creditor *Creditor, bond *Bond) error
@@ -203,6 +205,14 @@ func (s *service) forcePayment(ctx context.Context, loan *Loan, company *company
 
 	// TODO: notify company about the whole thing
 	return nil
+}
+
+func (s *service) GetBonds(ctx context.Context, page, limit uint) ([]*Bond, error) {
+	return s.repository.GetBonds(ctx, page, limit)
+}
+
+func (s *service) GetCompanyBonds(ctx context.Context, companyId int64) ([]*Bond, error) {
+	return s.repository.GetCompanyBonds(ctx, companyId)
 }
 
 func (s *service) EmitBond(ctx context.Context, rate float64, amount, companyId int64) (*Bond, error) {

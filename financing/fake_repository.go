@@ -145,10 +145,29 @@ func (r *fakeRepository) ForcePrincipalPayment(ctx context.Context, terrains []i
 	return nil
 }
 
-func (r *fakeRepository) GetBonds(ctx context.Context, companyId int64) ([]*Bond, error) {
+func (r *fakeRepository) GetBonds(ctx context.Context, page, limit uint) ([]*Bond, error) {
+	index := 0
+	bonds := make([]*Bond, 0, limit)
+	for _, bond := range r.bonds {
+		if len(bonds) >= int(limit) {
+			break
+		}
+
+		if int(page*limit) <= index {
+			bonds = append(bonds, bond)
+		}
+
+		index++
+	}
+	return bonds, nil
+}
+
+func (r *fakeRepository) GetCompanyBonds(ctx context.Context, companyId int64) ([]*Bond, error) {
 	bonds := make([]*Bond, 0)
 	for _, bond := range r.bonds {
-		bonds = append(bonds, bond)
+		if bond.CompanyId == companyId {
+			bonds = append(bonds, bond)
+		}
 	}
 	return bonds, nil
 }
