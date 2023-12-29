@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -93,6 +94,106 @@ func TestFinancingRoutes(t *testing.T) {
 			if len(response) != 1 {
 				t.Errorf("expected %d bonds, got %d", 1, len(response))
 			}
+		})
+
+		t.Run("EmitBond", func(t *testing.T) {
+			t.Run("validation", func(t *testing.T) {
+				body := strings.NewReader(`{"rate":0.7,"amount":100000000.00}`)
+
+				req := httptest.NewRequest("POST", "/financing/bonds", body)
+				req.Header.Set("Accept", "application/json")
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+token)
+
+				rec := httptest.NewRecorder()
+				svr.ServeHTTP(rec, req)
+
+				if rec.Code != http.StatusBadRequest {
+					t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+				}
+			})
+
+			t.Run("success", func(t *testing.T) {
+				body := strings.NewReader(`{"rate":0.17,"amount":100000000}`)
+
+				req := httptest.NewRequest("POST", "/financing/bonds", body)
+				req.Header.Set("Accept", "application/json")
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+token)
+
+				rec := httptest.NewRecorder()
+				svr.ServeHTTP(rec, req)
+
+				if rec.Code != http.StatusOK {
+					t.Errorf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+			})
+		})
+
+		t.Run("BuyBackBond", func(t *testing.T) {
+			t.Run("invalid bond", func(t *testing.T) {
+				body := strings.NewReader(`{"creditor_id":2,"amount":100}`)
+
+				req := httptest.NewRequest("POST", "/financing/bonds/aoeu", body)
+				req.Header.Set("Accept", "application/json")
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+token)
+
+				rec := httptest.NewRecorder()
+				svr.ServeHTTP(rec, req)
+
+				if rec.Code != http.StatusBadRequest {
+					t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+				}
+			})
+
+			t.Run("non-existing bond", func(t *testing.T) {
+				body := strings.NewReader(`{"creditor_id":2,"amount":100}`)
+
+				req := httptest.NewRequest("POST", "/financing/bonds/1523", body)
+				req.Header.Set("Accept", "application/json")
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+token)
+
+				rec := httptest.NewRecorder()
+				svr.ServeHTTP(rec, req)
+
+				if rec.Code != http.StatusUnprocessableEntity {
+					t.Errorf("expected status %d, got %d: %s", http.StatusUnprocessableEntity, rec.Code, rec.Body.String())
+				}
+			})
+
+			t.Run("validation", func(t *testing.T) {
+				body := strings.NewReader(`{"creditor_id":2,"amount":"100"}`)
+
+				req := httptest.NewRequest("POST", "/financing/bonds/1", body)
+				req.Header.Set("Accept", "application/json")
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+token)
+
+				rec := httptest.NewRecorder()
+				svr.ServeHTTP(rec, req)
+
+				if rec.Code != http.StatusBadRequest {
+					t.Errorf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+				}
+			})
+
+			t.Run("success", func(t *testing.T) {
+				body := strings.NewReader(`{"creditor_id":2,"amount":100}`)
+
+				req := httptest.NewRequest("POST", "/financing/bonds/1", body)
+				req.Header.Set("Accept", "application/json")
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+token)
+
+				rec := httptest.NewRecorder()
+				svr.ServeHTTP(rec, req)
+
+				if rec.Code != http.StatusOK {
+					t.Errorf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+				}
+			})
 		})
 	})
 }

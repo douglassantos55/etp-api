@@ -116,4 +116,63 @@ func createBondEndpoints(group *echo.Group, service Service) {
 
 		return c.JSON(http.StatusOK, bonds)
 	})
+
+	group.POST("/bonds", func(c echo.Context) error {
+		request := struct {
+			Rate   float64 `json:"rate" validate:"required"`
+			Amount int64   `json:"amount" validate:"required"`
+		}{}
+
+		if err := c.Bind(&request); err != nil {
+			return err
+		}
+
+		if err := c.Validate(&request); err != nil {
+			return err
+		}
+
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		bond, err := service.EmitBond(c.Request().Context(), request.Rate, request.Amount, int64(companyId))
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, bond)
+	})
+
+	group.POST("/bonds/:bondId", func(c echo.Context) error {
+		bondId, err := strconv.ParseInt(c.Param("bondId"), 10, 64)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest)
+		}
+
+		request := struct {
+			Amount     int64 `json:"amount" validate:"required"`
+			CreditorId int64 `json:"creditor_id" validate:"required"`
+		}{}
+
+		if err := c.Bind(&request); err != nil {
+			return err
+		}
+
+		if err := c.Validate(&request); err != nil {
+			return err
+		}
+
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		creditor, err := service.BuyBackBond(c.Request().Context(), request.Amount, bondId, request.CreditorId, int64(companyId))
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, creditor)
+	})
 }

@@ -39,8 +39,8 @@ type (
 		CompanyId    int64   `db:"company_id" json:"-"`
 		Purchased    int64   `db:"purchased" json:"purchased"`
 
-		Company   *company.Company `db:"company" json:"company" goqu:"skipinsert,skipupdate"`
-		Creditors []*Creditor      `json:"creditors" goqu:"skipinsert,skipupdate"`
+		Company   *company.Company `db:"company" json:"company,omitempty" goqu:"skipinsert,skipupdate"`
+		Creditors []*Creditor      `json:"creditors,omitempty" goqu:"skipinsert,skipupdate"`
 	}
 
 	Creditor struct {
@@ -263,7 +263,7 @@ func (s *service) BuyBond(ctx context.Context, amount, bondId, companyId int64) 
 		return nil, nil, err
 	}
 
-	if amount > bond.Purchased {
+	if amount > (bond.Amount - bond.Purchased) {
 		return nil, nil, ErrAmountHigherThanAvailable
 	}
 
