@@ -3,11 +3,8 @@ package financing_test
 import (
 	"api/accounting"
 	"api/company"
-	"api/company/building"
 	"api/database"
 	"api/financing"
-	"api/resource"
-	"api/warehouse"
 	"context"
 	"testing"
 	"time"
@@ -109,137 +106,6 @@ func TestFinancingRepository(t *testing.T) {
 	companyRepo := company.NewRepository(conn, accountingRepo)
 	repository := financing.NewRepository(conn, accountingRepo)
 
-	t.Run("GetLoans", func(t *testing.T) {
-		t.Run("should return empty list when not found", func(t *testing.T) {
-			loans, err := repository.GetLoans(ctx, 3)
-			if err != nil {
-				t.Fatalf("could not get loans: %s", err)
-			}
-
-			if len(loans) != 0 {
-				t.Errorf("expected %d loans, got %d", 0, len(loans))
-			}
-		})
-
-		t.Run("should list company's loans", func(t *testing.T) {
-			loans, err := repository.GetLoans(ctx, 2)
-			if err != nil {
-				t.Fatalf("could not get loans: %s", err)
-			}
-
-			if len(loans) != 2 {
-				t.Errorf("expected %d loans, got %d", 2, len(loans))
-			}
-		})
-	})
-
-	t.Run("SaveLoan", func(t *testing.T) {
-		loan, err := repository.SaveLoan(ctx, &financing.Loan{
-			Principal:    1_000_000_00,
-			CompanyId:    1,
-			PayableFrom:  time.Now().Add(time.Second),
-			InterestRate: 0.15,
-		})
-
-		if err != nil {
-			t.Fatalf("could not save loan: %s", err)
-		}
-
-		if loan.Id == 0 {
-			t.Error("should set an id")
-		}
-
-		company, err := companyRepo.GetById(ctx, 1)
-		if err != nil {
-			t.Fatalf("could not get company: %s", err)
-		}
-
-		if company.AvailableCash != 1_000_000_00 {
-			t.Errorf("expected cash %d, got %d", 1_000_000_00, company.AvailableCash)
-		}
-	})
-
-	t.Run("PayInterest", func(t *testing.T) {
-		loan := &financing.Loan{
-			Id:              1,
-			InterestRate:    0.15,
-			CompanyId:       2,
-			Principal:       1_000_000_00,
-			DelayedPayments: 2,
-		}
-
-		if err := repository.PayLoanInterest(ctx, loan); err != nil {
-			t.Fatalf("could not pay interest: %s", err)
-		}
-
-		company, err := companyRepo.GetById(ctx, 2)
-		if err != nil {
-			t.Fatalf("could not get company: %s", err)
-		}
-
-		if company.AvailableCash != -150_000_00 {
-			t.Errorf("expected cash %d, got %d", -150_000_00, company.AvailableCash)
-		}
-
-		loan, err = repository.GetLoan(ctx, 1, 2)
-		if err != nil {
-			t.Fatalf("could not get loan: %s", err)
-		}
-
-		if loan.InterestPaid != 300_000_00 {
-			t.Errorf("expected interest paid %d, got %d", 300_000_00, loan.InterestPaid)
-		}
-
-		if loan.DelayedPayments != 0 {
-			t.Errorf("shoud have reset delayed payments, got %d", loan.DelayedPayments)
-		}
-	})
-
-	t.Run("ForcePrincipalPayment", func(t *testing.T) {
-		err := repository.ForcePrincipalPayment(ctx, []int8{0, 1, 2}, &financing.Loan{
-			Id:        1,
-			CompanyId: 2,
-			Principal: 1_000_000_00,
-		})
-
-		if err != nil {
-			t.Fatalf("could not force payment: %s", err)
-		}
-
-		company, err := companyRepo.GetById(ctx, 2)
-		if err != nil {
-			t.Fatalf("could not get company: %s", err)
-		}
-
-		if company.AvailableTerrains != 0 {
-			t.Errorf("expected 0 terrains left, got %d", company.AvailableTerrains)
-		}
-
-		loan, err := repository.GetLoan(ctx, 1, 2)
-		if err != nil {
-			t.Fatalf("could not get loan: %s", err)
-		}
-
-		if loan.PrincipalPaid != 1_000_000_00 {
-			t.Errorf("expected principal paid %d, got %d", 1_000_000_00, loan.PrincipalPaid)
-		}
-
-		buildingsRepo := building.NewBuildingRepository(
-			conn,
-			resource.NewRepository(conn),
-			warehouse.NewRepository(conn),
-		)
-
-		buildings, err := buildingsRepo.GetAll(ctx, 2)
-		if err != nil {
-			t.Fatalf("could not get buildings: %s", err)
-		}
-
-		if len(buildings) != 1 {
-			t.Errorf("should have demolished buildings, got %d", len(buildings))
-		}
-	})
-
 	t.Run("GetBonds", func(t *testing.T) {
 		t.Run("should paginate", func(t *testing.T) {
 			bonds, err := repository.GetBonds(ctx, 0, 1)
@@ -326,8 +192,8 @@ func TestFinancingRepository(t *testing.T) {
 			t.Fatalf("could not get company: %s", err)
 		}
 
-		if company.AvailableCash != 2_000_000_00 {
-			t.Errorf("expected %d cash, got %d", 2_000_000_00, company.AvailableCash)
+		if company.AvailableCash != 1_000_000_00 {
+			t.Errorf("expected %d cash, got %d", 1_000_000_00, company.AvailableCash)
 		}
 	})
 
@@ -490,8 +356,8 @@ func TestFinancingRepository(t *testing.T) {
 			t.Fatalf("could not get company: %s", err)
 		}
 
-		if emissor.AvailableCash != 1_850_000_00 {
-			t.Errorf("expected cash %d, got %d", 1_850_000_00, emissor.AvailableCash)
+		if emissor.AvailableCash != 850_000_00 {
+			t.Errorf("expected cash %d, got %d", 850_000_00, emissor.AvailableCash)
 		}
 
 		// Make sure creditor gets his money
@@ -556,8 +422,8 @@ func TestFinancingRepository(t *testing.T) {
 			t.Fatalf("could not get issuer: %s", err)
 		}
 
-		if issuer.AvailableCash != 2_850_000_00 {
-			t.Errorf("expected cash %d, got %d", 2_850_000_00, issuer.AvailableCash)
+		if issuer.AvailableCash != 1_850_000_00 {
+			t.Errorf("expected cash %d, got %d", 1_850_000_00, issuer.AvailableCash)
 		}
 
 		// Adds to bond
@@ -568,36 +434,6 @@ func TestFinancingRepository(t *testing.T) {
 
 		if len(bond.Creditors) != 3 {
 			t.Errorf("expected %d creditors, got %d", 3, len(bond.Creditors))
-		}
-	})
-
-	t.Run("BuyBackLoan", func(t *testing.T) {
-		loan, err := repository.BuyBackLoan(ctx, 500_000_00, &financing.Loan{
-			Id:          2,
-			CompanyId:   2,
-			Principal:   1_000_000_00,
-			PayableFrom: time.Now().Add(time.Second),
-		})
-
-		if err != nil {
-			t.Fatalf("could not pay back loan: %s", err)
-		}
-
-		company, err := companyRepo.GetById(ctx, 2)
-		if err != nil {
-			t.Fatalf("could not get company: %s", err)
-		}
-
-		if company.AvailableCash != -650_000_00 {
-			t.Errorf("expected cash %d, got %d", -650_000_00, company.AvailableCash)
-		}
-
-		if loan.PrincipalPaid != 500_000_00 {
-			t.Errorf("expected principal paid %d, got %d", 500_000_00, loan.PrincipalPaid)
-		}
-
-		if loan.GetPrincipal() != 500_000_00 {
-			t.Errorf("expected principal %d, got %d", 500_000_00, loan.GetPrincipal())
 		}
 	})
 
@@ -619,8 +455,8 @@ func TestFinancingRepository(t *testing.T) {
 			t.Fatalf("could not get company: %s", err)
 		}
 
-		if issuer.AvailableCash != -900_000_00 {
-			t.Errorf("expected cash %d, got %d", -900_000_00, issuer.AvailableCash)
+		if issuer.AvailableCash != -250_000_00 {
+			t.Errorf("expected cash %d, got %d", -250_000_00, issuer.AvailableCash)
 		}
 
 		// Check creditor transaction
