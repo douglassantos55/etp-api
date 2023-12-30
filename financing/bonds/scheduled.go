@@ -1,4 +1,4 @@
-package financing
+package bonds
 
 import (
 	"api/scheduler"
