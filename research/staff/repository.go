@@ -238,7 +238,7 @@ func (r *goquRepository) SaveTraining(ctx context.Context, training *Training) (
 
 	defer tx.Rollback()
 
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          -int(training.Investment),

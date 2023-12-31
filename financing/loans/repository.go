@@ -68,7 +68,7 @@ func (r *goquRepository) BuyBackLoan(ctx context.Context, amount int64, loan *Lo
 
 	defer tx.Rollback()
 
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          -int(amount),
@@ -111,7 +111,7 @@ func (r *goquRepository) SaveLoan(ctx context.Context, loan *Loan) (*Loan, error
 
 	defer tx.Rollback()
 
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Classification: accounting.LOAN,
@@ -196,7 +196,7 @@ func (r *goquRepository) PayLoanInterest(ctx context.Context, loan *Loan) error 
 	interest := loan.GetInterest()
 	principal := loan.GetPrincipal()
 
-	if r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          -int(interest),

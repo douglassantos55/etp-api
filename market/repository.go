@@ -135,7 +135,7 @@ func (r *goquRepository) PlaceOrder(ctx context.Context, order *Order, inventory
 		return nil, err
 	}
 
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		dbTx,
 		accounting.Transaction{
 			Classification: accounting.TRANSPORT_FEE,
@@ -192,7 +192,7 @@ func (r *goquRepository) CancelOrder(ctx context.Context, order *Order, inventor
 		return err
 	}
 
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		dbTx,
 		accounting.Transaction{
 			Classification: accounting.REFUNDS,
@@ -346,7 +346,7 @@ func (r *goquRepository) registerPurchaseTransactions(tx *goqu.TxDatabase, order
 		total -= int(order.MarketFee)
 	}
 
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Classification: accounting.MARKET_PURCHASE,
@@ -358,7 +358,7 @@ func (r *goquRepository) registerPurchaseTransactions(tx *goqu.TxDatabase, order
 		return err
 	}
 
-	if err := r.accountingRepo.RegisterTransaction(
+	transactionId, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Classification: accounting.MARKET_SALE,
@@ -366,11 +366,23 @@ func (r *goquRepository) registerPurchaseTransactions(tx *goqu.TxDatabase, order
 			Description:    fmt.Sprintf("Sale of %dx %s on market", quantity, order.Resource.Name),
 		},
 		order.Company.Id,
-	); err != nil {
+	)
+
+	if err != nil {
 		return err
 	}
 
-	return nil
+	_, err = tx.
+		Insert(goqu.T("orders_transactions")).
+		Rows(goqu.Record{
+			"order_id":       order.Id,
+			"transaction_id": transactionId,
+			"quantity":       quantity,
+		}).
+		Executor().
+		Exec()
+
+	return err
 }
 
 func (r *goquRepository) updateOrder(tx *goqu.TxDatabase, order *Order) error {

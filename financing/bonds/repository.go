@@ -189,7 +189,7 @@ func (r *goquRepository) SaveBond(ctx context.Context, bond *Bond) (*Bond, error
 
 	defer tx.Rollback()
 
-	err = r.accountingRepo.RegisterTransaction(
+	_, err = r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          int(bond.Amount),
@@ -233,7 +233,7 @@ func (r *goquRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 
 	defer tx.Rollback()
 
-	err = r.accountingRepo.RegisterTransaction(
+	_, err = r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          -int(creditor.GetInterest()),
@@ -250,7 +250,7 @@ func (r *goquRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 		return err
 	}
 
-	err = r.accountingRepo.RegisterTransaction(
+	_, err = r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          int(creditor.GetInterest()),
@@ -292,7 +292,7 @@ func (r *goquRepository) SaveCreditor(ctx context.Context, bond *Bond, creditor 
 	defer tx.Rollback()
 
 	// Transfer to issuer
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          int(creditor.Principal),
@@ -309,7 +309,7 @@ func (r *goquRepository) SaveCreditor(ctx context.Context, bond *Bond, creditor 
 	}
 
 	// Remove from creditor
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          -int(creditor.Principal),
@@ -356,7 +356,7 @@ func (r *goquRepository) BuyBackBond(ctx context.Context, amount int64, creditor
 
 	defer tx.Rollback()
 
-	err = r.accountingRepo.RegisterTransaction(
+	_, err = r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          -int(amount),
@@ -370,7 +370,7 @@ func (r *goquRepository) BuyBackBond(ctx context.Context, amount int64, creditor
 		return nil, err
 	}
 
-	err = r.accountingRepo.RegisterTransaction(
+	_, err = r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          int(amount),

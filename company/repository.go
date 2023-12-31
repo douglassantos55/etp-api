@@ -72,7 +72,7 @@ func (r *goquRepository) PurchaseTerrain(ctx context.Context, total int, company
 		return err
 	}
 
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          -total,
@@ -112,7 +112,7 @@ func (r *goquRepository) Register(ctx context.Context, registration *Registratio
 		return nil, err
 	}
 
-	if err = r.accountingRepo.RegisterTransaction(
+	if _, err = r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Classification: accounting.SOCIAL_CAPITAL,

@@ -119,7 +119,7 @@ func (r *goquRepository) SaveResearch(ctx context.Context, finishesAt time.Time,
 
 	defer tx.Rollback()
 
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Classification: accounting.RESEARCH,

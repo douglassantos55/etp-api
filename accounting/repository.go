@@ -29,7 +29,7 @@ const (
 
 type (
 	Repository interface {
-		RegisterTransaction(tx *database.DB, transaction Transaction, companyId uint64) error
+		RegisterTransaction(tx *database.DB, transaction Transaction, companyId uint64) (int64, error)
 	}
 
 	Transaction struct {
@@ -48,8 +48,8 @@ func NewRepository(conn *database.Connection) Repository {
 	return &goquRepository{builder}
 }
 
-func (r *goquRepository) RegisterTransaction(tx *database.DB, transaction Transaction, companyId uint64) error {
-	_, err := tx.
+func (r *goquRepository) RegisterTransaction(tx *database.DB, transaction Transaction, companyId uint64) (int64, error) {
+	result, err := tx.
 		Insert(goqu.T("transactions")).
 		Rows(goqu.Record{
 			"company_id":        companyId,
@@ -60,5 +60,14 @@ func (r *goquRepository) RegisterTransaction(tx *database.DB, transaction Transa
 		Executor().
 		Exec()
 
-	return err
+	if err != nil {
+		return -1, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return -1, err
+	}
+
+	return id, nil
 }

@@ -45,7 +45,7 @@ func (r *productionRepository) SaveProduction(ctx context.Context, production *P
 		return nil, err
 	}
 
-	if err := r.accountingRepo.RegisterTransaction(
+	if _, err := r.accountingRepo.RegisterTransaction(
 		dbTx,
 		accounting.Transaction{
 			Classification: accounting.WAGES,
