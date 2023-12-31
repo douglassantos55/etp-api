@@ -23,7 +23,7 @@ type (
 		Amount       int64   `db:"amount" json:"amount"`
 		InterestRate float64 `db:"interest_rate" json:"interest_rate"`
 		CompanyId    int64   `db:"company_id" json:"-"`
-		Purchased    int64   `db:"purchased" json:"purchased"`
+		Purchased    int64   `db:"purchased" json:"purchased" goqu:"skipinsert,skipupdate"`
 
 		Company   *company.Company `db:"company" json:"company,omitempty" goqu:"skipinsert,skipupdate"`
 		Creditors []*Creditor      `json:"creditors,omitempty" goqu:"skipinsert,skipupdate"`
