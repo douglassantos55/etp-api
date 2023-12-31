@@ -17,3 +17,12 @@ CREATE TABLE IF NOT EXISTS `transactions` (
     FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
     FOREIGN KEY (`classification_id`) REFERENCES `classifications` (`id`)
 );
+
+CREATE TABLE IF NOT EXISTS `orders_transactions` (
+    `order_id` INTEGER,
+    `quantity` INTEGER,
+    `transaction_id` INTEGER,
+    PRIMARY KEY (`order_id`, `transaction_id`),
+    FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`),
+    FOREIGN KEY (`transaction_id`) REFERENCES `transactions` (`id`)
+);
