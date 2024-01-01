@@ -7,6 +7,9 @@ import (
 	companyBuilding "api/company/building"
 	"api/company/building/production"
 	"api/database"
+	"api/financing"
+	"api/financing/bonds"
+	"api/financing/loans"
 	"api/research"
 	"api/resource"
 	"api/server"
@@ -54,6 +57,15 @@ func main() {
 
 	company.CreateEndpoints(svr, companySvc)
 	production.CreateEndpoints(svr, scheduledProductionSvc, scheduledBuildingSvc, companySvc)
+
+	loansRepo := loans.NewRepository(conn, accountingRepo)
+	loansSvc := loans.NewService(loansRepo, companySvc)
+
+	bondsRepo := bonds.NewRepository(conn, accountingRepo)
+	bondsSvc := bonds.NewService(bondsRepo, companySvc)
+
+	financingSvc := financing.NewService(financing.NewRepository(conn))
+	financing.CreateEndpoints(svr, financingSvc, loansSvc, bondsSvc)
 
 	svr.GET("/", server.Greeting(events))
 	svr.GET("/private", server.Private(events))
