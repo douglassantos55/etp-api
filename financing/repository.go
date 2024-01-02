@@ -13,6 +13,7 @@ import (
 type (
 	Repository interface {
 		GetAveragePrices(ctx context.Context, start, end time.Time) (map[int64]int64, error)
+		GetAverageInterestRate(ctx context.Context, start, end time.Time) (float64, error)
 	}
 
 	goquRepository struct {
@@ -23,6 +24,22 @@ type (
 func NewRepository(conn *database.Connection) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
 	return &goquRepository{builder}
+}
+
+func (r *goquRepository) GetAverageInterestRate(ctx context.Context, start, end time.Time) (float64, error) {
+	var interestRate float64
+
+	_, err := r.builder.
+		Select(goqu.COALESCE(goqu.AVG(goqu.I("interest_rate")), 0.01)).
+		From(goqu.T("loans")).
+		Where(goqu.I("created_at").Between(exp.NewRangeVal(start, end))).
+		ScanValContext(ctx, &interestRate)
+
+	if err != nil {
+		return -1, err
+	}
+
+	return interestRate, nil
 }
 
 func (r *goquRepository) GetAveragePrices(ctx context.Context, start, end time.Time) (map[int64]int64, error) {

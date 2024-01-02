@@ -7,6 +7,7 @@ import (
 
 type (
 	Service interface {
+		GetInterestRate(ctx context.Context, start, end time.Time) (float64, error)
 		GetInflation(ctx context.Context, start, end time.Time) (float64, map[int64]float64, error)
 	}
 
@@ -19,6 +20,20 @@ const Day = 24 * time.Hour
 
 func NewService(repository Repository) Service {
 	return &service{repository}
+}
+
+func (s *service) GetInterestRate(ctx context.Context, start, end time.Time) (float64, error) {
+	averageRate, err := s.repository.GetAverageInterestRate(ctx, start, end)
+	if err != nil {
+		return -1, err
+	}
+
+	inflation, _, err := s.GetInflation(ctx, start, end)
+	if err != nil {
+		return -1, err
+	}
+
+	return (averageRate + inflation) / (1 + inflation), nil
 }
 
 func (s *service) GetInflation(ctx context.Context, start, end time.Time) (float64, map[int64]float64, error) {

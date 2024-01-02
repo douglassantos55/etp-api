@@ -34,3 +34,7 @@ func NewFakeRepository() Repository {
 func (r *fakeRepository) GetAveragePrices(ctx context.Context, start, end time.Time) (map[int64]int64, error) {
 	return r.prices[start], nil
 }
+
+func (r *fakeRepository) GetAverageInterestRate(ctx context.Context, start, end time.Time) (float64, error) {
+	return 0.0165, nil
+}

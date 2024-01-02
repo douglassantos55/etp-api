@@ -7,5 +7,6 @@ CREATE TABLE IF NOT EXISTS `loans` (
     `interest_paid` INTEGER DEFAULT 0,
     `principal_paid` INTEGER DEFAULT 0,
     `delayed_payments` TINYINT DEFAULT 0,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (`company_id`) REFERENCES `companies`(`id`)
 );

@@ -3,6 +3,7 @@ package financing_test
 import (
 	"api/financing"
 	"context"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -14,12 +15,12 @@ func TestFinancingService(t *testing.T) {
 	defer cancel()
 
 	t.Run("GetInflation", func(t *testing.T) {
-		start, err := time.Parse("2006-01-02 15:04:05", "2023-12-01 00:00:00")
+		start, err := time.Parse(time.DateTime, "2023-12-01 00:00:00")
 		if err != nil {
 			t.Fatalf("could not parse date: %s", err)
 		}
 
-		end, err := time.Parse("2006-01-02 15:04:05", "2023-12-31 23:59:59")
+		end, err := time.Parse(time.DateTime, "2023-12-31 23:59:59")
 		if err != nil {
 			t.Fatalf("could not parse date: %s", err)
 		}
@@ -39,6 +40,29 @@ func TestFinancingService(t *testing.T) {
 
 		if categories[2] != 0 {
 			t.Errorf("expected inflation %.2f, got %.2f", 0.0, categories[2])
+		}
+	})
+
+	t.Run("GetInterestRate", func(t *testing.T) {
+		start, err := time.Parse(time.DateTime, "2023-12-01 00:00:00")
+		if err != nil {
+			t.Fatalf("could not parse date: %s", err)
+		}
+
+		end, err := time.Parse(time.DateTime, "2023-12-31 23:59:59")
+		if err != nil {
+			t.Fatalf("could not parse date: %s", err)
+		}
+
+		rate, err := service.GetInterestRate(ctx, start, end)
+		if err != nil {
+			t.Fatalf("could not get interest rate: %s", err)
+		}
+
+		// (0.0165 + 0.125) / (1 + 0.125) = 0.1257777778
+		expectedRate := 0.125778
+		if fmt.Sprintf("%f", rate) != fmt.Sprintf("%f", expectedRate) {
+			t.Errorf("expected interest rate %f, got %f", expectedRate, rate)
 		}
 	})
 }

@@ -72,11 +72,26 @@ func TestFinancingRepository(t *testing.T) {
 		t.Fatalf("could not seed database: %s", err)
 	}
 
+	if _, err := tx.Exec(`
+        INSERT INTO loans (company_id, principal, interest_rate, payable_from, created_at) VALUES
+        (1, 100000, 0.015, '2030-01-01 10:00:00', '2023-10-05 22:50:45'),
+        (2, 100000, 0.012, '2030-01-01 10:00:00', '2023-12-05 22:50:45'),
+        (1, 100000, 0.018, '2030-01-01 10:00:00', '2023-12-15 22:50:45'),
+        (2, 100000, 0.015, '2030-01-01 10:00:00', '2023-12-25 22:50:45'),
+        (1, 100000, 0.021, '2030-01-01 10:00:00', '2023-12-31 23:59:58'),
+        (2, 100000, 0.019, '2030-01-01 10:00:00', '2024-01-01 00:00:00')
+    `); err != nil {
+		t.Fatalf("could not seed database: %s", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("could not commit transaction: %s", err)
 	}
 
 	t.Cleanup(func() {
+		if _, err := conn.DB.Exec(`DELETE FROM loans`); err != nil {
+			t.Errorf("could not cleanup database: %s", err)
+		}
 		if _, err := conn.DB.Exec(`DELETE FROM orders_transactions`); err != nil {
 			t.Errorf("could not cleanup database: %s", err)
 		}
@@ -157,6 +172,50 @@ func TestFinancingRepository(t *testing.T) {
 
 			if avgPrices[2] != 3550 {
 				t.Errorf("expected %d, got %d", 3550, avgPrices[2])
+			}
+		})
+	})
+
+	t.Run("GetAverageInterestRate", func(t *testing.T) {
+		t.Run("defaults to 10%", func(t *testing.T) {
+			start, err := time.Parse(time.DateTime, "2023-11-01 00:00:00")
+			if err != nil {
+				t.Fatalf("could not parse date: %s", err)
+			}
+
+			end, err := time.Parse(time.DateTime, "2023-11-30 23:59:59")
+			if err != nil {
+				t.Fatalf("could not parse date: %s", err)
+			}
+
+			rate, err := repository.GetAverageInterestRate(ctx, start, end)
+			if err != nil {
+				t.Fatalf("could not get interest rate: %s", err)
+			}
+
+			if rate != 0.01 {
+				t.Errorf("expected rate %f, got %f", 0.01, rate)
+			}
+		})
+
+		t.Run("calculates", func(t *testing.T) {
+			start, err := time.Parse(time.DateTime, "2023-12-01 00:00:00")
+			if err != nil {
+				t.Fatalf("could not parse date: %s", err)
+			}
+
+			end, err := time.Parse(time.DateTime, "2023-12-31 23:59:59")
+			if err != nil {
+				t.Fatalf("could not parse date: %s", err)
+			}
+
+			rate, err := repository.GetAverageInterestRate(ctx, start, end)
+			if err != nil {
+				t.Fatalf("could not get interest rate: %s", err)
+			}
+
+			if rate != 0.0165 {
+				t.Errorf("expected rate %f, got %f", 0.0165, rate)
 			}
 		})
 	})
