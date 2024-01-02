@@ -32,66 +32,29 @@ func TestFinancingRoutes(t *testing.T) {
 	svr := server.NewServer()
 	financing.CreateEndpoints(svr, svc, loansSvc, bondsSvc)
 
-	t.Run("GetInflation", func(t *testing.T) {
-		t.Run("no start", func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/financing/inflation?end=2023-12-31", nil)
-			req.Header.Set("Accept", "application/json")
-			req.Header.Set("Authorization", "Bearer "+token)
+	t.Run("GetRates", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/financing/rates", nil)
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
 
-			rec := httptest.NewRecorder()
-			svr.ServeHTTP(rec, req)
+		rec := httptest.NewRecorder()
+		svr.ServeHTTP(rec, req)
 
-			if rec.Code != http.StatusBadRequest {
-				t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
-			}
-		})
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+		}
 
-		t.Run("no end", func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/financing/inflation?start=2023-12-01", nil)
-			req.Header.Set("Accept", "application/json")
-			req.Header.Set("Authorization", "Bearer "+token)
+		var response map[string]float64
+		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+			t.Fatalf("could not parse json: %s", err)
+		}
 
-			rec := httptest.NewRecorder()
-			svr.ServeHTTP(rec, req)
+		if _, ok := response["inflation"]; !ok {
+			t.Error("should return inflation rate")
+		}
 
-			if rec.Code != http.StatusBadRequest {
-				t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
-			}
-		})
-
-		t.Run("no start/end", func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/financing/inflation", nil)
-			req.Header.Set("Accept", "application/json")
-			req.Header.Set("Authorization", "Bearer "+token)
-
-			rec := httptest.NewRecorder()
-			svr.ServeHTTP(rec, req)
-
-			if rec.Code != http.StatusBadRequest {
-				t.Errorf("expected status %d, got %d", http.StatusBadRequest, rec.Code)
-			}
-		})
-
-		t.Run("get inflation", func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/financing/inflation?start=2023-12-01&end=2023-12-31", nil)
-			req.Header.Set("Accept", "application/json")
-			req.Header.Set("Authorization", "Bearer "+token)
-
-			rec := httptest.NewRecorder()
-			svr.ServeHTTP(rec, req)
-
-			if rec.Code != http.StatusOK {
-				t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
-			}
-
-			var response map[string]float64
-			if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-				t.Fatalf("could not parse json: %s", err)
-			}
-
-			if response["inflation"] != 0.125 {
-				t.Errorf("expected %f, got %f", 0.125, response["inflation"])
-			}
-		})
+		if _, ok := response["interest"]; !ok {
+			t.Error("should return interest rate")
+		}
 	})
 }

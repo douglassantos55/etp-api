@@ -10,9 +10,9 @@ type fakeRepository struct {
 }
 
 func NewFakeRepository() Repository {
-	october, _ := time.Parse("2006-01-02 15:04:05", "2023-10-01 00:00:00")
-	november, _ := time.Parse("2006-01-02 15:04:05", "2023-11-01 00:00:00")
-	december, _ := time.Parse("2006-01-02 15:04:05", "2023-12-01 00:00:00")
+	october, _ := time.Parse(time.DateTime, "2023-10-01 00:00:00")
+	november, _ := time.Parse(time.DateTime, "2023-11-26 00:00:00")
+	december, _ := time.Parse(time.DateTime, "2023-12-03 00:00:00")
 
 	prices := map[time.Time]map[int64]int64{
 		october: {

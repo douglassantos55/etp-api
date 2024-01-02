@@ -121,13 +121,34 @@ func TestFinancingRepository(t *testing.T) {
 	defer cancel()
 
 	t.Run("GetAveragePrices", func(t *testing.T) {
-		t.Run("skip category", func(t *testing.T) {
-			start, err := time.Parse("2006-01-02 15:04:05", "2023-11-01 00:00:00")
+		t.Run("no data", func(t *testing.T) {
+			start, err := time.Parse(time.DateTime, "2023-01-01 00:00:00")
 			if err != nil {
 				t.Fatalf("could not parse date: %s", err)
 			}
 
-			end, err := time.Parse("2006-01-02 15:04:05", "2023-11-30 23:59:59")
+			end, err := time.Parse(time.DateTime, "2023-01-31 23:59:59")
+			if err != nil {
+				t.Fatalf("could not parse date: %s", err)
+			}
+
+			avgPrices, err := repository.GetAveragePrices(ctx, start, end)
+			if err != nil {
+				t.Fatalf("could not get average prices: %s", err)
+			}
+
+			if len(avgPrices) != 0 {
+				t.Errorf("expected no data, got %d", len(avgPrices))
+			}
+		})
+
+		t.Run("skip category", func(t *testing.T) {
+			start, err := time.Parse(time.DateTime, "2023-11-01 00:00:00")
+			if err != nil {
+				t.Fatalf("could not parse date: %s", err)
+			}
+
+			end, err := time.Parse(time.DateTime, "2023-11-30 23:59:59")
 			if err != nil {
 				t.Fatalf("could not parse date: %s", err)
 			}
@@ -147,12 +168,12 @@ func TestFinancingRepository(t *testing.T) {
 		})
 
 		t.Run("group by category", func(t *testing.T) {
-			start, err := time.Parse("2006-01-02 15:04:05", "2023-12-01 00:00:00")
+			start, err := time.Parse(time.DateTime, "2023-12-01 00:00:00")
 			if err != nil {
 				t.Fatalf("could not parse date: %s", err)
 			}
 
-			end, err := time.Parse("2006-01-02 15:04:05", "2023-12-31 23:59:59")
+			end, err := time.Parse(time.DateTime, "2023-12-31 23:59:59")
 			if err != nil {
 				t.Fatalf("could not parse date: %s", err)
 			}
