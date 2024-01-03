@@ -2,6 +2,7 @@ package loans_test
 
 import (
 	"api/company"
+	"api/financing"
 	"api/financing/loans"
 	"api/scheduler"
 	"context"
@@ -13,7 +14,8 @@ import (
 func TestLoansService(t *testing.T) {
 	companyRepo := company.NewFakeRepository()
 	companySvc := company.NewService(companyRepo)
-	service := loans.NewService(loans.NewFakeRepository(companyRepo), companySvc)
+	financingSvc := financing.NewService(financing.NewFakeRepository())
+	service := loans.NewService(loans.NewFakeRepository(companyRepo), companySvc, financingSvc)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

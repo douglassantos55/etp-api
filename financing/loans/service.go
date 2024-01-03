@@ -2,6 +2,7 @@ package loans
 
 import (
 	"api/company"
+	"api/financing"
 	"api/server"
 	"context"
 	"fmt"
@@ -39,8 +40,9 @@ type (
 	}
 
 	service struct {
-		repository Repository
-		companySvc company.Service
+		repository   Repository
+		companySvc   company.Service
+		financingSvc financing.Service
 	}
 )
 
@@ -52,8 +54,8 @@ func (l *Loan) GetInterest() int64 {
 	return int64(float64(l.GetPrincipal()) * l.InterestRate)
 }
 
-func NewService(repository Repository, companySvc company.Service) Service {
-	return &service{repository, companySvc}
+func NewService(repository Repository, companySvc company.Service, financingSvc financing.Service) Service {
+	return &service{repository, companySvc, financingSvc}
 }
 
 func (s *service) GetLoans(ctx context.Context, companyId int64) ([]*Loan, error) {
@@ -92,12 +94,16 @@ func (s *service) TakeLoan(ctx context.Context, amount int64, companyId int64) (
 		return nil, fmt.Errorf("amount must not be higher than %.2f", float64(company.GetCreditScore()/100))
 	}
 
+	rates, err := s.financingSvc.GetEffectiveRates(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	loan, err := s.repository.SaveLoan(ctx, &Loan{
-		Principal:   amount,
-		CompanyId:   companyId,
-		PayableFrom: time.Now().Add(3 * Week),
-		// TODO: use interest rate relative to inflation
-		InterestRate: 0.15,
+		Principal:    amount,
+		CompanyId:    companyId,
+		PayableFrom:  time.Now().Add(4 * Week),
+		InterestRate: rates.Interest,
 	})
 
 	if err != nil {

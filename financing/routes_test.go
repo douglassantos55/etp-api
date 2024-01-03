@@ -4,8 +4,6 @@ import (
 	"api/auth"
 	"api/company"
 	"api/financing"
-	"api/financing/bonds"
-	"api/financing/loans"
 	"api/server"
 	"encoding/json"
 	"net/http"
@@ -26,11 +24,8 @@ func TestFinancingRoutes(t *testing.T) {
 	companyRepo := company.NewFakeRepository()
 	companySvc := company.NewService(companyRepo)
 
-	loansSvc := loans.NewService(loans.NewFakeRepository(companyRepo), companySvc)
-	bondsSvc := bonds.NewService(bonds.NewFakeRepository(companyRepo), companySvc)
-
 	svr := server.NewServer()
-	financing.CreateEndpoints(svr, svc, loansSvc, bondsSvc, companySvc)
+	financing.CreateEndpoints(svr, svc, companySvc)
 
 	t.Run("GetRates", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/financing/rates", nil)

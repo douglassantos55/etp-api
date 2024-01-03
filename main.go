@@ -58,14 +58,16 @@ func main() {
 	company.CreateEndpoints(svr, companySvc)
 	production.CreateEndpoints(svr, scheduledProductionSvc, scheduledBuildingSvc, companySvc)
 
+	financingSvc := financing.NewService(financing.NewRepository(conn))
+	financingGroup := financing.CreateEndpoints(svr, financingSvc, companySvc)
+
 	loansRepo := loans.NewRepository(conn, accountingRepo)
-	loansSvc := loans.NewService(loansRepo, companySvc)
+	loansSvc := loans.NewService(loansRepo, companySvc, financingSvc)
+	loans.CreateEndpoints(financingGroup, loansSvc)
 
 	bondsRepo := bonds.NewRepository(conn, accountingRepo)
 	bondsSvc := bonds.NewService(bondsRepo, companySvc)
-
-	financingSvc := financing.NewService(financing.NewRepository(conn))
-	financing.CreateEndpoints(svr, financingSvc, loansSvc, bondsSvc, companySvc)
+	bonds.CreateEndpoints(financingGroup, bondsSvc)
 
 	svr.GET("/", server.Greeting(events))
 	svr.GET("/private", server.Private(events))

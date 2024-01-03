@@ -32,7 +32,7 @@ func NewFakeRepository() Repository {
 }
 
 func (r *fakeRepository) GetEffectiveRates(ctx context.Context) (*Rates, error) {
-	return &Rates{Inflation: 0.125, Interest: 0.136}, nil
+	return &Rates{Inflation: 0.125, Interest: 0.15}, nil
 }
 
 func (r *fakeRepository) GetAveragePrices(ctx context.Context, start, end time.Time) (map[int64]int64, error) {

@@ -3,14 +3,12 @@ package financing
 import (
 	"api/auth"
 	"api/company"
-	"api/financing/bonds"
-	"api/financing/loans"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 )
 
-func CreateEndpoints(e *echo.Echo, financingSvc Service, loansSvc loans.Service, bondsSvc bonds.Service, companySvc company.Service) {
+func CreateEndpoints(e *echo.Echo, financingSvc Service, companySvc company.Service) *echo.Group {
 	group := e.Group("/financing")
 
 	group.GET("/rates", func(c echo.Context) error {
@@ -47,6 +45,5 @@ func CreateEndpoints(e *echo.Echo, financingSvc Service, loansSvc loans.Service,
 		return c.JSON(http.StatusOK, rates)
 	})
 
-	loans.CreateEndpoints(group, loansSvc)
-	bonds.CreateEndpoints(group, bondsSvc)
+	return group
 }
