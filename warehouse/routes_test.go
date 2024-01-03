@@ -39,8 +39,8 @@ func TestWarehouseService(t *testing.T) {
 			t.Fatalf("could not parse response: %s", err)
 		}
 
-		if len(response.Items) != 3 {
-			t.Errorf("expected %d items, got %d", 3, len(response.Items))
+		if len(response.Items) != 4 {
+			t.Errorf("expected %d items, got %d", 4, len(response.Items))
 		}
 	})
 }

@@ -7,14 +7,14 @@ import (
 )
 
 type ScheduledBuildingService struct {
-	scheduler *scheduler.Scheduler
-	service   BuildingService
+	timer   *scheduler.Scheduler
+	service BuildingService
 }
 
-func NewScheduledBuildingService(buildingSvc BuildingService) BuildingService {
+func NewScheduledBuildingService(buildingSvc BuildingService, timer *scheduler.Scheduler) BuildingService {
 	return &ScheduledBuildingService{
-		scheduler: scheduler.NewScheduler(),
-		service:   buildingSvc,
+		timer:   timer,
+		service: buildingSvc,
 	}
 }
 
@@ -37,7 +37,7 @@ func (s *ScheduledBuildingService) AddBuilding(ctx context.Context, companyId, b
 	}
 
 	duration := companyBuilding.CompletesAt.Sub(time.Now())
-	s.scheduler.Add(companyBuilding.Id, duration, func() error {
+	s.timer.Add(companyBuilding.Id, duration, func() error {
 		return s.completeConstruction(companyId, companyBuilding)
 	})
 
@@ -50,7 +50,7 @@ func (s *ScheduledBuildingService) Demolish(ctx context.Context, companyId, buil
 		return err
 	}
 
-	s.scheduler.Remove(buildingId)
+	s.timer.Remove(buildingId)
 	return nil
 }
 
@@ -61,7 +61,7 @@ func (s *ScheduledBuildingService) Upgrade(ctx context.Context, companyId, build
 	}
 
 	duration := companyBuilding.CompletesAt.Sub(time.Now())
-	s.scheduler.Add(buildingId, duration, func() error {
+	s.timer.Add(buildingId, duration, func() error {
 		return s.completeConstruction(companyId, companyBuilding)
 	})
 

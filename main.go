@@ -12,6 +12,7 @@ import (
 	"api/financing/loans"
 	"api/research"
 	"api/resource"
+	"api/scheduler"
 	"api/server"
 	"api/warehouse"
 	"log"
@@ -30,6 +31,7 @@ func main() {
 	disconnections := make(chan string)
 
 	svr := server.NewServer()
+	timer := scheduler.NewScheduler()
 
 	resourceRepo := resource.NewRepository(conn)
 	resourceSvc := resource.NewService(resourceRepo)
@@ -48,12 +50,12 @@ func main() {
 
 	companyBuildingRepo := companyBuilding.NewBuildingRepository(conn, resourceRepo, warehouseRepo)
 	companyBuildingSvc := companyBuilding.NewBuildingService(companyBuildingRepo, warehouseSvc, buildingSvc)
-	scheduledBuildingSvc := companyBuilding.NewScheduledBuildingService(companyBuildingSvc)
+	scheduledBuildingSvc := companyBuilding.NewScheduledBuildingService(companyBuildingSvc, timer)
 
 	researchSvc := research.NewService(research.NewRepository(conn, accountingRepo), companySvc)
 	productionRepo := production.NewProductionRepository(conn, accountingRepo, companyBuildingRepo, warehouseRepo)
 	productionSvc := production.NewProductionService(productionRepo, companySvc, companyBuildingSvc, warehouseSvc, researchSvc)
-	scheduledProductionSvc := production.NewScheduledProductionService(productionSvc)
+	scheduledProductionSvc := production.NewScheduledProductionService(productionSvc, timer)
 
 	company.CreateEndpoints(svr, companySvc)
 	production.CreateEndpoints(svr, scheduledProductionSvc, scheduledBuildingSvc, companySvc)
@@ -63,11 +65,13 @@ func main() {
 
 	loansRepo := loans.NewRepository(conn, accountingRepo)
 	loansSvc := loans.NewService(loansRepo, companySvc, financingSvc)
-	loans.CreateEndpoints(financingGroup, loansSvc)
+	scheduledLoansSvc := loans.NewScheduledService(loansSvc, timer)
+	loans.CreateEndpoints(financingGroup, scheduledLoansSvc)
 
 	bondsRepo := bonds.NewRepository(conn, accountingRepo)
 	bondsSvc := bonds.NewService(bondsRepo, companySvc)
-	bonds.CreateEndpoints(financingGroup, bondsSvc)
+	scheduledBondsSvc := bonds.NewScheduledService(bondsSvc, timer)
+	bonds.CreateEndpoints(financingGroup, scheduledBondsSvc)
 
 	svr.GET("/", server.Greeting(events))
 	svr.GET("/private", server.Private(events))

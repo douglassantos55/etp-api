@@ -9,14 +9,14 @@ import (
 )
 
 type ScheduledProductionService struct {
-	scheduler *scheduler.Scheduler
-	service   ProductionService
+	timer   *scheduler.Scheduler
+	service ProductionService
 }
 
-func NewScheduledProductionService(service ProductionService) ProductionService {
+func NewScheduledProductionService(service ProductionService, timer *scheduler.Scheduler) ProductionService {
 	return &ScheduledProductionService{
-		scheduler: scheduler.NewScheduler(),
-		service:   service,
+		timer:   timer,
+		service: service,
 	}
 }
 
@@ -27,7 +27,7 @@ func (s *ScheduledProductionService) Produce(ctx context.Context, companyId, com
 	}
 
 	duration := startedProduction.FinishesAt.Sub(time.Now())
-	s.scheduler.Add(startedProduction.Id, duration, func() error {
+	s.timer.Add(startedProduction.Id, duration, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
@@ -45,7 +45,7 @@ func (s *ScheduledProductionService) CancelProduction(ctx context.Context, compa
 		return err
 	}
 
-	s.scheduler.Remove(productionId)
+	s.timer.Remove(productionId)
 	return nil
 }
 
