@@ -12,20 +12,12 @@ func CreateEndpoints(e *echo.Echo, financingSvc Service, loansSvc loans.Service,
 	group := e.Group("/financing")
 
 	group.GET("/rates", func(c echo.Context) error {
-		inflation, _, err := financingSvc.GetInflation(c.Request().Context())
+		rates, err := financingSvc.GetEffectiveRates(c.Request().Context())
 		if err != nil {
 			return err
 		}
 
-		interest, err := financingSvc.GetInterestRate(c.Request().Context())
-		if err != nil {
-			return err
-		}
-
-		return c.JSON(http.StatusOK, map[string]float64{
-			"inflation": inflation,
-			"interest":  interest,
-		})
+		return c.JSON(http.StatusOK, rates)
 	})
 
 	loans.CreateEndpoints(group, loansSvc)

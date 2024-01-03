@@ -26,17 +26,13 @@ func TestFinancingService(t *testing.T) {
 				t.Fatalf("could not parse date: %s", err)
 			}
 
-			inflation, categories, err := service.GetInflationPeriod(ctx, start, end)
+			inflation, err := service.GetInflationPeriod(ctx, start, end)
 			if err != nil {
 				t.Fatalf("could not calculate inflation: %s", err)
 			}
 
 			if inflation != 0.0 {
 				t.Errorf("expected inflation %f, got %f", 0.0, inflation)
-			}
-
-			if len(categories) != 0 {
-				t.Errorf("expected no data, got %d", len(categories))
 			}
 		})
 
@@ -51,21 +47,13 @@ func TestFinancingService(t *testing.T) {
 				t.Fatalf("could not parse date: %s", err)
 			}
 
-			inflation, categories, err := service.GetInflationPeriod(ctx, start, end)
+			inflation, err := service.GetInflationPeriod(ctx, start, end)
 			if err != nil {
 				t.Fatalf("could not calculate inflation: %s", err)
 			}
 
 			if inflation != 0.125 {
 				t.Errorf("expected inflation %f, got %f", 0.125, inflation)
-			}
-
-			if categories[1] != 0.25 {
-				t.Errorf("expected inflation %.2f, got %.2f", 0.25, categories[1])
-			}
-
-			if categories[2] != 0 {
-				t.Errorf("expected inflation %.2f, got %.2f", 0.0, categories[2])
 			}
 		})
 	})
@@ -82,7 +70,7 @@ func TestFinancingService(t *testing.T) {
 				t.Fatalf("could not parse date: %s", err)
 			}
 
-			rate, err := service.GetInterestPeriod(ctx, start, end)
+			rate, err := service.GetInterestPeriod(ctx, start, end, 0.125)
 			if err != nil {
 				t.Fatalf("could not get interest rate: %s", err)
 			}
@@ -105,7 +93,7 @@ func TestFinancingService(t *testing.T) {
 				t.Fatalf("could not parse date: %s", err)
 			}
 
-			rate, err := service.GetInterestPeriod(ctx, start, end)
+			rate, err := service.GetInterestPeriod(ctx, start, end, 0.0)
 			if err != nil {
 				t.Fatalf("could not get interest rate: %s", err)
 			}

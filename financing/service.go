@@ -6,12 +6,16 @@ import (
 )
 
 type (
-	Service interface {
-		GetInterestRate(ctx context.Context) (float64, error)
-		GetInflation(ctx context.Context) (float64, map[int64]float64, error)
+	Rates struct {
+		Inflation float64 `db:"inflation" json:"inflation"`
+		Interest  float64 `db:"interest" json:"interest"`
+	}
 
-		GetInterestPeriod(ctx context.Context, start, end time.Time) (float64, error)
-		GetInflationPeriod(ctx context.Context, start, end time.Time) (float64, map[int64]float64, error)
+	Service interface {
+		GetEffectiveRates(ctx context.Context) (*Rates, error)
+		CalculateRates(ctx context.Context) (float64, float64, error)
+		GetInflationPeriod(ctx context.Context, start, end time.Time) (float64, error)
+		GetInterestPeriod(ctx context.Context, start, end time.Time, inflation float64) (float64, error)
 	}
 
 	service struct {
@@ -25,7 +29,32 @@ func NewService(repository Repository) Service {
 	return &service{repository}
 }
 
-func (s *service) GetCurrentPeriod() (time.Time, time.Time) {
+func (s *service) GetEffectiveRates(ctx context.Context) (*Rates, error) {
+	return s.repository.GetEffectiveRates(ctx)
+}
+
+func (s *service) CalculateRates(ctx context.Context) (float64, float64, error) {
+	start, end := s.getCurrentPeriod()
+
+	inflation, err := s.GetInflationPeriod(ctx, start, end)
+	if err != nil {
+		return -1, -1, err
+	}
+
+	interest, err := s.GetInterestPeriod(ctx, start, end, inflation)
+	if err != nil {
+		return -1, -1, err
+	}
+
+	rates := &Rates{Inflation: inflation, Interest: interest}
+	if err := s.repository.SaveRates(ctx, end, rates); err != nil {
+		return -1, -1, err
+	}
+
+	return inflation, interest, err
+}
+
+func (s *service) getCurrentPeriod() (time.Time, time.Time) {
 	now := time.Now().UTC()
 	year, month, day := now.Date()
 
@@ -35,39 +64,15 @@ func (s *service) GetCurrentPeriod() (time.Time, time.Time) {
 	return start, end
 }
 
-func (s *service) GetInterestRate(ctx context.Context) (float64, error) {
-	start, end := s.GetCurrentPeriod()
-	return s.GetInterestPeriod(ctx, start, end)
-}
-
-func (s *service) GetInflation(ctx context.Context) (float64, map[int64]float64, error) {
-	start, end := s.GetCurrentPeriod()
-	return s.GetInflationPeriod(ctx, start, end)
-}
-
-func (s *service) GetInterestPeriod(ctx context.Context, start, end time.Time) (float64, error) {
-	averageRate, err := s.repository.GetAverageInterestRate(ctx, start, end)
-	if err != nil {
-		return -1, err
-	}
-
-	inflation, _, err := s.GetInflationPeriod(ctx, start, end)
-	if err != nil {
-		return -1, err
-	}
-
-	return (averageRate + inflation) / (1 + inflation), nil
-}
-
-func (s *service) GetInflationPeriod(ctx context.Context, start, end time.Time) (float64, map[int64]float64, error) {
+func (s *service) GetInflationPeriod(ctx context.Context, start, end time.Time) (float64, error) {
 	currentPrices, err := s.repository.GetAveragePrices(ctx, start, end)
 	if err != nil {
-		return -1, nil, err
+		return -1, err
 	}
 
 	previousPrices, err := s.repository.GetAveragePrices(ctx, start.Add(-7*Day), end.Add(-7*Day))
 	if err != nil {
-		return -1, nil, err
+		return -1, err
 	}
 
 	var inflation float64
@@ -82,8 +87,17 @@ func (s *service) GetInflationPeriod(ctx context.Context, start, end time.Time) 
 	}
 
 	if len(categories) == 0 {
-		return 0.0, categories, nil
+		return 0.0, nil
 	}
 
-	return inflation / float64(len(categories)), categories, nil
+	return inflation / float64(len(categories)), nil
+}
+
+func (s *service) GetInterestPeriod(ctx context.Context, start, end time.Time, inflation float64) (float64, error) {
+	averageRate, err := s.repository.GetAverageInterestRate(ctx, start, end)
+	if err != nil {
+		return -1, err
+	}
+
+	return (averageRate + inflation) / (1 + inflation), nil
 }

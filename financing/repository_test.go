@@ -84,11 +84,25 @@ func TestFinancingRepository(t *testing.T) {
 		t.Fatalf("could not seed database: %s", err)
 	}
 
+	if _, err := tx.Exec(`
+        INSERT INTO rates_history (period, inflation, interest) VALUES
+        ('2023-12-03', 0.0125, 0.01),
+        ('2023-12-09', 0.0215, 0.02),
+        ('2023-12-15', 0.0201, 0.0213),
+        ('2023-12-22', 0.0189, 0.0195),
+        ('2023-12-29', 0.0193, 0.0201)
+    `); err != nil {
+		t.Fatalf("could not seed database: %s", err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("could not commit transaction: %s", err)
 	}
 
 	t.Cleanup(func() {
+		if _, err := conn.DB.Exec(`DELETE FROM rates_history`); err != nil {
+			t.Errorf("could not cleanup database: %s", err)
+		}
 		if _, err := conn.DB.Exec(`DELETE FROM loans`); err != nil {
 			t.Errorf("could not cleanup database: %s", err)
 		}
@@ -239,5 +253,22 @@ func TestFinancingRepository(t *testing.T) {
 				t.Errorf("expected rate %f, got %f", 0.0165, rate)
 			}
 		})
+	})
+
+	t.Run("GetEffectiveRates", func(t *testing.T) {
+		rates, err := repository.GetEffectiveRates(ctx)
+		if err != nil {
+			t.Fatalf("could not get rates: %s", err)
+		}
+
+		expectedInflation := 0.0798
+		if rates.Inflation != expectedInflation {
+			t.Errorf("expected inflation %f, got %f", expectedInflation, rates.Inflation)
+		}
+
+		expectedInterest := 0.0809
+		if rates.Interest != expectedInterest {
+			t.Errorf("expected interest %f, got %f", expectedInterest, rates.Interest)
+		}
 	})
 }

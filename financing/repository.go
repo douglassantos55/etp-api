@@ -10,8 +10,12 @@ import (
 	"github.com/doug-martin/goqu/v9/exp"
 )
 
+const ACCUMULATED_PERIOD_WEEKS = 4
+
 type (
 	Repository interface {
+		GetEffectiveRates(ctx context.Context) (*Rates, error)
+		SaveRates(ctx context.Context, period time.Time, rates *Rates) error
 		GetAveragePrices(ctx context.Context, start, end time.Time) (map[int64]int64, error)
 		GetAverageInterestRate(ctx context.Context, start, end time.Time) (float64, error)
 	}
@@ -24,6 +28,44 @@ type (
 func NewRepository(conn *database.Connection) Repository {
 	builder := goqu.New(conn.Driver, conn.DB)
 	return &goquRepository{builder}
+}
+
+func (r *goquRepository) GetEffectiveRates(ctx context.Context) (*Rates, error) {
+	rates := new(Rates)
+
+	_, err := r.builder.
+		Select(
+			goqu.COALESCE(goqu.SUM(goqu.I("inflation")), 0).As("inflation"),
+			goqu.COALESCE(goqu.SUM(goqu.I("interest")), 0).As("interest"),
+		).
+		From(
+			goqu.
+				Select(goqu.I("inflation"), goqu.I("interest")).
+				From(goqu.T("rates_history")).
+				Order(goqu.I("period").Desc()).
+				Limit(ACCUMULATED_PERIOD_WEEKS),
+		).
+		ScanStructContext(ctx, rates)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rates, nil
+}
+
+func (r *goquRepository) SaveRates(ctx context.Context, period time.Time, rates *Rates) error {
+	_, err := r.builder.
+		Insert(goqu.T("rates_history")).
+		Rows(goqu.Record{
+			"inflation": rates.Inflation,
+			"interest":  rates.Interest,
+			"period":    period,
+		}).
+		Executor().
+		ExecContext(ctx)
+
+	return err
 }
 
 func (r *goquRepository) GetAverageInterestRate(ctx context.Context, start, end time.Time) (float64, error) {

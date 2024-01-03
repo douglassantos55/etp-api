@@ -44,16 +44,16 @@ func TestFinancingRoutes(t *testing.T) {
 			t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 		}
 
-		var response map[string]float64
+		var response *financing.Rates
 		if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 			t.Fatalf("could not parse json: %s", err)
 		}
 
-		if _, ok := response["inflation"]; !ok {
+		if response.Inflation == 0 {
 			t.Error("should return inflation rate")
 		}
 
-		if _, ok := response["interest"]; !ok {
+		if response.Interest == 0 {
 			t.Error("should return interest rate")
 		}
 	})
