@@ -26,6 +26,7 @@ type (
 		Name              string     `db:"name" json:"name"`
 		Email             string     `db:"email" json:"email"`
 		Pass              string     `db:"password" json:"-"`
+		Admin             bool       `db:"is_admin" json:"-"`
 		LastLogin         *time.Time `db:"last_login" json:"last_login"`
 		CreatedAt         time.Time  `db:"created_at" json:"created_at"`
 		AvailableCash     int        `db:"cash" json:"available_cash"`
@@ -50,6 +51,10 @@ const (
 	TERRAIN_UNIT_VALUE     = 500_000_00
 	TERRAIN_POSITION_VALUE = 100_000_00
 )
+
+func (c *Company) IsAdmin() bool {
+	return c.Admin
+}
 
 func (c *Company) GetCreditScore() int64 {
 	return c.TerrainValue(c.AvailableTerrains)

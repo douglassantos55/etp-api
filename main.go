@@ -65,7 +65,7 @@ func main() {
 	bondsSvc := bonds.NewService(bondsRepo, companySvc)
 
 	financingSvc := financing.NewService(financing.NewRepository(conn))
-	financing.CreateEndpoints(svr, financingSvc, loansSvc, bondsSvc)
+	financing.CreateEndpoints(svr, financingSvc, loansSvc, bondsSvc, companySvc)
 
 	svr.GET("/", server.Greeting(events))
 	svr.GET("/private", server.Private(events))

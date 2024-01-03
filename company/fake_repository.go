@@ -10,7 +10,7 @@ func NewFakeRepository() Repository {
 	data := map[uint64]*Company{
 		1: {Id: 1, Name: "Test", Email: "admin@test.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy", AvailableCash: 720, AvailableTerrains: 3},
 		2: {Id: 2, Name: "Test 2", Email: "admin@test2.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy", AvailableCash: 255720, AvailableTerrains: 3},
-		3: {Id: 3, Name: "Test 3", Email: "admin@test3.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy", AvailableCash: 125572000, AvailableTerrains: 3},
+		3: {Id: 3, Name: "Test 3", Email: "admin@test3.com", Pass: "$2a$10$OBo6gtRDtR2g8X6S9Qn/Z.1r33jf6QYRSxavEIjG8UfrJ8MLQWRzy", AvailableCash: 125572000, AvailableTerrains: 3, Admin: true},
 	}
 	return &fakeRepository{data}
 }

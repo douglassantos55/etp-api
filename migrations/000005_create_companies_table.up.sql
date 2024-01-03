@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS `companies` (
     `email` VARCHAR(255) NOT NULL,
     `password` VARCHAR(255) NOT NULL,
     `available_terrains` TINYINT UNSIGNED DEFAULT 3,
+    `is_admin` TINYINT DEFAULT 0,
     `last_login` TIMESTAMP DEFAULT NULL,
     `blocked_at` TIMESTAMP DEFAULT NULL,
     `deleted_at` TIMESTAMP DEFAULT NULL,

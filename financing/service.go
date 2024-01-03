@@ -7,13 +7,14 @@ import (
 
 type (
 	Rates struct {
-		Inflation float64 `db:"inflation" json:"inflation"`
-		Interest  float64 `db:"interest" json:"interest"`
+		Period    time.Time `db:"period" json:"period,omitempty"`
+		Inflation float64   `db:"inflation" json:"inflation"`
+		Interest  float64   `db:"interest" json:"interest"`
 	}
 
 	Service interface {
+		CalculateRates(ctx context.Context) (*Rates, error)
 		GetEffectiveRates(ctx context.Context) (*Rates, error)
-		CalculateRates(ctx context.Context) (float64, float64, error)
 		GetInflationPeriod(ctx context.Context, start, end time.Time) (float64, error)
 		GetInterestPeriod(ctx context.Context, start, end time.Time, inflation float64) (float64, error)
 	}
@@ -33,25 +34,30 @@ func (s *service) GetEffectiveRates(ctx context.Context) (*Rates, error) {
 	return s.repository.GetEffectiveRates(ctx)
 }
 
-func (s *service) CalculateRates(ctx context.Context) (float64, float64, error) {
+func (s *service) CalculateRates(ctx context.Context) (*Rates, error) {
 	start, end := s.getCurrentPeriod()
 
 	inflation, err := s.GetInflationPeriod(ctx, start, end)
 	if err != nil {
-		return -1, -1, err
+		return nil, err
 	}
 
 	interest, err := s.GetInterestPeriod(ctx, start, end, inflation)
 	if err != nil {
-		return -1, -1, err
+		return nil, err
 	}
 
-	rates := &Rates{Inflation: inflation, Interest: interest}
+	rates := &Rates{
+		Period:    end,
+		Inflation: inflation,
+		Interest:  interest,
+	}
+
 	if err := s.repository.SaveRates(ctx, end, rates); err != nil {
-		return -1, -1, err
+		return nil, err
 	}
 
-	return inflation, interest, err
+	return rates, err
 }
 
 func (s *service) getCurrentPeriod() (time.Time, time.Time) {

@@ -62,7 +62,8 @@ func (r *goquRepository) PurchaseTerrain(ctx context.Context, total int, company
 		return err
 	}
 
-	if _, err = tx.Update(goqu.T("companies")).
+	if _, err = tx.
+		Update(goqu.T("companies")).
 		Set(goqu.Record{
 			"available_terrains": goqu.L("? + 1", goqu.I("available_terrains")),
 		}).
@@ -140,6 +141,7 @@ func (r *goquRepository) getSelect() *goqu.SelectDataset {
 			goqu.I("c.password"),
 			goqu.I("c.last_login"),
 			goqu.I("c.created_at"),
+			goqu.I("c.is_admin"),
 			goqu.I("c.available_terrains"),
 			goqu.COALESCE(goqu.SUM("t.value"), 0).As("cash"),
 		).

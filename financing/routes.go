@@ -1,6 +1,8 @@
 package financing
 
 import (
+	"api/auth"
+	"api/company"
 	"api/financing/bonds"
 	"api/financing/loans"
 	"net/http"
@@ -8,11 +10,36 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func CreateEndpoints(e *echo.Echo, financingSvc Service, loansSvc loans.Service, bondsSvc bonds.Service) {
+func CreateEndpoints(e *echo.Echo, financingSvc Service, loansSvc loans.Service, bondsSvc bonds.Service, companySvc company.Service) {
 	group := e.Group("/financing")
 
 	group.GET("/rates", func(c echo.Context) error {
 		rates, err := financingSvc.GetEffectiveRates(c.Request().Context())
+		if err != nil {
+			return err
+		}
+
+		return c.JSON(http.StatusOK, rates)
+	})
+
+	group.POST("/rates", func(c echo.Context) error {
+		companyId, err := auth.ParseToken(c.Get("user"))
+		if err != nil {
+			return err
+		}
+
+		ctx := c.Request().Context()
+
+		company, err := companySvc.GetById(ctx, companyId)
+		if err != nil {
+			return err
+		}
+
+		if !company.IsAdmin() {
+			return echo.NewHTTPError(http.StatusForbidden)
+		}
+
+		rates, err := financingSvc.CalculateRates(ctx)
 		if err != nil {
 			return err
 		}
