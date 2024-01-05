@@ -74,7 +74,10 @@ func (r *goquRepository) GetAverageInterestRate(ctx context.Context, start, end 
 	_, err := r.builder.
 		Select(goqu.COALESCE(goqu.AVG(goqu.I("interest_rate")), 0.01)).
 		From(goqu.T("loans")).
-		Where(goqu.I("created_at").Between(exp.NewRangeVal(start, end))).
+		Where(goqu.I("created_at").Between(exp.NewRangeVal(
+			start.Format(time.DateTime),
+			end.Format(time.DateTime)),
+		)).
 		ScanValContext(ctx, &interestRate)
 
 	if err != nil {
@@ -113,7 +116,10 @@ func (r *goquRepository) GetAveragePrices(ctx context.Context, start, end time.T
 		).
 		Where(goqu.And(
 			goqu.I("t.classification_id").Eq(accounting.MARKET_SALE),
-			goqu.I("t.created_at").Between(exp.NewRangeVal(start.UTC(), end.UTC())),
+			goqu.I("t.created_at").Between(exp.NewRangeVal(
+				start.Format(time.DateTime),
+				end.Format(time.DateTime),
+			)),
 		)).
 		GroupBy(goqu.I("r.category_id")).
 		ScanStructsContext(ctx, &averagePrices)
