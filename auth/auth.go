@@ -38,6 +38,12 @@ func ParseToken(token any) (uint64, error) {
 		return 0, errors.New("not a valid claims instance")
 	}
 
+	for _, aud := range claims.Audience {
+		if aud == "cronjob" {
+			return 0, nil
+		}
+	}
+
 	id, err := strconv.ParseUint(claims.Subject, 10, 64)
 	if err != nil {
 		return 0, err

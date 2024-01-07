@@ -4,6 +4,8 @@ import (
 	"api/auth"
 	"strings"
 	"testing"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func TestAuth(t *testing.T) {
@@ -43,5 +45,66 @@ func TestAuth(t *testing.T) {
 		if periods != 2 {
 			t.Errorf("expected valid token, got %s", token)
 		}
+	})
+
+	t.Run("ParseToken", func(t *testing.T) {
+		t.Run("company token", func(t *testing.T) {
+			token := jwt.NewWithClaims(jwt.SigningMethodES256, &jwt.RegisteredClaims{
+				Subject:  "1535",
+				Audience: jwt.ClaimStrings{"entrepreneur-client"},
+			})
+
+			id, err := auth.ParseToken(token)
+			if err != nil {
+				t.Fatalf("could not parse token: %s", err)
+			}
+
+			if id != 1535 {
+				t.Errorf("expected id %d, got %d", 1535, id)
+			}
+		})
+
+		t.Run("cron token", func(t *testing.T) {
+			token := jwt.NewWithClaims(jwt.SigningMethodES256, &jwt.RegisteredClaims{
+				Audience: jwt.ClaimStrings{"cronjob"},
+			})
+
+			id, err := auth.ParseToken(token)
+			if err != nil {
+				t.Fatalf("could not parse token: %s", err)
+			}
+
+			if id != 0 {
+				t.Errorf("expected id %d, got %d", 0, id)
+			}
+		})
+
+		t.Run("invalid token", func(t *testing.T) {
+			token := jwt.NewWithClaims(jwt.SigningMethodES256, &jwt.RegisteredClaims{
+				Subject:  "cron",
+				Audience: jwt.ClaimStrings{"entrepreneur-client"},
+			})
+
+			_, err := auth.ParseToken(token)
+			if err == nil {
+				t.Fatal("should not parse token")
+			}
+		})
+
+		t.Run("invalid cron token", func(t *testing.T) {
+			token := jwt.NewWithClaims(jwt.SigningMethodES256, &jwt.RegisteredClaims{
+				Subject:  "120",
+				Audience: jwt.ClaimStrings{"cronjob"},
+			})
+
+			id, err := auth.ParseToken(token)
+			if err != nil {
+				t.Fatalf("could not parse token: %s", err)
+			}
+
+			if id != 0 {
+				t.Errorf("expected id %d, got %d", 0, id)
+			}
+		})
 	})
 }

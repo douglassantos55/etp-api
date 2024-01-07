@@ -21,22 +21,16 @@ func CreateEndpoints(e *echo.Echo, financingSvc Service, companySvc company.Serv
 	})
 
 	group.POST("/rates", func(c echo.Context) error {
-		companyId, err := auth.ParseToken(c.Get("user"))
+		id, err := auth.ParseToken(c.Get("user"))
 		if err != nil {
 			return err
+		}
+
+		if id != 0 {
+			return echo.NewHTTPError(http.StatusUnauthorized)
 		}
 
 		ctx := c.Request().Context()
-
-		company, err := companySvc.GetById(ctx, companyId)
-		if err != nil {
-			return err
-		}
-
-		if !company.IsAdmin() {
-			return echo.NewHTTPError(http.StatusForbidden)
-		}
-
 		rates, err := financingSvc.CalculateRates(ctx)
 		if err != nil {
 			return err

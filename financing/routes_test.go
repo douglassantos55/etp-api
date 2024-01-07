@@ -79,7 +79,7 @@ func TestFinancingRoutes(t *testing.T) {
 			}
 		})
 
-		t.Run("not admin", func(t *testing.T) {
+		t.Run("not cron token", func(t *testing.T) {
 			req := httptest.NewRequest("POST", "/financing/rates", nil)
 			req.Header.Set("Authorization", "Bearer "+token)
 			req.Header.Set("Accept", "application/json")
@@ -87,19 +87,14 @@ func TestFinancingRoutes(t *testing.T) {
 			rec := httptest.NewRecorder()
 			svr.ServeHTTP(rec, req)
 
-			if rec.Code != http.StatusForbidden {
-				t.Errorf("expected status %d, got %d", http.StatusForbidden, rec.Code)
+			if rec.Code != http.StatusUnauthorized {
+				t.Errorf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
 			}
 		})
 
-		t.Run("admin", func(t *testing.T) {
-			adminToken, err := auth.GenerateToken(3, "secret")
-			if err != nil {
-				t.Fatalf("could not generate jwt token: %s", err)
-			}
-
+		t.Run("cron token", func(t *testing.T) {
 			req := httptest.NewRequest("POST", "/financing/rates", nil)
-			req.Header.Set("Authorization", "Bearer "+adminToken)
+			req.Header.Set("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjcm9uIiwiYXVkIjoiY3JvbmpvYiIsImlzcyI6ImVudHJlcHJlbmV1ci1hcGkiLCJpYXQiOjE1MTYyMzkwMjJ9.mZmms00XUtw7JbObsSsC9pm40vk0ENdnJFU7Exp9rPU")
 			req.Header.Set("Accept", "application/json")
 
 			rec := httptest.NewRecorder()
