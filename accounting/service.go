@@ -1,7 +1,9 @@
 package accounting
 
 import (
+	"api/scheduler"
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -12,19 +14,25 @@ type (
 		categories map[uint64]int
 	}
 
+	IncomeResult struct {
+		CompanyId     int64 `db:"company_id"`
+		TaxableIncome int64 `db:"taxable_income"`
+		DeferredTaxes int64 `db:"deferred_taxes"`
+	}
+
 	Transaction struct {
-		Value          int       `db:"value"`
-		Description    string    `db:"description"`
-		Classification uint64    `db:"classification_id"`
-		CreatedAt      time.Time `db:"created_at" goqu:"skipinsert,skipupdate"`
+		Value          int    `db:"value"`
+		Description    string `db:"description"`
+		Classification uint64 `db:"classification_id"`
 	}
 
 	Service interface {
-		PayTaxes(ctx context.Context, start, end time.Time, companyId int64) (int64, error)
+		PayTaxes(ctx context.Context, start, end time.Time) error
 	}
 
 	service struct {
 		repository Repository
+		timer      *scheduler.Scheduler
 	}
 )
 
@@ -63,8 +71,18 @@ func (s *IncomeStatement) GetTaxes() int64 {
 	return int64(taxes)
 }
 
-func NewService(repository Repository) Service {
-	return &service{repository}
+func NewService(repository Repository, timer *scheduler.Scheduler) Service {
+	return &service{repository, timer}
+}
+
+func GetCurrentPeriod() (start, end time.Time) {
+	now := time.Now().UTC()
+	year, month, day := now.Date()
+
+	start = time.Date(year, month, day-int(now.Weekday())-7, 0, 0, 0, 0, time.UTC)
+	end = time.Date(year, month, day-int(now.Weekday())-1, 23, 59, 59, 0, time.UTC)
+
+	return start, end
 }
 
 func (s *service) GetIncomeStatement(ctx context.Context, start, end time.Time, companyId int64) (*IncomeStatement, error) {
@@ -75,14 +93,22 @@ func (s *service) GetIncomeStatement(ctx context.Context, start, end time.Time, 
 	return NewIncomeStatement(transactions), nil
 }
 
-func (s *service) PayTaxes(ctx context.Context, start, end time.Time, companyId int64) (int64, error) {
-	statement, err := s.GetIncomeStatement(ctx, start, end, companyId)
+func (s *service) PayTaxes(ctx context.Context, start, end time.Time) error {
+	results, err := s.repository.GetPeriodResults(ctx, start, end)
 	if err != nil {
-		return -1, err
+		return err
 	}
 
-	taxes := statement.GetTaxes()
-	s.repository.SaveTaxes(ctx, taxes, companyId)
+	for _, result := range results {
+		companyId := result.CompanyId
+		taxes := int64(float64(result.TaxableIncome)*TAX_RATE) - result.DeferredTaxes
 
-	return taxes, nil
+		if err := s.repository.SaveTaxes(ctx, taxes, result.CompanyId); err != nil {
+			s.timer.Add(fmt.Sprintf("TAXES_%d", result.CompanyId), 3*time.Second, func() error {
+				return s.repository.SaveTaxes(ctx, taxes, companyId)
+			})
+		}
+	}
+
+	return nil
 }

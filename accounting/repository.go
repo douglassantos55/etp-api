@@ -40,13 +40,13 @@ var INCOME_STATEMENT_CLASSIFICATIONS = []int{
 	MARKET_SALE,
 	MARKET_FEE,
 	TAXES_PAID,
-	TAXES_DEFERRED,
+	// TAXES_DEFERRED,
 }
 
 type (
 	Repository interface {
 		SaveTaxes(ctx context.Context, taxes, companyId int64) error
-		GetTransactions(ctx context.Context, companyId int64) ([]*Transaction, error)
+		GetPeriodResults(ctx context.Context, start, end time.Time) ([]*IncomeResult, error)
 		RegisterTransaction(tx *database.DB, transaction Transaction, companyId uint64) (int64, error)
 		GetIncomeTransactions(ctx context.Context, start, end time.Time, companyId int64) ([]*Transaction, error)
 	}
@@ -61,27 +61,44 @@ func NewRepository(conn *database.Connection) Repository {
 	return &goquRepository{builder}
 }
 
-func (r *goquRepository) GetTransactions(ctx context.Context, companyId int64) ([]*Transaction, error) {
-	transactions := make([]*Transaction, 0)
+func (r *goquRepository) GetPeriodResults(ctx context.Context, start, end time.Time) ([]*IncomeResult, error) {
+	results := make([]*IncomeResult, 0)
 
 	err := r.builder.
 		Select(
-			goqu.I("value"),
-			goqu.I("created_at"),
-			goqu.I("classification_id"),
+			goqu.I("c.id").As("company_id"),
+			goqu.COALESCE(goqu.SUM(goqu.I("t.value")), 0).As("taxable_income"),
+			goqu.
+				Select(goqu.COALESCE(goqu.SUM(goqu.I("value")), 0)).
+				From(goqu.T("transactions")).
+				Where(goqu.And(
+					goqu.I("company_id").Eq(goqu.I("c.id")),
+					goqu.I("classification_id").Eq(TAXES_DEFERRED),
+				)).
+				As("deferred_taxes"),
 		).
-		From(goqu.T("transactions")).
-		Where(goqu.And(
-			goqu.I("company_id").Eq(companyId),
-			goqu.I("classification_id").In(INCOME_STATEMENT_CLASSIFICATIONS),
-		)).
-		ScanStructsContext(ctx, &transactions)
+		From(goqu.T("companies").As("c")).
+		LeftJoin(
+			goqu.T("transactions").As("t"),
+			goqu.On(
+				goqu.And(
+					goqu.I("t.company_id").Eq(goqu.I("c.id")),
+					goqu.I("t.classification_id").In(INCOME_STATEMENT_CLASSIFICATIONS),
+					goqu.I("t.created_at").Between(exp.NewRangeVal(
+						start.Format(time.DateTime),
+						end.Format(time.DateTime),
+					)),
+				),
+			),
+		).
+		GroupBy(goqu.I("c.id")).
+		ScanStructsContext(ctx, &results)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return transactions, nil
+	return results, nil
 }
 
 func (r *goquRepository) GetIncomeTransactions(ctx context.Context, start, end time.Time, companyId int64) ([]*Transaction, error) {
@@ -95,7 +112,10 @@ func (r *goquRepository) GetIncomeTransactions(ctx context.Context, start, end t
 		From(goqu.T("transactions")).
 		Where(goqu.And(
 			goqu.I("company_id").Eq(companyId),
-			goqu.I("classification_id").In(INCOME_STATEMENT_CLASSIFICATIONS),
+			goqu.I("classification_id").In(append(
+				INCOME_STATEMENT_CLASSIFICATIONS,
+				TAXES_DEFERRED,
+			)),
 			goqu.Or(
 				goqu.I("classification_id").Eq(TAXES_DEFERRED),
 				goqu.I("created_at").Between(exp.NewRangeVal(

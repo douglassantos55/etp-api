@@ -79,6 +79,51 @@ func TestAccountRepository(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
+	t.Run("GetPeriodResults", func(t *testing.T) {
+		start, err := time.Parse(time.DateTime, "2023-12-24 00:00:00")
+		if err != nil {
+			t.Fatalf("could not parse time: %s", err)
+		}
+
+		end, err := time.Parse(time.DateTime, "2023-12-30 23:59:59")
+		if err != nil {
+			t.Fatalf("could not parse time: %s", err)
+		}
+
+		results, err := repository.GetPeriodResults(ctx, start, end)
+		if err != nil {
+			t.Fatalf("could not get transactions: %s", err)
+		}
+
+		if len(results) != 3 {
+			t.Fatalf("expected %d results, got %d", 3, len(results))
+		}
+
+		for _, result := range results {
+			if result.CompanyId == 1 {
+				if result.TaxableIncome != 0 {
+					t.Errorf("expected no taxable income, got %d", result.TaxableIncome)
+				}
+				if result.DeferredTaxes != 2900000 {
+					t.Errorf("expected %d deferred taxes, got %d", 2900000, result.DeferredTaxes)
+				}
+			}
+			if result.CompanyId == 2 {
+				if result.TaxableIncome != 0 || result.DeferredTaxes != 0 {
+					t.Errorf("expected no taxable income and deferred taxes, got %d, %d", result.TaxableIncome, result.DeferredTaxes)
+				}
+			}
+			if result.CompanyId == 3 {
+				if result.TaxableIncome != 5450000 {
+					t.Errorf("expected taxable income %d, got %d", 5450000, result.TaxableIncome)
+				}
+				if result.DeferredTaxes != 0 {
+					t.Errorf("expected deferred taxes %d, got %d", 0, result.DeferredTaxes)
+				}
+			}
+		}
+	})
+
 	t.Run("GetIncomeTransactions", func(t *testing.T) {
 		t.Run("should filter by company", func(t *testing.T) {
 			start, err := time.Parse(time.DateTime, "2023-12-24 00:00:00")

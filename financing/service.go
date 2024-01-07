@@ -1,6 +1,7 @@
 package financing
 
 import (
+	"api/accounting"
 	"context"
 	"time"
 )
@@ -35,7 +36,7 @@ func (s *service) GetEffectiveRates(ctx context.Context) (*Rates, error) {
 }
 
 func (s *service) CalculateRates(ctx context.Context) (*Rates, error) {
-	start, end := s.getCurrentPeriod()
+	start, end := accounting.GetCurrentPeriod()
 
 	inflation, err := s.GetInflationPeriod(ctx, start, end)
 	if err != nil {
@@ -58,16 +59,6 @@ func (s *service) CalculateRates(ctx context.Context) (*Rates, error) {
 	}
 
 	return rates, err
-}
-
-func (s *service) getCurrentPeriod() (time.Time, time.Time) {
-	now := time.Now().UTC()
-	year, month, day := now.Date()
-
-	start := time.Date(year, month, day-int(now.Weekday())-7, 0, 0, 0, 0, time.UTC)
-	end := time.Date(year, month, day-int(now.Weekday())-1, 23, 59, 59, 0, time.UTC)
-
-	return start, end
 }
 
 func (s *service) GetInflationPeriod(ctx context.Context, start, end time.Time) (float64, error) {
