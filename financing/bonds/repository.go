@@ -237,7 +237,7 @@ func (r *goquRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          -int(creditor.GetInterest()),
-			Classification: accounting.BOND_INTEREST_PAYMENT,
+			Classification: accounting.BOND_INTEREST_EXPENSE,
 			Description: fmt.Sprintf(
 				"Bond interest payment over principal $ %.2f",
 				float64(creditor.GetPrincipal()/100),
@@ -254,7 +254,7 @@ func (r *goquRepository) PayBondInterest(ctx context.Context, bond *Bond, credit
 		&database.DB{TxDatabase: tx},
 		accounting.Transaction{
 			Value:          int(creditor.GetInterest()),
-			Classification: accounting.BOND_INTEREST_PAYMENT,
+			Classification: accounting.BOND_INTEREST_INCOME,
 			Description: fmt.Sprintf(
 				"Bond interest payment over principal $ %.2f",
 				float64(creditor.GetPrincipal()/100),
