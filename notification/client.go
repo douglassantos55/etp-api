@@ -7,8 +7,7 @@ type Client struct {
 }
 
 func (s *Client) Write(p []byte) (int, error) {
-	notification := new(Notification)
-	if err := s.Conn.WriteJSON(notification); err != nil {
+	if err := s.Conn.WriteMessage(websocket.TextMessage, p); err != nil {
 		return 0, err
 	}
 	return len(p), nil
