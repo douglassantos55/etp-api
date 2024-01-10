@@ -53,7 +53,8 @@ func TestNotificationRepository(t *testing.T) {
         (21, 2, "hi there", "2024-01-08 21:31:50"),
         (22, 2, "hi there", "2024-01-08 21:32:50"),
         (23, 2, "hi there", "2024-01-08 21:33:50"),
-        (24, 2, "hi there", "2024-01-08 21:34:50")
+        (24, 2, "hi there", "2024-01-08 21:34:50"),
+        (25, NULL, "broadcast", "2024-01-08 21:35:50")
     `); err != nil {
 		t.Fatalf("could not seed database: %s", err)
 	}
@@ -86,8 +87,8 @@ func TestNotificationRepository(t *testing.T) {
 			t.Errorf("expected %d notifications, got %d", 3, len(notifications))
 		}
 
-		if notifications[0].Id != 20 {
-			t.Errorf("expected id %d, got %d", 20, notifications[0].Id)
+		if notifications[0].Id != 25 {
+			t.Errorf("expected id %d, got %d", 25, notifications[0].Id)
 		}
 
 		notifications, err = repository.GetNotifications(ctx, 2)
@@ -95,14 +96,16 @@ func TestNotificationRepository(t *testing.T) {
 			t.Fatalf("could not get notifications: %s", err)
 		}
 
-		if len(notifications) != 4 {
-			t.Errorf("expected %d notifications, got %d", 4, len(notifications))
+		if len(notifications) != 5 {
+			t.Errorf("expected %d notifications, got %d", 5, len(notifications))
 		}
 	})
 
 	t.Run("SaveNotification", func(t *testing.T) {
+		companyId := int64(1)
+
 		notification, err := repository.SaveNotification(ctx, &notification.Notification{
-			CompanyId: 1,
+			CompanyId: &companyId,
 			Message:   "hello there",
 		})
 

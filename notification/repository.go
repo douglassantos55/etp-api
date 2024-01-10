@@ -18,6 +18,7 @@ type (
 	}
 
 	inMemoryRepository struct {
+		broadcasts    []*Notification
 		notifications map[int64][]*Notification
 	}
 )
@@ -33,7 +34,10 @@ func (r *goquRepository) GetNotifications(ctx context.Context, companyId int64) 
 	err := r.builder.
 		Select().
 		From(goqu.T("notifications")).
-		Where(goqu.I("company_id").Eq(companyId)).
+		Where(goqu.Or(
+			goqu.I("company_id").IsNull(),
+			goqu.I("company_id").Eq(companyId),
+		)).
 		Limit(20).
 		Order(goqu.I("created_at").Desc()).
 		ScanStructsContext(ctx, &notifications)
@@ -67,15 +71,21 @@ func (r *goquRepository) SaveNotification(ctx context.Context, notification *Not
 
 func NewFakeRepository() Repository {
 	return &inMemoryRepository{
+		broadcasts:    make([]*Notification, 0),
 		notifications: make(map[int64][]*Notification),
 	}
 }
 
 func (r *inMemoryRepository) GetNotifications(ctx context.Context, companyId int64) ([]*Notification, error) {
-	return r.notifications[companyId], nil
+	notifications := r.notifications[companyId]
+	return append(r.broadcasts, notifications...), nil
 }
 
 func (r *inMemoryRepository) SaveNotification(ctx context.Context, notification *Notification) (*Notification, error) {
-	r.notifications[notification.CompanyId] = append(r.notifications[notification.CompanyId], notification)
+	if notification.CompanyId == nil {
+		r.broadcasts = append(r.broadcasts, notification)
+	} else {
+		r.notifications[*notification.CompanyId] = append(r.notifications[*notification.CompanyId], notification)
+	}
 	return notification, nil
 }

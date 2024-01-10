@@ -5,24 +5,23 @@ import (
 	"encoding/json"
 	"io"
 	"sync"
+	"time"
 )
 
 type (
 	Notifier interface {
 		Disconnect(identifier int64)
 		Connect(identifier int64, client io.WriteCloser)
-		Notify(ctx context.Context, message string, indentifier int64) error
-	}
 
-	Notification struct {
-		Id        int64  `db:"id" json:"id" goqu:"skipinsert,skipupdate"`
-		Message   string `db:"message" json:"message"`
-		CompanyId int64  `db:"company_id" json:"-"`
+		Broadcast(ctx context.Context, message string) error
+		Notify(ctx context.Context, message string, indentifier int64) error
 	}
 
 	notifier struct {
 		clients    *sync.Map
 		repository Repository
+		messages   chan *Notification
+		broadcasts chan string
 	}
 )
 
@@ -30,9 +29,34 @@ func NewNotifier(repository Repository) Notifier {
 	notifier := &notifier{
 		clients:    &sync.Map{},
 		repository: repository,
+		messages:   make(chan *Notification),
+		broadcasts: make(chan string),
 	}
 
+	go notifier.handleMessages()
+
 	return notifier
+}
+
+func (n *notifier) handleMessages() {
+	for {
+		select {
+		case notification := <-n.messages:
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			if err := n.doNotify(ctx, notification); err != nil {
+				println(err.Error())
+			}
+		case message := <-n.broadcasts:
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			if err := n.doBroadcast(ctx, message); err != nil {
+				println(err.Error())
+			}
+		}
+	}
 }
 
 func (n *notifier) Connect(identifier int64, client io.WriteCloser) {
@@ -43,17 +67,51 @@ func (n *notifier) Disconnect(identifier int64) {
 	n.clients.Delete(identifier)
 }
 
-func (n *notifier) Notify(ctx context.Context, message string, companyId int64) error {
-	notification, err := n.repository.SaveNotification(ctx, &Notification{
+func (n *notifier) Notify(ctx context.Context, message string, identifier int64) error {
+	n.messages <- &Notification{
 		Message:   message,
-		CompanyId: companyId,
+		CompanyId: &identifier,
+	}
+	return nil
+}
+
+func (n *notifier) Broadcast(ctx context.Context, message string) error {
+	n.broadcasts <- message
+	return nil
+}
+
+func (n *notifier) doBroadcast(ctx context.Context, message string) error {
+	notification, err := n.repository.SaveNotification(ctx, &Notification{
+		Message: message,
 	})
 
 	if err != nil {
 		return err
 	}
 
-	if client, ok := n.clients.Load(companyId); ok {
+	stream, err := json.Marshal(notification)
+	if err != nil {
+		return err
+	}
+
+	n.clients.Range(func(_, client any) bool {
+		if _, err := client.(io.WriteCloser).Write(stream); err != nil {
+			println(err.Error())
+		}
+		return true
+	})
+
+	return nil
+}
+
+func (n *notifier) doNotify(ctx context.Context, notification *Notification) error {
+	notification, err := n.repository.SaveNotification(ctx, notification)
+
+	if err != nil {
+		return err
+	}
+
+	if client, ok := n.clients.Load(*notification.CompanyId); ok {
 		stream, err := json.Marshal(notification)
 		if err != nil {
 			return err
