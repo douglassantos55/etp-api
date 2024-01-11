@@ -11,10 +11,10 @@ import (
 
 type socket struct {
 	mutex  sync.Mutex
-	buffer *notification.Notification
+	buffer any
 }
 
-func (s *socket) Flush() string {
+func (s *socket) Flush() any {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -22,10 +22,12 @@ func (s *socket) Flush() string {
 		return "empty"
 	}
 
-	message := s.buffer.Message
-	s.buffer = nil
+	if buf, ok := s.buffer.(map[string]any); ok {
+		s.buffer = nil
+		return buf["message"]
+	}
 
-	return message
+	return s.buffer.(string)
 }
 
 func (s *socket) Write(p []byte) (int, error) {

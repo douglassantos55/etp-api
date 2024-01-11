@@ -13,24 +13,24 @@ type (
 		Disconnect(identifier int64)
 		Connect(identifier int64, client io.WriteCloser)
 
-		Broadcast(ctx context.Context, message string) error
+		Broadcast(ctx context.Context, message any) error
 		Notify(ctx context.Context, message string, indentifier int64) error
 	}
 
 	notifier struct {
-		clients    *sync.Map
-		repository Repository
-		messages   chan *Notification
-		broadcasts chan string
+		clients       *sync.Map
+		repository    Repository
+		notifications chan *Notification
+		broadcasts    chan any
 	}
 )
 
 func NewNotifier(repository Repository) Notifier {
 	notifier := &notifier{
-		clients:    &sync.Map{},
-		repository: repository,
-		messages:   make(chan *Notification),
-		broadcasts: make(chan string),
+		clients:       &sync.Map{},
+		repository:    repository,
+		notifications: make(chan *Notification),
+		broadcasts:    make(chan any),
 	}
 
 	go notifier.handleMessages()
@@ -41,7 +41,7 @@ func NewNotifier(repository Repository) Notifier {
 func (n *notifier) handleMessages() {
 	for {
 		select {
-		case notification := <-n.messages:
+		case notification := <-n.notifications:
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
@@ -68,28 +68,20 @@ func (n *notifier) Disconnect(identifier int64) {
 }
 
 func (n *notifier) Notify(ctx context.Context, message string, identifier int64) error {
-	n.messages <- &Notification{
+	n.notifications <- &Notification{
 		Message:   message,
 		CompanyId: &identifier,
 	}
 	return nil
 }
 
-func (n *notifier) Broadcast(ctx context.Context, message string) error {
+func (n *notifier) Broadcast(ctx context.Context, message any) error {
 	n.broadcasts <- message
 	return nil
 }
 
-func (n *notifier) doBroadcast(ctx context.Context, message string) error {
-	notification, err := n.repository.SaveNotification(ctx, &Notification{
-		Message: message,
-	})
-
-	if err != nil {
-		return err
-	}
-
-	stream, err := json.Marshal(notification)
+func (n *notifier) doBroadcast(ctx context.Context, message any) error {
+	stream, err := json.Marshal(message)
 	if err != nil {
 		return err
 	}
