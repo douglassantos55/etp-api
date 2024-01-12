@@ -8,7 +8,18 @@ import (
 	"time"
 )
 
+const (
+	OrderPlaced    = "order_placed"
+	OrderPurchased = "order_purchased"
+	OrderCanceled  = "order_canceled"
+)
+
 type (
+	Event struct {
+		Type    string `json:"type"`
+		Payload any    `json:"payload"`
+	}
+
 	Notifier interface {
 		Disconnect(identifier int64)
 		Connect(identifier int64, client io.WriteCloser)
@@ -22,6 +33,9 @@ type (
 		repository    Repository
 		notifications chan *Notification
 		broadcasts    chan any
+	}
+
+	noOpNotifier struct {
 	}
 )
 
@@ -113,5 +127,23 @@ func (n *notifier) doNotify(ctx context.Context, notification *Notification) err
 		}
 	}
 
+	return nil
+}
+
+func NoOpNotifier() Notifier {
+	return new(noOpNotifier)
+}
+
+func (n *noOpNotifier) Connect(identifier int64, client io.WriteCloser) {
+}
+
+func (n *noOpNotifier) Disconnect(identifier int64) {
+}
+
+func (n *noOpNotifier) Broadcast(ctx context.Context, message any) error {
+	return nil
+}
+
+func (n *noOpNotifier) Notify(ctx context.Context, message string, identifier int64) error {
 	return nil
 }

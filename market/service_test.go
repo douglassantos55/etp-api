@@ -3,6 +3,7 @@ package market_test
 import (
 	"api/company"
 	"api/market"
+	"api/notification"
 	"api/warehouse"
 	"context"
 	"testing"
@@ -12,7 +13,7 @@ func TestMarketService(t *testing.T) {
 	companySvc := company.NewService(company.NewFakeRepository())
 	warehouseSvc := warehouse.NewService(warehouse.NewFakeRepository())
 
-	service := market.NewService(market.NewFakeRepository(), companySvc, warehouseSvc)
+	service := market.NewService(market.NewFakeRepository(), companySvc, warehouseSvc, notification.NoOpNotifier())
 
 	ctx := context.Background()
 

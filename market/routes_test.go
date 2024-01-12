@@ -4,6 +4,7 @@ import (
 	"api/auth"
 	"api/company"
 	"api/market"
+	"api/notification"
 	"api/server"
 	"api/warehouse"
 	"encoding/json"
@@ -26,7 +27,7 @@ func TestMarketRoutes(t *testing.T) {
 	companySvc := company.NewService(company.NewFakeRepository())
 	warehouseSvc := warehouse.NewService(warehouse.NewFakeRepository())
 
-	service := market.NewService(market.NewFakeRepository(), companySvc, warehouseSvc)
+	service := market.NewService(market.NewFakeRepository(), companySvc, warehouseSvc, notification.NoOpNotifier())
 
 	market.CreateEndpoints(svr, service)
 

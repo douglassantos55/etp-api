@@ -2,6 +2,7 @@ package market
 
 import (
 	"api/company"
+	"api/notification"
 	"api/resource"
 	"api/server"
 	"api/warehouse"
@@ -46,11 +47,12 @@ type (
 		repository   Repository
 		companySvc   company.Service
 		warehouseSvc warehouse.Service
+		notifier     notification.Notifier
 	}
 )
 
-func NewService(repository Repository, companySvc company.Service, warehouseSvc warehouse.Service) Service {
-	return &service{repository, companySvc, warehouseSvc}
+func NewService(repository Repository, companySvc company.Service, warehouseSvc warehouse.Service, notifier notification.Notifier) Service {
+	return &service{repository, companySvc, warehouseSvc, notifier}
 }
 
 func (s *service) GetById(ctx context.Context, orderId uint64) (*Order, error) {
@@ -62,7 +64,23 @@ func (s *service) GetByResource(ctx context.Context, resourceId, quality uint64)
 }
 
 func (s *service) Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error) {
-	return s.repository.Purchase(ctx, purchase, companyId)
+	// TODO: return orders which were purchased
+	stockItem, err := s.repository.Purchase(ctx, purchase, companyId)
+	if err != nil {
+		return nil, err
+	}
+
+	event := notification.Event{
+		Type:    notification.OrderPurchased,
+		Payload: stockItem,
+	}
+
+	if err := s.notifier.Broadcast(ctx, event); err != nil {
+		// TODO: change for log
+		println(err.Error())
+	}
+
+	return stockItem, nil
 }
 
 func (s *service) PlaceOrder(ctx context.Context, order *Order) (*Order, error) {
@@ -95,7 +113,22 @@ func (s *service) PlaceOrder(ctx context.Context, order *Order) (*Order, error) 
 		return nil, server.NewBusinessRuleError("not enough cash to pay transport fee")
 	}
 
-	return s.repository.PlaceOrder(ctx, order, inventory)
+	newOrder, err := s.repository.PlaceOrder(ctx, order, inventory)
+	if err != nil {
+		return nil, err
+	}
+
+	event := notification.Event{
+		Type:    notification.OrderPlaced,
+		Payload: newOrder,
+	}
+
+	if err := s.notifier.Broadcast(ctx, event); err != nil {
+		// TODO: change for log
+		println(err.Error())
+	}
+
+	return newOrder, err
 }
 
 func (s *service) CancelOrder(ctx context.Context, order *Order) error {
@@ -115,5 +148,19 @@ func (s *service) CancelOrder(ctx context.Context, order *Order) error {
 		},
 	})
 
-	return s.repository.CancelOrder(ctx, order, inventory)
+	if err := s.repository.CancelOrder(ctx, order, inventory); err != nil {
+		return err
+	}
+
+	event := notification.Event{
+		Type:    notification.OrderCanceled,
+		Payload: order.Id,
+	}
+
+	if err := s.notifier.Broadcast(ctx, event); err != nil {
+		// TODO: change for log
+		println(err.Error())
+	}
+
+	return nil
 }
