@@ -20,7 +20,7 @@ type (
 		GetByResource(ctx context.Context, resourceId uint64, quality uint8) ([]*Order, error)
 		PlaceOrder(ctx context.Context, order *Order, inventory *warehouse.Inventory) (*Order, error)
 		CancelOrder(ctx context.Context, order *Order, inventory *warehouse.Inventory) error
-		Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error)
+		Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, []*Order, error)
 	}
 
 	goquRepository struct {
@@ -223,29 +223,34 @@ func (r *goquRepository) CancelOrder(ctx context.Context, order *Order, inventor
 	return tx.Commit()
 }
 
-func (r *goquRepository) Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error) {
+func (r *goquRepository) Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, []*Order, error) {
 	orders, err := r.GetByResource(ctx, purchase.ResourceId, purchase.Quality)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	tx, err := r.builder.BeginTx(ctx, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	defer tx.Rollback()
 
 	total := 0
 	remaining := purchase.Quantity
+
+	purchasedOrders := make([]*Order, 0)
 	purchasedItems := make([]*warehouse.StockItem, 0)
 
 	for _, order := range orders {
 		if order.Quantity >= remaining {
 			item, err := r.partialPurchase(tx, order, remaining, companyId)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
+
+			order.Quantity -= remaining
+			purchasedOrders = append(purchasedOrders, order)
 
 			remaining = 0
 			total += int(order.Price) * int(remaining)
@@ -258,43 +263,46 @@ func (r *goquRepository) Purchase(ctx context.Context, purchase *Purchase, compa
 
 			item, err := r.fullPurchase(tx, order, companyId)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			purchasedItems = append(purchasedItems, item)
+
+			order.Quantity = 0
+			purchasedOrders = append(purchasedOrders, order)
 		}
 	}
 
 	if remaining > 0 {
-		return nil, server.NewBusinessRuleError("not enough market orders")
+		return nil, nil, server.NewBusinessRuleError("not enough market orders")
 	}
 
 	company, err := r.companyRepo.GetById(ctx, companyId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if company.AvailableCash < total {
-		return nil, server.NewBusinessRuleError("not enough cash")
+		return nil, nil, server.NewBusinessRuleError("not enough cash")
 	}
 
 	inventory, err := r.warehouseRepo.FetchInventory(ctx, companyId)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	inventory.IncrementStock(purchasedItems)
 
 	dbTx := &database.DB{TxDatabase: tx}
 	if err := r.warehouseRepo.UpdateInventory(dbTx, inventory); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := tx.Commit(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return purchasedItems, nil
+	return purchasedItems, purchasedOrders, nil
 }
 
 func (r *goquRepository) fullPurchase(tx *goqu.TxDatabase, order *Order, companyId uint64) (*warehouse.StockItem, error) {

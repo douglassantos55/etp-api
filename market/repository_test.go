@@ -273,7 +273,7 @@ func TestMarketRepository(t *testing.T) {
 				Quality:    3,
 			}
 
-			_, err := repository.Purchase(ctx, purchase, 2)
+			_, _, err := repository.Purchase(ctx, purchase, 2)
 			expectedError := "not enough market orders"
 
 			if err.Error() != expectedError {
@@ -287,7 +287,7 @@ func TestMarketRepository(t *testing.T) {
 				Quality:    0,
 			}
 
-			_, err = repository.Purchase(ctx, purchase, 2)
+			_, _, err = repository.Purchase(ctx, purchase, 2)
 			if err.Error() != expectedError {
 				t.Errorf("expected error \"%s\", got \"%s\"", expectedError, err)
 			}
@@ -300,7 +300,7 @@ func TestMarketRepository(t *testing.T) {
 				Quality:    0,
 			}
 
-			_, err := repository.Purchase(ctx, purchase, 3)
+			_, _, err := repository.Purchase(ctx, purchase, 3)
 			expectedError := "not enough cash"
 
 			if err.Error() != expectedError {
@@ -315,7 +315,7 @@ func TestMarketRepository(t *testing.T) {
 				Quality:    1,
 			}
 
-			items, err := repository.Purchase(ctx, purchase, 2)
+			items, orders, err := repository.Purchase(ctx, purchase, 2)
 			if err != nil {
 				t.Fatalf("could not purchase order: %s", err)
 			}
@@ -324,8 +324,16 @@ func TestMarketRepository(t *testing.T) {
 				t.Errorf("expected 1 item, got %d", len(items))
 			}
 
+			if len(orders) != 1 {
+				t.Errorf("expected 1 order, got %d", len(orders))
+			}
+
 			if items[0].Qty != 500 {
 				t.Errorf("expected qty %d, got %d", 500, items[0].Qty)
+			}
+
+			if orders[0].Id != 2 {
+				t.Errorf("expected order %d, got %d", 2, orders[0].Id)
 			}
 
 			inventory, err := warehouseRepo.FetchInventory(ctx, 2)
@@ -379,13 +387,29 @@ func TestMarketRepository(t *testing.T) {
 				Quality:    0,
 			}
 
-			items, err := repository.Purchase(ctx, purchase, 2)
+			items, orders, err := repository.Purchase(ctx, purchase, 2)
 			if err != nil {
 				t.Fatalf("could not purchase order: %s", err)
 			}
 
 			if len(items) != 3 {
 				t.Errorf("expected 3 items, got %d", len(items))
+			}
+
+			if len(orders) != 3 {
+				t.Errorf("expected 3 orders, got %d", len(orders))
+			}
+
+			for _, order := range orders {
+				if order.Id != 3 && order.Id != 4 && order.Id != 5 {
+					t.Errorf("expected only orders 3, 4 and 5, got %d", order.Id)
+				}
+				if (order.Id == 3 || order.Id == 4) && order.Quantity != 0 {
+					t.Errorf("expected quantity %d, got %d", 0, order.Quantity)
+				}
+				if order.Id == 5 && order.Quantity != 1000 {
+					t.Errorf("expected quantity %d, got %d", 1000, order.Quantity)
+				}
 			}
 
 			inventory, err := warehouseRepo.FetchInventory(ctx, 2)

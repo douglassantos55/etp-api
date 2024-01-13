@@ -7,6 +7,7 @@ import (
 	"api/server"
 	"api/warehouse"
 	"context"
+	"log"
 	"time"
 )
 
@@ -48,11 +49,12 @@ type (
 		companySvc   company.Service
 		warehouseSvc warehouse.Service
 		notifier     notification.Notifier
+		logger       *log.Logger
 	}
 )
 
-func NewService(repository Repository, companySvc company.Service, warehouseSvc warehouse.Service, notifier notification.Notifier) Service {
-	return &service{repository, companySvc, warehouseSvc, notifier}
+func NewService(repository Repository, companySvc company.Service, warehouseSvc warehouse.Service, notifier notification.Notifier, logger *log.Logger) Service {
+	return &service{repository, companySvc, warehouseSvc, notifier, logger}
 }
 
 func (s *service) GetById(ctx context.Context, orderId uint64) (*Order, error) {
@@ -64,20 +66,18 @@ func (s *service) GetByResource(ctx context.Context, resourceId, quality uint64)
 }
 
 func (s *service) Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error) {
-	// TODO: return orders which were purchased
-	stockItem, err := s.repository.Purchase(ctx, purchase, companyId)
+	stockItem, orders, err := s.repository.Purchase(ctx, purchase, companyId)
 	if err != nil {
 		return nil, err
 	}
 
 	event := notification.Event{
 		Type:    notification.OrderPurchased,
-		Payload: stockItem,
+		Payload: orders,
 	}
 
 	if err := s.notifier.Broadcast(ctx, event); err != nil {
-		// TODO: change for log
-		println(err.Error())
+		s.logger.Printf("error broadcasting purchase event: %s", err)
 	}
 
 	return stockItem, nil
@@ -124,8 +124,7 @@ func (s *service) PlaceOrder(ctx context.Context, order *Order) (*Order, error) 
 	}
 
 	if err := s.notifier.Broadcast(ctx, event); err != nil {
-		// TODO: change for log
-		println(err.Error())
+		s.logger.Printf("error broadcasting order placed event: %s", err)
 	}
 
 	return newOrder, err
@@ -158,8 +157,7 @@ func (s *service) CancelOrder(ctx context.Context, order *Order) error {
 	}
 
 	if err := s.notifier.Broadcast(ctx, event); err != nil {
-		// TODO: change for log
-		println(err.Error())
+		s.logger.Printf("error broadcasting order canceled event: %s", err)
 	}
 
 	return nil

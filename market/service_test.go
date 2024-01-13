@@ -6,6 +6,7 @@ import (
 	"api/notification"
 	"api/warehouse"
 	"context"
+	"log"
 	"testing"
 )
 
@@ -13,7 +14,7 @@ func TestMarketService(t *testing.T) {
 	companySvc := company.NewService(company.NewFakeRepository())
 	warehouseSvc := warehouse.NewService(warehouse.NewFakeRepository())
 
-	service := market.NewService(market.NewFakeRepository(), companySvc, warehouseSvc, notification.NoOpNotifier())
+	service := market.NewService(market.NewFakeRepository(), companySvc, warehouseSvc, notification.NoOpNotifier(), log.Default())
 
 	ctx := context.Background()
 

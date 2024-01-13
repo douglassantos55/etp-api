@@ -78,14 +78,14 @@ func (r *fakeRepository) CancelOrder(ctx context.Context, order *Order, inventor
 	return nil
 }
 
-func (r *fakeRepository) Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, error) {
-
+func (r *fakeRepository) Purchase(ctx context.Context, purchase *Purchase, companyId uint64) ([]*warehouse.StockItem, []*Order, error) {
 	orders, err := r.GetByResource(ctx, purchase.ResourceId, purchase.Quality)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	remaining := purchase.Quantity
+	purchasedOrders := make([]*Order, 0)
 	items := make([]*warehouse.StockItem, 0)
 
 	for _, order := range orders {
@@ -100,6 +100,7 @@ func (r *fakeRepository) Purchase(ctx context.Context, purchase *Purchase, compa
 				},
 			})
 			remaining = 0
+			purchasedOrders = append(purchasedOrders, order)
 			break
 		} else {
 			remaining -= order.Quantity
@@ -112,12 +113,13 @@ func (r *fakeRepository) Purchase(ctx context.Context, purchase *Purchase, compa
 					ResourceId: order.ResourceId,
 				},
 			})
+			purchasedOrders = append(purchasedOrders, order)
 		}
 	}
 
 	if remaining > 0 {
-		return nil, server.NewBusinessRuleError("nope")
+		return nil, nil, server.NewBusinessRuleError("nope")
 	}
 
-	return items, nil
+	return items, purchasedOrders, nil
 }
