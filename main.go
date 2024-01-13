@@ -10,6 +10,7 @@ import (
 	"api/financing"
 	"api/financing/bonds"
 	"api/financing/loans"
+	"api/market"
 	"api/notification"
 	"api/research"
 	"api/resource"
@@ -17,6 +18,7 @@ import (
 	"api/server"
 	"api/warehouse"
 	"log"
+	"os"
 )
 
 func main() {
@@ -27,6 +29,12 @@ func main() {
 
 	svr := server.NewServer()
 	timer := scheduler.NewScheduler()
+
+	logFile, err := os.OpenFile("dev.log", os.O_CREATE|os.O_APPEND, 664)
+	logger := log.New(logFile, "[DEV]", log.Flags())
+
+	notificationRepo := notification.NewRepository(conn)
+	notifier := notification.NewNotifier(notificationRepo)
 
 	resourceRepo := resource.NewRepository(conn)
 	resourceSvc := resource.NewService(resourceRepo)
@@ -55,6 +63,10 @@ func main() {
 	company.CreateEndpoints(svr, companySvc)
 	production.CreateEndpoints(svr, scheduledProductionSvc, scheduledBuildingSvc, companySvc)
 
+	marketRepo := market.NewRepository(conn, companyRepo, warehouseRepo, accountingRepo)
+	marketSvc := market.NewService(marketRepo, companySvc, warehouseSvc, notifier, logger)
+	market.CreateEndpoints(svr, marketSvc)
+
 	financingSvc := financing.NewService(financing.NewRepository(conn))
 	financingGroup := financing.CreateEndpoints(svr, financingSvc, companySvc)
 
@@ -68,8 +80,6 @@ func main() {
 	scheduledBondsSvc := bonds.NewScheduledService(bondsSvc, timer)
 	bonds.CreateEndpoints(financingGroup, scheduledBondsSvc)
 
-	notificationRepo := notification.NewRepository(conn)
-	notifier := notification.NewNotifier(notificationRepo)
 	notificationSvc := notification.NewService(notificationRepo)
 	notification.CreateEndpoints(svr, notificationSvc, notifier)
 
