@@ -2,14 +2,16 @@ package financing_test
 
 import (
 	"api/financing"
+	"api/notification"
 	"context"
 	"fmt"
+	"log"
 	"testing"
 	"time"
 )
 
 func TestFinancingService(t *testing.T) {
-	service := financing.NewService(financing.NewFakeRepository())
+	service := financing.NewService(financing.NewFakeRepository(), notification.NoOpNotifier(), log.Default())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

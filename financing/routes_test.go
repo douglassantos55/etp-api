@@ -4,8 +4,10 @@ import (
 	"api/auth"
 	"api/company"
 	"api/financing"
+	"api/notification"
 	"api/server"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,7 +21,7 @@ func TestFinancingRoutes(t *testing.T) {
 		t.Fatalf("could not generate jwt token: %s", err)
 	}
 
-	svc := financing.NewService(financing.NewFakeRepository())
+	svc := financing.NewService(financing.NewFakeRepository(), notification.NoOpNotifier(), log.Default())
 
 	companyRepo := company.NewFakeRepository()
 	companySvc := company.NewService(companyRepo)

@@ -2,7 +2,9 @@ package financing
 
 import (
 	"api/accounting"
+	"api/notification"
 	"context"
+	"log"
 	"time"
 )
 
@@ -22,13 +24,15 @@ type (
 
 	service struct {
 		repository Repository
+		notifier   notification.Notifier
+		logger     *log.Logger
 	}
 )
 
 const Day = 24 * time.Hour
 
-func NewService(repository Repository) Service {
-	return &service{repository}
+func NewService(repository Repository, notifier notification.Notifier, logger *log.Logger) Service {
+	return &service{repository, notifier, logger}
 }
 
 func (s *service) GetEffectiveRates(ctx context.Context) (*Rates, error) {
@@ -56,6 +60,15 @@ func (s *service) CalculateRates(ctx context.Context) (*Rates, error) {
 
 	if err := s.repository.SaveRates(ctx, end, rates); err != nil {
 		return nil, err
+	}
+
+	event := &notification.Event{
+		Type:    notification.FinancingRatesUpdated,
+		Payload: rates,
+	}
+
+	if err := s.notifier.Broadcast(ctx, event); err != nil {
+		s.logger.Printf("error broadcasting rates updated event: %s", err)
 	}
 
 	return rates, err

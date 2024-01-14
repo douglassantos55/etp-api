@@ -8,16 +8,20 @@ import (
 	"time"
 )
 
+type EventType string
+
 const (
-	OrderPlaced    = "order_placed"
-	OrderPurchased = "order_purchased"
-	OrderCanceled  = "order_canceled"
+	OrderPlaced    EventType = "order_placed"
+	OrderPurchased           = "order_purchased"
+	OrderCanceled            = "order_canceled"
+
+	FinancingRatesUpdated = "financing_rates_updated"
 )
 
 type (
 	Event struct {
-		Type    string `json:"type"`
-		Payload any    `json:"payload"`
+		Type    EventType `json:"type"`
+		Payload any       `json:"payload"`
 	}
 
 	Notifier interface {
