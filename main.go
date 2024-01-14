@@ -13,6 +13,7 @@ import (
 	"api/market"
 	"api/notification"
 	"api/research"
+	"api/research/staff"
 	"api/resource"
 	"api/scheduler"
 	"api/server"
@@ -63,20 +64,24 @@ func main() {
 	company.CreateEndpoints(svr, companySvc)
 	production.CreateEndpoints(svr, scheduledProductionSvc, scheduledBuildingSvc, companySvc)
 
+	staffRepo := staff.NewRepository(conn, accountingRepo)
+	staffSvc := staff.NewService(staffRepo, timer, notifier, logger)
+	staff.CreateEndpoints(svr, staffSvc)
+
 	marketRepo := market.NewRepository(conn, companyRepo, warehouseRepo, accountingRepo)
 	marketSvc := market.NewService(marketRepo, companySvc, warehouseSvc, notifier, logger)
 	market.CreateEndpoints(svr, marketSvc)
 
-	financingSvc := financing.NewService(financing.NewRepository(conn))
+	financingSvc := financing.NewService(financing.NewRepository(conn), notifier, logger)
 	financingGroup := financing.CreateEndpoints(svr, financingSvc, companySvc)
 
 	loansRepo := loans.NewRepository(conn, accountingRepo)
-	loansSvc := loans.NewService(loansRepo, companySvc, financingSvc)
+	loansSvc := loans.NewService(loansRepo, companySvc, financingSvc, notifier, logger)
 	scheduledLoansSvc := loans.NewScheduledService(loansSvc, timer)
 	loans.CreateEndpoints(financingGroup, scheduledLoansSvc)
 
 	bondsRepo := bonds.NewRepository(conn, accountingRepo)
-	bondsSvc := bonds.NewService(bondsRepo, companySvc)
+	bondsSvc := bonds.NewService(bondsRepo, companySvc, notifier, logger)
 	scheduledBondsSvc := bonds.NewScheduledService(bondsSvc, timer)
 	bonds.CreateEndpoints(financingGroup, scheduledBondsSvc)
 
