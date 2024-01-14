@@ -3,7 +3,9 @@ package bonds_test
 import (
 	"api/company"
 	"api/financing/bonds"
+	"api/notification"
 	"context"
+	"log"
 	"testing"
 	"time"
 )
@@ -11,7 +13,7 @@ import (
 func TestBondService(t *testing.T) {
 	companyRepo := company.NewFakeRepository()
 	companySvc := company.NewService(companyRepo)
-	service := bonds.NewService(bonds.NewFakeRepository(companyRepo), companySvc)
+	service := bonds.NewService(bonds.NewFakeRepository(companyRepo), companySvc, notification.NoOpNotifier(), log.Default())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -29,25 +31,26 @@ func TestBondService(t *testing.T) {
 
 	t.Run("PayBondInterest", func(t *testing.T) {
 		t.Run("should skip if not enough cash", func(t *testing.T) {
-			company, err := companyRepo.GetById(ctx, 1)
+			issuer, err := companyRepo.GetById(ctx, 1)
 			if err != nil {
 				t.Fatalf("could not get company: %s", err)
 			}
 
-			initialCash := company.AvailableCash
+			initialCash := issuer.AvailableCash
 
 			err = service.PayBondInterest(ctx, &bonds.Creditor{
 				InterestRate:  0.1,
 				Principal:     500_000_00,
 				PrincipalPaid: 100_000_00,
+				Company:       &company.Company{Name: "Bar"},
 			}, &bonds.Bond{CompanyId: 1})
 
 			if err != nil {
 				t.Fatalf("could not pay interest: %s", err)
 			}
 
-			if company.AvailableCash != initialCash {
-				t.Errorf("expected cash %d, got %d", initialCash, company.AvailableCash)
+			if issuer.AvailableCash != initialCash {
+				t.Errorf("expected cash %d, got %d", initialCash, issuer.AvailableCash)
 			}
 		})
 

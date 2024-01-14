@@ -2,9 +2,11 @@ package bonds
 
 import (
 	"api/company"
+	"api/notification"
 	"api/server"
 	"context"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -51,6 +53,9 @@ type (
 	service struct {
 		repository Repository
 		companySvc company.Service
+
+		notifier notification.Notifier
+		logger   *log.Logger
 	}
 )
 
@@ -71,8 +76,13 @@ func (c *Creditor) GetInterest() int64 {
 	return int64(c.InterestRate * float64(c.GetPrincipal()))
 }
 
-func NewService(repository Repository, companySvc company.Service) Service {
-	return &service{repository, companySvc}
+func NewService(
+	repository Repository,
+	companySvc company.Service,
+	notifier notification.Notifier,
+	logger *log.Logger,
+) Service {
+	return &service{repository, companySvc, notifier, logger}
 }
 
 func (s *service) GetBonds(ctx context.Context, page, limit uint) ([]*Bond, error) {
@@ -113,13 +123,20 @@ func (s *service) PayBondInterest(ctx context.Context, creditor *Creditor, bond 
 	}
 
 	if emissor.AvailableCash < int(creditor.GetInterest()) {
-		// TODO: notify creditor that there was no payment
+		issuerMessage := fmt.Sprintf("Bond interest payment for %s missed due to insufficient cash", creditor.Name)
+		if err := s.notifier.Notify(ctx, issuerMessage, int64(emissor.Id)); err != nil {
+			s.logger.Printf("Error notifying issuer of bond interest payment missed: %s\n", err)
+		}
+
+		creditorMessage := fmt.Sprintf("Bond interest payment from %s missed", emissor.Name)
+		if err := s.notifier.Notify(ctx, creditorMessage, int64(creditor.Id)); err != nil {
+			s.logger.Printf("Error notifying creditor of bond interest payment missed: %s\n", err)
+		}
+
 	} else {
-		err = s.repository.PayBondInterest(ctx, bond, creditor)
-		if err != nil {
+		if err := s.repository.PayBondInterest(ctx, bond, creditor); err != nil {
 			return err
 		}
-		// TODO: notify creditor that payment was executed
 	}
 
 	return nil

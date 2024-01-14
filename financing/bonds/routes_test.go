@@ -4,8 +4,10 @@ import (
 	"api/auth"
 	"api/company"
 	"api/financing/bonds"
+	"api/notification"
 	"api/server"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -22,7 +24,7 @@ func TestBondRoutes(t *testing.T) {
 
 	companyRepo := company.NewFakeRepository()
 	companySvc := company.NewService(companyRepo)
-	svc := bonds.NewService(bonds.NewFakeRepository(companyRepo), companySvc)
+	svc := bonds.NewService(bonds.NewFakeRepository(companyRepo), companySvc, notification.NoOpNotifier(), log.Default())
 
 	svr := server.NewServer()
 	group := svr.Group("/financing")
