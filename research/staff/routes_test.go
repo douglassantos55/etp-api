@@ -2,10 +2,12 @@ package staff_test
 
 import (
 	"api/auth"
+	"api/notification"
 	"api/research/staff"
 	"api/scheduler"
 	"api/server"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,7 +19,7 @@ func TestResearchRoutes(t *testing.T) {
 	t.Setenv(server.JWT_SECRET_KEY, "secret")
 
 	svr := server.NewServer()
-	svc := staff.NewService(staff.NewFakeRepository(), scheduler.NewScheduler())
+	svc := staff.NewService(staff.NewFakeRepository(), scheduler.NewScheduler(), notification.NoOpNotifier(), log.Default())
 
 	staff.CreateEndpoints(svr, svc)
 	token, err := auth.GenerateToken(1, "secret")

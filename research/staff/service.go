@@ -1,9 +1,12 @@
 package staff
 
 import (
+	"api/notification"
 	"api/scheduler"
 	"api/server"
 	"context"
+	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"time"
@@ -81,11 +84,18 @@ type (
 	service struct {
 		repository Repository
 		timer      *scheduler.Scheduler
+		notifier   notification.Notifier
+		logger     *log.Logger
 	}
 )
 
-func NewService(repository Repository, timer *scheduler.Scheduler) Service {
-	return &service{repository, timer}
+func NewService(
+	repository Repository,
+	timer *scheduler.Scheduler,
+	notifier notification.Notifier,
+	logger *log.Logger,
+) Service {
+	return &service{repository, timer, notifier, logger}
 }
 
 func (s *service) FindGraduate(ctx context.Context, companyId uint64) (*Search, error) {
@@ -103,9 +113,12 @@ func (s *service) FindGraduate(ctx context.Context, companyId uint64) (*Search, 
 			return err
 		}
 
-		_, err := s.GetGraduate(ctx, companyId)
+		graduate, err := s.GetGraduate(ctx, companyId)
 
-		// TODO: send a message to the socket
+		message := fmt.Sprintf("%s is available for hire", graduate.Name)
+		if err := s.notifier.Notify(ctx, message, int64(companyId)); err != nil {
+			s.logger.Printf("Error notifying graduate available for hire: %s\n", err)
+		}
 
 		return err
 
@@ -149,9 +162,12 @@ func (s *service) FindExperienced(ctx context.Context, companyId uint64) (*Searc
 			return err
 		}
 
-		_, err := s.GetExperienced(ctx, companyId)
+		candidate, err := s.GetExperienced(ctx, companyId)
 
-		// TODO: send a message to the socket
+		message := fmt.Sprintf("%s is available for hire", candidate.Name)
+		if err := s.notifier.Notify(ctx, message, int64(companyId)); err != nil {
+			s.logger.Printf("Error notifying experienced available for hire: %s\n", err)
+		}
 
 		return err
 	})
@@ -191,8 +207,7 @@ func (s *service) HireStaff(ctx context.Context, staffId, companyId uint64) (*St
 		return nil, ErrStaffNotFound
 	}
 
-	// If hiring experienced, update the salary and clean up poaching
-	// fields
+	// If hiring experienced, update the salary and clean up poaching fields
 	if staff.Poacher != nil {
 		staff.Salary = staff.Offer
 		staff.Employer = *staff.Poacher
@@ -229,7 +244,10 @@ func (s *service) MakeOffer(ctx context.Context, offer, staffId, companyId uint6
 		return nil, err
 	}
 
-	// TODO: send message on socket notifying current employer
+	message := fmt.Sprintf("%s received an offer of $ %.2f", staff.Name, float64(staff.Offer)/100)
+	if err := s.notifier.Notify(ctx, message, int64(companyId)); err != nil {
+		s.logger.Printf("Error notifying offer: %s\n", err)
+	}
 
 	s.timer.Add(staffId, 48*time.Hour, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -256,7 +274,9 @@ func (s *service) IncreaseSalary(ctx context.Context, salary, staffId, companyId
 		return nil, server.NewBusinessRuleError("new salary must be higher than current salary")
 	}
 
+	var hasPoacher bool
 	if staff.Poacher != nil {
+		hasPoacher = true
 		if salary <= staff.Offer {
 			return nil, server.NewBusinessRuleError("new salary must be higher than current offer")
 		}
@@ -269,8 +289,12 @@ func (s *service) IncreaseSalary(ctx context.Context, salary, staffId, companyId
 		return nil, err
 	}
 
-	// TODO: send message on socket notifying the poaching company, if that's
-	// the case
+	if hasPoacher {
+		message := fmt.Sprintf("%s has declined your offer", staff.Name)
+		if err := s.notifier.Notify(ctx, message, int64(companyId)); err != nil {
+			s.logger.Printf("Error notifying offer declined: %s\n", err)
+		}
+	}
 
 	return staff, nil
 }

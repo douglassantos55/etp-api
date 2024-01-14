@@ -1,9 +1,11 @@
 package staff_test
 
 import (
+	"api/notification"
 	"api/research/staff"
 	"api/scheduler"
 	"context"
+	"log"
 	"testing"
 	"time"
 )
@@ -14,7 +16,7 @@ func TestResearchService(t *testing.T) {
 
 	repository := staff.NewFakeRepository()
 	timer := scheduler.NewScheduler()
-	service := staff.NewService(repository, timer)
+	service := staff.NewService(repository, timer, notification.NoOpNotifier(), log.Default())
 
 	t.Run("GetGraduate", func(t *testing.T) {
 		employee, err := service.GetGraduate(ctx, 1)
