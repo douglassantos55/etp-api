@@ -3,9 +3,11 @@ package loans
 import (
 	"api/company"
 	"api/financing"
+	"api/notification"
 	"api/server"
 	"context"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -43,6 +45,9 @@ type (
 		repository   Repository
 		companySvc   company.Service
 		financingSvc financing.Service
+
+		notifier notification.Notifier
+		logger   *log.Logger
 	}
 )
 
@@ -54,8 +59,20 @@ func (l *Loan) GetInterest() int64 {
 	return int64(float64(l.GetPrincipal()) * l.InterestRate)
 }
 
-func NewService(repository Repository, companySvc company.Service, financingSvc financing.Service) Service {
-	return &service{repository, companySvc, financingSvc}
+func NewService(
+	repository Repository,
+	companySvc company.Service,
+	financingSvc financing.Service,
+	notifier notification.Notifier,
+	logger *log.Logger,
+) Service {
+	return &service{
+		repository:   repository,
+		companySvc:   companySvc,
+		financingSvc: financingSvc,
+		notifier:     notifier,
+		logger:       logger,
+	}
 }
 
 func (s *service) GetLoans(ctx context.Context, companyId int64) ([]*Loan, error) {
@@ -138,7 +155,15 @@ func (s *service) PayLoanInterest(ctx context.Context, loanId, companyId int64) 
 			return true, err
 		}
 
-		// TODO: notify company
+		message := "Loan interest payment missed due to insuffient cash."
+		if loan.DelayedPayments-MAX_DELAYED_PAYMENTS == 1 {
+			message += " Missing the next payment will incur seizing of terrains to cover principal."
+		}
+
+		if err := s.notifier.Notify(ctx, message, companyId); err != nil {
+			s.logger.Printf("error notifying failure of pay loan interest: %s", err)
+		}
+
 		return true, nil
 	}
 
@@ -163,6 +188,10 @@ func (s *service) forcePayment(ctx context.Context, loan *Loan, company *company
 		return err
 	}
 
-	// TODO: notify company about the whole thing
+	message := fmt.Sprintf("%d terrains were seized as payment for the $ %.2f loan.", len(terrains), float64(principal)/100)
+	if err := s.notifier.Notify(ctx, message, int64(company.Id)); err != nil {
+		s.logger.Printf("error notifying terrains claimed: %s", err)
+	}
+
 	return nil
 }

@@ -4,9 +4,11 @@ import (
 	"api/company"
 	"api/financing"
 	"api/financing/loans"
+	"api/notification"
 	"api/scheduler"
 	"context"
 	"fmt"
+	"log"
 	"testing"
 	"time"
 )
@@ -14,8 +16,12 @@ import (
 func TestLoansService(t *testing.T) {
 	companyRepo := company.NewFakeRepository()
 	companySvc := company.NewService(companyRepo)
-	financingSvc := financing.NewService(financing.NewFakeRepository())
-	service := loans.NewService(loans.NewFakeRepository(companyRepo), companySvc, financingSvc)
+
+	logger := log.Default()
+	notifier := notification.NoOpNotifier()
+
+	financingSvc := financing.NewService(financing.NewFakeRepository(), notifier, logger)
+	service := loans.NewService(loans.NewFakeRepository(companyRepo), companySvc, financingSvc, notifier, logger)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
