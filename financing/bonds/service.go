@@ -204,5 +204,15 @@ func (s *service) BuyBackBond(ctx context.Context, amount, bondId, creditorId, c
 		return nil, ErrNotEnoughCash
 	}
 
-	return s.repository.BuyBackBond(ctx, amount, creditor, bond)
+	creditor, err = s.repository.BuyBackBond(ctx, amount, creditor, bond)
+	if err != nil {
+		return nil, err
+	}
+
+	message := fmt.Sprintf("%s bought back %.2f in bonds", creditor.Name, float64(amount)/100)
+	if err := s.notifier.Notify(ctx, message, companyId); err != nil {
+		s.logger.Printf("Error notifying bond buy back: %s\n", err)
+	}
+
+	return creditor, nil
 }
