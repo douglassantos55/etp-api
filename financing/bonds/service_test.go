@@ -105,7 +105,7 @@ func TestBondService(t *testing.T) {
 			}
 		})
 
-		t.Run("should buy back from creditor that does not exist", func(t *testing.T) {
+		t.Run("should not buy back from creditor that does not exist", func(t *testing.T) {
 			_, err := service.BuyBackBond(ctx, 500_000_00, 1, 3, 1)
 			if err != bonds.ErrCreditorNotFound {
 				t.Errorf("expected error \"%s\", got \"%s\"", bonds.ErrCreditorNotFound, err)
