@@ -203,6 +203,8 @@ func (s *service) HireStaff(ctx context.Context, staffId, companyId uint64) (*St
 		return nil, err
 	}
 
+	currentEmployer := staff.Employer
+
 	if (staff.Poacher != nil && *staff.Poacher != companyId) || (staff.Poacher == nil && staff.Employer != companyId) {
 		return nil, ErrStaffNotFound
 	}
@@ -219,6 +221,16 @@ func (s *service) HireStaff(ctx context.Context, staffId, companyId uint64) (*St
 	staff.Status = HIRED
 	if err := s.repository.UpdateStaff(ctx, staff); err != nil {
 		return nil, err
+	}
+
+	message := fmt.Sprintf("%s accepted your offer", staff.Name)
+	if err := s.notifier.Notify(ctx, message, int64(companyId)); err != nil {
+		s.logger.Printf("Error notifying poacher of offer accepted: %s\n", err)
+	}
+
+	message = fmt.Sprintf("%s accepted the offer and no longer works for us", staff.Name)
+	if err := s.notifier.Notify(ctx, message, int64(currentEmployer)); err != nil {
+		s.logger.Printf("Error notifying employer of offer accepted: %s\n", err)
 	}
 
 	return staff, nil
